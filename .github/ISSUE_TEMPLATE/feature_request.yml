@@ -1,0 +1,30 @@
+name: Feature request
+description: Suggest an improvement within PromptCraft's product boundaries
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Describe the user problem instead of only the proposed interface.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: tradeoffs
+    attributes:
+      label: Risks and tradeoffs
+      description: Consider privacy, cost, compatibility, and scope.
+  - type: checkboxes
+    id: boundary
+    attributes:
+      label: Product boundary
+      options:
+        - label: I understand V1 does not automate target websites, perform OCR, or provide cloud synchronization.
+          required: true

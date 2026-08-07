@@ -1,0 +1,14 @@
+# Optional mirror for contributors who cannot reliably access crates.io.
+# Copy this file to config.toml only when the mirror is needed.
+
+[source.crates-io]
+replace-with = "rsproxy-sparse"
+
+[source.rsproxy-sparse]
+registry = "sparse+https://rsproxy.cn/index/"
+
+[net]
+retry = 2
+
+[http]
+timeout = 60

@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Private security report
+    url: https://github.com/wewe29/ai-prompt-enhancer/security/advisories/new
+    about: Report vulnerabilities privately. Never post secrets in a public issue.

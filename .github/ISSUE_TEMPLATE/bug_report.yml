@@ -1,0 +1,63 @@
+name: Bug report
+description: Report a reproducible PromptCraft problem
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include API keys, passwords, personal information, company source code, or private documents.
+  - type: input
+    id: version
+    attributes:
+      label: PromptCraft version
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: Windows 11 24H2
+    validations:
+      required: true
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Where did the problem occur?
+      options:
+        - API configuration
+        - Prompt enhancement
+        - Streaming or cancellation
+        - Attachments
+        - History or import/export
+        - Copy and open
+        - Startup or packaging
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Use sample or redacted data only.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and error message
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Sensitive data check
+      options:
+        - label: I removed all secrets and private data from this report.
+          required: true
