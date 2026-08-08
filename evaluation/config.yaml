@@ -1,0 +1,120 @@
+# PromptCraft 评测脚本配置
+# 说明：
+# - API Key 读取优先级由 key_source 控制：keyring（读取 PromptCraft 已存的 Key）→ env → config
+# - targets 的 selectors 为各网页版站点的 DOM 选择器，站点改版时可在此调整
+# - 可运行 `python run_eval.py --login` 打开浏览器手动登录后，再用 `python run_eval.py` 全量评测
+
+enhancer:
+  base_url: https://api.deepseek.com   # DeepSeek 兼容 OpenAI API 地址
+  model: deepseek-chat                 # 增强器模型（可切换 deepseek-v4-flash）
+  verbosity: standard                  # concise | standard | deep | custom
+  custom_instructions: ""              # 自定义增强要求（可选）
+  temperature: 0.35                    # 与 PromptCraft 后端一致
+
+key_source: keyring                    # keyring | env | config
+# api_key: ""                          # 仅当 key_source=config 时填写（请勿提交到版本库）
+
+browser:
+  mode: playwright                     # playwright（持久浏览器+登录态）| cdp（连接已启动的浏览器:9222）
+  channel: msedge                      # 用哪个浏览器：msedge=系统Edge（推荐）| chrome=系统Chrome | chromium=Playwright自带
+  cdp_url: http://localhost:9222
+  headless: false                      # 网页版建议有头模式（部分站点无头环境可能触发风控）
+  slow_input_chars: 200                # 慢速输入每批字符数
+  input_delay_ms: 30                   # 慢速输入每字符延迟（毫秒）
+
+targets:
+  deepseek_web:
+    enabled: true
+    mode: web
+    url: https://chat.deepseek.com/
+    timeout: 30                   # 生成超时等待（秒），超时后兜底返回已生成的部分内容
+    stabilize_seconds: 6          # 输出文本连续 N 秒不变视为完成（需小于 timeout）
+    wait_strategy: stop_button    # stop_button | stabilize（统一判定逻辑下主要作为参考）
+    selectors:
+      input: ["#chat-input", "textarea", "[contenteditable='true']"]
+      send: ""                    # 留空 = 按回车发送
+      stop: ["div[class*='stop']", "button[class*='stop']", ".ds-icon-button"]
+      output_selector: [".ds-markdown", "div[class*='markdown']", "div[class*='message-content']"]
+      new_chat: ["button:has-text('新对话')", "div[class*='new-chat']"]
+      include_code: true
+
+  doubao:
+    enabled: true
+    mode: web
+    url: https://www.doubao.com/chat/
+    timeout: 30                   # 生成超时等待（秒）
+    stabilize_seconds: 6          # 豆包停止按钮选择器不可靠，主要依赖文本稳定判定
+    wait_strategy: stabilize
+    selectors:
+      input: ["textarea.semi-input-textarea", "textarea[placeholder*='发消息']", "textarea", "div[contenteditable='true']"]
+      send: ""                    # 留空 = 按回车发送
+      stop: ["div[class*='stop']", "button[class*='stop']"]
+      output_selector: [
+        "[class*='v_list_row']",
+        "div[class*='message-list']",
+        "[class*='message'] [class*='content']",
+        "[class*='message'] [class*='markdown']",
+        "[class*='answer']",
+        "[class*='chat'] [class*='message']",
+        "div[class*='message']:last-of-type",
+        "[class*='markdown']"
+      ]
+      new_chat: ["div[class*='new-chat']", "button:has-text('新对话')"]
+      include_code: true
+
+  qwen:
+    enabled: true
+    mode: web
+    url: https://www.qianwen.com/     # 原 tongyi.aliyun.com/qianwen/ 已重定向到 qianwen.com
+    timeout: 45                   # 生成超时等待（秒）
+    stabilize_seconds: 6
+    wait_strategy: stop_button
+    selectors:
+      input: ["[class*='whitespace-pre-wrap'][contenteditable='true']", "div[contenteditable='true']", "textarea", "#chat-input"]
+      send: ""                    # 留空=回车发送；千问回车不发送时脚本会自动点击发送图标兜底
+      stop: ["div[class*='stop']", "button[class*='stop']"]
+      output_selector: [
+        "[class*='markdown']",
+        "div[class*='answer']",
+        "div[class*='message']:last-of-type",
+        "main [class*='whitespace-pre-wrap']",
+        "main"
+      ]
+      new_chat: ["button:has-text('新建对话')", "div:has-text('新建对话')"]
+      include_code: true
+
+  minimax:
+    enabled: false                # 注：chat.minimaxi.com 已重定向到 MiniMax Agent（agent.minimaxi.com），需确认新聊天地址后再启用
+    mode: web
+    url: https://chat.minimaxi.com/
+    timeout: 30                   # 生成超时等待（秒）
+    stabilize_seconds: 6
+    wait_strategy: stabilize
+    selectors:
+      input: ["textarea", "div[contenteditable='true']"]
+      send: ["button[class*='send']", "div[class*='send']"]
+      stop: ["button[class*='stop']", "div[class*='stop']"]
+      output_selector: ["div[class*='markdown']", "div[class*='message']:last-of-type"]
+      new_chat: ["button:has-text('新对话')"]
+      include_code: true
+
+  # 备用：直接把提示词发给 OpenAI 兼容 API（无网页访问时使用，需 base_url/model/api_key）
+  # custom_api:
+  #   enabled: false
+  #   mode: api
+  #   base_url: https://api.deepseek.com
+  #   model: deepseek-chat
+  #   temperature: 0.7
+
+judge:
+  model: deepseek-chat
+  temperature: 0
+  randomize_order: true               # 随机互换 A/B 消除位置偏差
+  cross_check: false                  # 每条独立再评一次交叉验证（增加成本）
+
+samples: samples/samples.yaml
+
+run:
+  delay_between: 2.0                  # 秒，网页请求间隔（避免限流）
+  max_cost_usd: 2.0                   # 增强+裁判的 API 预算保护
+  retry_seconds: 60                   # 限流后等待重试的秒数
