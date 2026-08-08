@@ -202,7 +202,7 @@ fn build_body(request: &EnhancementRequest) -> Value {
     let user_message = format!(
         "系统提示词版本：{SYSTEM_PROMPT_VERSION}\n目标模型：{}\n详细程度：{}\n自定义详细要求：{}\n澄清轮次：{}/3\n用户偏好摘要：\n{}\n\n原始提示词：\n{}\n\n上下文：\n{}\n\n本轮澄清回答：\n{}\n\n附件参考资料：\n{}",
         request.target_model,
-        request.verbosity,
+        verbosity_label(&request.verbosity),
         request.custom_instructions.as_deref().unwrap_or("无"),
         request.clarification_round,
         request.profile_summary.join("\n"),
@@ -222,6 +222,15 @@ fn build_body(request: &EnhancementRequest) -> Value {
         "stream_options": {"include_usage": true},
         "response_format": {"type": "json_object"}
     })
+}
+
+fn verbosity_label(verbosity: &str) -> &str {
+    match verbosity {
+        "concise" => "简洁（只补充必要信息）",
+        "deep" => "深入（允许较完整的背景与边界说明）",
+        "custom" => "自定义",
+        _ => "标准（适度补充）",
+    }
 }
 
 fn parse_result(raw: &str) -> Result<EnhancementResult, String> {
@@ -335,7 +344,7 @@ mod tests {
             content: "内容".into(), operation: "insert".into(), anchor: String::new(), applied: false,
         };
         let mut result = EnhancementResult {
-            status: "ready".into(), primary_prompt: "有效提示词".into(), assumptions: Vec::new(),
+            status: "ready".into(), task_type: "other".into(), primary_prompt: "有效提示词".into(), assumptions: Vec::new(),
             questions: Vec::new(), changes: Vec::new(),
             suggestions: (0..5).map(|index| crate::models::Suggestion { id: format!("s{index}"), ..suggestion.clone() }).collect(),
             risk_flags: Vec::new(),

@@ -31,6 +31,8 @@ pub struct ClarificationAnswer {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnhancementResult {
     pub status: String,
+    #[serde(default)]
+    pub task_type: String,
     pub primary_prompt: String,
     #[serde(default)]
     pub assumptions: Vec<Assumption>,
