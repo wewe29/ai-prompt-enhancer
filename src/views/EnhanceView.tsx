@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { copyText, targetModels } from "../lib";
 import { preflight } from "../preflight";
-import type { Attachment, EnhancementResult, EnhancementState, ProviderConfig, UsageRecord, Verbosity } from "../types";
+import type { Attachment, EnhancementResult, EnhancementState, ProviderConfig, Suggestion, UsageRecord, Verbosity } from "../types";
 import { StatusBadge } from "../components/StatusBadge";
 
 const detailLabels: Record<Verbosity, string> = { concise: "简洁", standard: "标准", deep: "深入", custom: "自定义" };
@@ -53,6 +53,9 @@ export interface EnhanceViewProps {
   submitClarification: () => void;
   changeState: (id: string, nextState: "accepted" | "rejected") => void;
   setSelectedSuggestion: Dispatch<SetStateAction<string | null>>;
+  showSecurity: boolean;
+  setShowSecurity: (v: boolean) => void;
+  selectedSuggestionData: Suggestion | null;
 }
 
 export function EnhanceView(props: EnhanceViewProps) {
@@ -62,6 +65,7 @@ export function EnhanceView(props: EnhanceViewProps) {
     original, setOriginal, context, setContext, totalChars, attachments, setAttachments, addAttachments,
     output, commitOutput, undo, redo, undoStack, redoStack, result, setResult, usage, handleCopyOpen,
     currentTarget, clarificationRound, answers, setAnswers, submitClarification, changeState, setSelectedSuggestion,
+    showSecurity, setShowSecurity, selectedSuggestionData,
   } = props;
   const [preflightDismissed, setPreflightDismissed] = useState(false);
   const findings = useMemo(() => preflight(original, context.length > 0), [original, context]);
@@ -73,7 +77,7 @@ export function EnhanceView(props: EnhanceViewProps) {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.ctrlKey && event.key === "Enter") {
         event.preventDefault();
-        if (state === "streaming" || document.querySelector(".modal-backdrop")) return;
+        if (state === "streaming" || showSecurity) return;
         runEnhance();
         return;
       }
@@ -91,15 +95,14 @@ export function EnhanceView(props: EnhanceViewProps) {
         return;
       }
       if (event.key === "Escape") {
-        const backdrop = document.querySelector(".modal-backdrop");
-        if (backdrop) { (backdrop.querySelector(".secondary") as HTMLElement | null)?.click(); return; }
+        if (showSecurity) { setShowSecurity(false); return; }
+        if (selectedSuggestionData) { setSelectedSuggestion(null); return; }
         if (error) { setError(""); return; }
-        setSelectedSuggestion(null);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [state, error, runEnhance, undo, redo, setError, setSelectedSuggestion]);
+  }, [state, error, showSecurity, selectedSuggestionData, runEnhance, undo, redo, setError, setSelectedSuggestion, setShowSecurity]);
   return <main className="workspace">
     <header className="topbar">
       <div><h1>提示词增强</h1><p>保留原意，只补充真正影响结果的信息</p></div>
