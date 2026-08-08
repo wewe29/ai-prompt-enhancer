@@ -25,6 +25,7 @@ const defaultProvider: ProviderConfig = {
   v4FlashModelId: "deepseek-v4-flash",
   inputPrice: 0.001,
   outputPrice: 0.002,
+  models: ["deepseek-chat"],
 };
 
 function localFindings(text: string): string[] {
@@ -74,7 +75,11 @@ export default function App() {
   const generationRef = useRef(0);
 
   useEffect(() => {
-    getProviderConfig().then((config) => { setProvider(config); setModel(config.defaultModel); }).catch(() => undefined);
+    getProviderConfig().then((config) => {
+      setProvider(config);
+      const models = config.models.length ? config.models : ["deepseek-chat"];
+      setModel(models.includes(config.defaultModel) ? config.defaultModel : models[0]);
+    }).catch(() => undefined);
     listHistoryRecords().then(setHistory).catch(() => undefined);
     getLocalSettings({ clearClipboard: false, profileEnabled: true, customTargetUrl: "", monthlyWarningLimit: 8, monthlyLimit: 10, profileRules: defaultRules }).then((settings) => {
       setClearClipboard(settings.clearClipboard); setProfileEnabled(settings.profileEnabled); setCustomTargetUrl(settings.customTargetUrl); setMonthlyWarningLimit(settings.monthlyWarningLimit); setMonthlyLimit(settings.monthlyLimit); setRules(settings.profileRules); setSettingsLoaded(true);
@@ -215,12 +220,15 @@ export default function App() {
     catch (cause) { setError(`复制失败：${cause instanceof Error ? cause.message : String(cause)}`); }
   };
 
-  const saveProvider = async () => {
+  const saveProvider = async (modelsOverride?: string[]) => {
     setSavingProvider(true); setProviderMessage("");
     try {
       if (apiKeyDraft) await validateProvider(apiKeyDraft, provider.baseUrl);
-      const next = { ...provider, hasApiKey: Boolean(apiKeyDraft || provider.hasApiKey), apiKey: apiKeyDraft || undefined };
-      await saveProviderConfig(next); setProvider({ ...provider, hasApiKey: next.hasApiKey }); setApiKeyDraft(""); setProviderMessage("连接验证成功，配置已保存");
+      const models = [...new Set(modelsOverride ?? provider.models)].filter((id) => id.trim());
+      if (!models.length) throw new Error("自定义模型列表不能为空");
+      if (!models.includes(provider.defaultModel)) models.unshift(provider.defaultModel);
+      const next = { ...provider, models, hasApiKey: Boolean(apiKeyDraft || provider.hasApiKey), apiKey: apiKeyDraft || undefined };
+      await saveProviderConfig(next); setProvider({ ...provider, models, hasApiKey: next.hasApiKey }); setApiKeyDraft(""); setProviderMessage("连接验证成功，配置已保存");
     } catch (cause) { setProviderMessage(cause instanceof Error ? cause.message : String(cause)); }
     finally { setSavingProvider(false); }
   };

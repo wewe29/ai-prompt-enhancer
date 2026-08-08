@@ -10,6 +10,8 @@ const detailLabels: Record<Verbosity, string> = { concise: "简洁", standard: "
 
 const taskTypeLabels: Record<string, string> = { code: "代码", creative: "创意", writing: "写作", qa: "问答解释", data: "数据分析", translation: "翻译", other: "其他" };
 
+const modelLabel = (id: string) => id === "deepseek-chat" ? "DeepSeek Chat" : id === "v4-flash" ? "V4-Flash" : id;
+
 export interface EnhanceViewProps {
   model: string;
   setModel: Dispatch<SetStateAction<string>>;
@@ -107,7 +109,7 @@ export function EnhanceView(props: EnhanceViewProps) {
     <header className="topbar">
       <div><h1>提示词增强</h1><p>保留原意，只补充真正影响结果的信息</p></div>
       <div className="toolbar-controls">
-        <label>增强模型<select value={model} onChange={(event) => setModel(event.target.value)}><option value="deepseek-chat">DeepSeek Chat</option><option value="v4-flash" disabled={!provider.v4FlashModelId}>V4-Flash{provider.v4FlashModelId ? "" : "（需配置 ID）"}</option></select><ChevronDown size={15} /></label>
+        <label>增强模型<select value={model} onChange={(event) => setModel(event.target.value)}>{(provider.models.length ? provider.models : ["deepseek-chat"]).map((id) => <option key={id} value={id} disabled={id === "v4-flash" && !provider.v4FlashModelId}>{modelLabel(id)}{id === "v4-flash" && !provider.v4FlashModelId ? "（需配置 ID）" : ""}</option>)}</select><ChevronDown size={15} /></label>
         <label>目标网页<select value={target} onChange={(event) => setTarget(event.target.value)}>{targetModels.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select><ChevronDown size={15} /></label>
         <label>详细程度<select value={verbosity} onChange={(event) => setVerbosity(event.target.value as Verbosity)}>{Object.entries(detailLabels).map(([id, label]) => <option key={id} value={id}>{label}</option>)}</select><ChevronDown size={15} /></label>
         {state === "streaming" ? <button className="primary danger" onClick={stop}><Square size={16} fill="currentColor" />停止</button> : <button className="primary" onClick={() => runEnhance()}><Sparkles size={17} />增强</button>}

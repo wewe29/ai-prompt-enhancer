@@ -69,6 +69,7 @@ export interface ProviderConfig {
   v4FlashModelId: string;
   inputPrice: number;
   outputPrice: number;
+  models: string[];
 }
 
 export interface UsageRecord {

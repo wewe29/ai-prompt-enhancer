@@ -106,8 +106,14 @@ pub struct ProviderConfig {
     pub v4_flash_model_id: String,
     pub input_price: f64,
     pub output_price: f64,
+    #[serde(default = "default_models")]
+    pub models: Vec<String>,
     #[serde(default, skip_serializing)]
     pub api_key: Option<String>,
+}
+
+fn default_models() -> Vec<String> {
+    vec!["deepseek-chat".into()]
 }
 
 impl Default for ProviderConfig {
@@ -119,6 +125,7 @@ impl Default for ProviderConfig {
             v4_flash_model_id: "deepseek-v4-flash".into(),
             input_price: 0.001,
             output_price: 0.002,
+            models: default_models(),
             api_key: None,
         }
     }

@@ -77,7 +77,7 @@ export async function cancelEnhancement(): Promise<void> {
 export async function getProviderConfig(): Promise<ProviderConfig> {
   if (isTauri) return command<ProviderConfig>("get_provider_config");
   const stored = localStorage.getItem("promptcraft.provider");
-  return stored ? JSON.parse(stored) : { baseUrl: "https://api.deepseek.com", hasApiKey: false, defaultModel: "deepseek-chat", v4FlashModelId: "deepseek-v4-flash", inputPrice: 0.001, outputPrice: 0.002 };
+  return stored ? JSON.parse(stored) : { baseUrl: "https://api.deepseek.com", hasApiKey: false, defaultModel: "deepseek-chat", v4FlashModelId: "deepseek-v4-flash", inputPrice: 0.001, outputPrice: 0.002, models: ["deepseek-chat"] };
 }
 
 export async function saveProviderConfig(config: ProviderConfig & { apiKey?: string }): Promise<void> {
