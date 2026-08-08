@@ -169,7 +169,6 @@ export default function App() {
         }
         if (event.type === "status" && event.data === "retrying_structure") setOutput("");
         if (event.type === "usage" && event.usage) setUsage(event.usage);
-        if (event.type === "error") throw new Error(event.message ?? "增强失败");
       });
     } catch (cause) {
       if (generationId !== generationRef.current) return;

@@ -26,25 +26,22 @@ export function blankResult(text: string): EnhancementResult {
 
 function mockResult(request: EnhancementRequest): EnhancementResult {
   const text = request.originalText.trim();
-  const isVague = text.length <= 3 || /这是什么意思|怎么做|帮我看看|优化一下/.test(text);
-  const assumptions = isVague
-    ? [{ id: "a1", text: "当前缺少具体对象或上下文，临时版本不会替用户猜测对象。", confirmed: false }]
-    : [];
-  const questions = isVague
-    ? [{ id: "q1", text: "请提供需要解释或处理的具体对象、原文或截图中的文字。", why_needed: "没有对象时无法保留你的真实意图。" }]
-    : [];
-  const primary = isVague
-    ? `${text}\n\n请先根据我提供的具体对象或上下文，解释其含义、用途和关键细节。若信息不足，请明确指出缺失信息，不要自行编造。`
-    : `请围绕以下任务给出可执行、结构清晰的结果：\n\n${text}\n\n要求：保留我的原始意图；只使用我提供的事实；如果存在关键信息缺失，先提出不超过3个澄清问题；不要添加与任务无关的模板化内容。`;
-  const suggestions = [
-    { id: "s1", kind: "goal" as const, title: "补充完成标准", purpose: "让结果更容易判断是否完成。", content: "请在结尾列出可验证的完成标准。", operation: "insert" as const, anchor: "", applied: false },
-    { id: "s2", kind: "context" as const, title: "补充受众", purpose: "让表达深度与读者背景匹配。", content: "请按目标读者的知识水平解释，遇到术语时给出简短定义。", operation: "insert" as const, anchor: "", applied: false },
-    { id: "s3", kind: "format" as const, title: "固定输出结构", purpose: "减少最终模型的追问和格式漂移。", content: "请先给结论，再给关键依据，最后列出下一步行动。", operation: "insert" as const, anchor: "", applied: false },
-    { id: "s4", kind: "constraint" as const, title: "避免无关扩写", purpose: "控制长度并保持重点。", content: "只保留直接影响任务结果的信息，避免泛泛而谈。", operation: "insert" as const, anchor: "", applied: false },
-    { id: "s5", kind: "alternate_intent" as const, title: "列出歧义分支", purpose: "适合输入可能对应多个目标的情况。", content: "如果我的目标存在多种合理理解，请先列出差异，再分别给出最短可行方案。", operation: "insert" as const, anchor: "", applied: false },
-  ];
-  const changes: EnhancementResult["changes"] = text === primary ? [] : [{ id: "c1", type: "clarify", before: text, after: primary, reason: "补充目标、事实边界和信息不足时的处理方式。", state: "pending" }];
-  return { status: questions.length ? "needs_clarification" : "ready", primary_prompt: primary, assumptions, questions, changes, suggestions, risk_flags: [] };
+  return {
+    status: "needs_clarification",
+    task_type: "other",
+    primary_prompt: `「${text || "我的需求"}」\n\n请先确认我提供的对象或上下文。若信息不足，先列出你需要的具体信息，并基于明确假设给出临时方案。`,
+    assumptions: [{ id: "a1", text: "临时版本不替用户猜测对象和上下文。", confirmed: false }],
+    questions: [{ id: "q1", text: "请提供需要处理的具体对象、原文或上下文。", why_needed: "没有对象时无法保留你的真实意图。" }],
+    changes: [{ id: "c1", type: "clarify", before: text, after: text, reason: "浏览器预览模式使用固定示例，不模拟真实增强。", state: "pending" }],
+    suggestions: [
+      { id: "s1", kind: "goal", title: "补充完成标准", purpose: "让结果更容易判断是否完成。", content: "请在结尾列出可验证的完成标准。", operation: "insert", anchor: "", applied: false },
+      { id: "s2", kind: "context", title: "补充受众", purpose: "让表达深度与读者背景匹配。", content: "请按目标读者的知识水平解释，遇到术语时给出简短定义。", operation: "insert", anchor: "", applied: false },
+      { id: "s3", kind: "format", title: "固定输出结构", purpose: "减少最终模型的追问和格式漂移。", content: "请先给结论，再给关键依据，最后列出下一步行动。", operation: "insert", anchor: "", applied: false },
+      { id: "s4", kind: "constraint", title: "避免无关扩写", purpose: "控制长度并保持重点。", content: "只保留直接影响任务结果的信息，避免泛泛而谈。", operation: "insert", anchor: "", applied: false },
+      { id: "s5", kind: "alternate_intent", title: "列出歧义分支", purpose: "适合输入可能对应多个目标的情况。", content: "如果目标存在多种合理理解，请先列出差异，再分别给出最短可行方案。", operation: "insert", anchor: "", applied: false },
+    ],
+    risk_flags: [],
+  };
 }
 
 export async function startEnhancement(
@@ -63,8 +60,14 @@ export async function startEnhancement(
     return;
   }
   const channel = new Channel<BackendEvent>();
-  channel.onmessage = onEvent;
-  await command<void>("enhance_prompt", { request, onEvent: channel });
+  const done = new Promise<void>((resolve, reject) => {
+    channel.onmessage = (event) => {
+      if (event.type === "error") { reject(new Error(event.message ?? "增强失败")); return; }
+      onEvent(event);
+    };
+    command<void>("enhance_prompt", { request, onEvent: channel }).then(resolve, reject);
+  });
+  await done;
 }
 
 export async function cancelEnhancement(): Promise<void> {
