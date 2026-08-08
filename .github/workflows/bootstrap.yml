@@ -25,6 +25,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Update repository description and topics
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           curl -fsS -X PATCH \
@@ -52,6 +54,8 @@ jobs:
           echo "Description and topics updated."
 
       - name: Enable Discussions
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           curl -fsS -X PATCH \
