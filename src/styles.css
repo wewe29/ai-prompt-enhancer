@@ -282,3 +282,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .preset-card strong { font-size: 14px; }
 .preset-card small { color: var(--muted); }
 .preset-row { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.preflight-card { margin-bottom: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,0.02); }
+.preflight-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.preflight-hint { font-size: 12px; font-weight: 400; color: var(--muted); }
+.preflight-close { margin-left: auto; background: none; border: 0; color: var(--muted); cursor: pointer; padding: 2px; }
+.preflight-card ul { margin: 0; padding-left: 18px; font-size: 12.5px; display: flex; flex-direction: column; gap: 4px; }
+.preflight-card li.level-warning { color: var(--warning, #e8b34b); }
+.preflight-card li.level-info { color: var(--muted); }

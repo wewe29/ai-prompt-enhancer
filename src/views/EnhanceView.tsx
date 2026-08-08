@@ -1,6 +1,8 @@
 import { AlertTriangle, ArrowRight, Check, ChevronDown, Clipboard, FileCode2, FilePlus2, LoaderCircle, MessageSquareText, Plus, RefreshCw, RotateCw, Send, Sparkles, Square, Undo2, X } from "lucide-react";
+import { useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { copyText, targetModels } from "../lib";
+import { preflight } from "../preflight";
 import type { Attachment, EnhancementResult, EnhancementState, ProviderConfig, UsageRecord, Verbosity } from "../types";
 import { StatusBadge } from "../components/StatusBadge";
 
@@ -61,6 +63,8 @@ export function EnhanceView(props: EnhanceViewProps) {
     output, commitOutput, undo, redo, undoStack, redoStack, result, setResult, usage, handleCopyOpen,
     currentTarget, clarificationRound, answers, setAnswers, submitClarification, changeState, setSelectedSuggestion,
   } = props;
+  const [preflightDismissed, setPreflightDismissed] = useState(false);
+  const findings = useMemo(() => preflight(original, context.length > 0), [original, context]);
   return <main className="workspace">
     <header className="topbar">
       <div><h1>提示词增强</h1><p>保留原意，只补充真正影响结果的信息</p></div>
@@ -80,6 +84,10 @@ export function EnhanceView(props: EnhanceViewProps) {
       <article className="editor-panel">
         <div className="panel-heading"><div><span className="step-index">01</span><h2>原始需求</h2></div><span>{original.length} 字</span></div>
         <textarea value={original} onChange={(event) => setOriginal(event.target.value)} placeholder="输入一句还不够清楚的需求，例如：中暑症状表现" />
+        {state !== "streaming" && !preflightDismissed && findings.length > 0 && <div className="preflight-card">
+          <div className="preflight-title">发送前快速检查<span className="preflight-hint">本地检查，不发送内容</span><button className="preflight-close" onClick={() => setPreflightDismissed(true)} title="关闭"><X size={14} /></button></div>
+          <ul>{findings.map((f) => <li key={f.id} className={`level-${f.level}`}>{f.level === "warning" ? "建议补充：" : ""}{f.message}</li>)}</ul>
+        </div>}
         <div className="context-area">
           <div className="context-title"><span>上下文</span><span>{totalChars.toLocaleString()} / 100,000 字</span></div>
           <textarea value={context} onChange={(event) => setContext(event.target.value)} placeholder="可粘贴聊天记录、项目背景或需要参考的文字" />
