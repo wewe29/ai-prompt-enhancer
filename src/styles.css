@@ -276,3 +276,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .task-type-badge.data { background: #eff6ff; color: #2563eb; }
 .task-type-badge.translation { background: #f5f3ff; color: #7c3aed; }
 .task-type-badge.other { background: #f3f4f6; color: #4b5563; }
+
+.preset-card { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: transparent; color: inherit; cursor: pointer; text-align: left; }
+.preset-card:hover { border-color: var(--blue); }
+.preset-card strong { font-size: 14px; }
+.preset-card small { color: var(--muted); }
+.preset-row { display: flex; flex-wrap: wrap; gap: 10px; }
