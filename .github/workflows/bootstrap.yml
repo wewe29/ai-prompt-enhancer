@@ -7,8 +7,9 @@ name: Bootstrap release
 #   4. List any open Dependabot pull requests
 #
 # Trigger: manual "Run workflow" from the Actions tab.
-# Re-running it after the release exists will fail at the release step, which is
-# intentional — the workflow is meant to run exactly once per release line.
+# This workflow avoids installing the GitHub CLI inside the runner — every
+# step uses only the tools that ship with `ubuntu-latest` (curl, bash) or
+# the official `actions/*` actions.
 on:
   workflow_dispatch:
 
@@ -18,78 +19,82 @@ jobs:
   bootstrap:
     name: Bootstrap metadata and publish v0.1.0
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Install GitHub CLI
-        run: |
-          set -euo pipefail
-          curl -fsSL https://cli.github.com/install.sh | sh
-          gh --version
-
       - name: Update repository description and topics
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          gh repo edit wewe29/ai-prompt-enhancer \
-            --description "PromptCraft is a local Windows AI prompt enhancer powered by user-configured DeepSeek APIs. It analyses your raw requirement and reference materials, asks up to three rounds of clarification, and uses your DeepSeek API to produce an editable main prompt, a list of changes, and five optional supplementary suggestions." \
-            --add-topic tauri \
-            --add-topic prompt-engineering \
-            --add-topic deepseek \
-            --add-topic windows \
-            --add-topic react \
-            --add-topic typescript \
-            --add-topic rust \
-            --add-topic sqlcipher \
-            --add-topic llm \
-            --add-topic opensource
-
-      - name: Enable Discussions
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           curl -fsS -X PATCH \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
-            https://api.github.com/repos/wewe29/ai-prompt-enhancer \
+            -H "Content-Type: application/json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}" \
+            --data @- <<'JSON'
+          {
+            "description": "PromptCraft is a local Windows AI prompt enhancer powered by user-configured DeepSeek APIs. It analyses your raw requirement and reference materials, asks up to three rounds of clarification, and uses your DeepSeek API to produce an editable main prompt, a list of changes, and five optional supplementary suggestions.",
+            "topics": [
+              "tauri",
+              "prompt-engineering",
+              "deepseek",
+              "windows",
+              "react",
+              "typescript",
+              "rust",
+              "sqlcipher",
+              "llm",
+              "opensource"
+            ]
+          }
+          JSON
+          echo "Description and topics updated."
+
+      - name: Enable Discussions
+        run: |
+          set -euo pipefail
+          curl -fsS -X PATCH \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "Content-Type: application/json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}" \
             -d '{"has_discussions": true}'
           echo "Discussions flag toggled to true."
 
       - name: Publish v0.1.0 release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          gh release create v0.1.0 \
-            --repo wewe29/ai-prompt-enhancer \
-            --title "PromptCraft 0.1.0 — Initial open-source release" \
-            --notes-file release-assets/RELEASE_NOTES-v0.1.0.md \
-            --target main \
-            release/PromptCraft-0.1.0-windows-x64-portable.zip \
-            release-assets/SHA256-zip.txt \
-            release-assets/SHA256-webview2.txt \
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.0
+          name: PromptCraft 0.1.0 — Initial open-source release
+          body_path: release-assets/RELEASE_NOTES-v0.1.0.md
+          target_commitish: main
+          fail_on_unmatched_files: true
+          files: |
+            release/PromptCraft-0.1.0-windows-x64-portable.zip
+            release-assets/SHA256-zip.txt
+            release-assets/SHA256-webview2.txt
             release-assets/README.txt
 
       - name: List open Dependabot pull requests
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          echo "Open Dependabot pull requests (review and merge when ready):"
-          gh pr list \
-            --repo wewe29/ai-prompt-enhancer \
-            --state open \
-            --author app/dependabot \
-            --json number,title,author,createdAt,url \
-            --template '{{range .}}- #{{.number}} {{.title}} ({{.url}}){{"\n"}}{{end}}'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prs = await github.paginate(github.pulls.list, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            });
+            const deps = prs.filter(pr => pr.user && pr.user.login === 'dependabot[bot]');
+            console.log(`Open Dependabot pull requests: ${deps.length}`);
+            for (const pr of deps) {
+              console.log(`- #${pr.number} ${pr.title} (${pr.html_url})`);
+            }
 
       - name: Summary
         run: |
           echo "Bootstrap complete."
-          echo "Repository : https://github.com/wewe29/ai-prompt-enhancer"
-          echo "Release    : https://github.com/wewe29/ai-prompt-enhancer/releases/tag/v0.1.0"
-          echo "Discussions: https://github.com/wewe29/ai-prompt-enhancer/discussions"
+          echo "Repository : https://github.com/${GITHUB_REPOSITORY}"
+          echo "Release    : https://github.com/${GITHUB_REPOSITORY}/releases/tag/v0.1.0"
+          echo "Discussions: https://github.com/${GITHUB_REPOSITORY}/discussions"
