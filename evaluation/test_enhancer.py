@@ -1,6 +1,6 @@
 """enhancer.py 与 Rust 源码的等价性测试。
 
-关键测试会直接读取 src-tauri/src/provider.rs，从源码中提取 SYSTEM_PROMPT
+关键测试会直接读取 src-tauri/src/prompts.rs，从源码中提取 SYSTEM_PROMPT
 与 SYSTEM_PROMPT_VERSION 原文，与我们 Python 端的常量做逐字比较——
 任何复刻偏差都会在这里暴露。
 """
@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import enhancer  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-PROVIDER_RS = PROJECT_ROOT / "src-tauri" / "src" / "provider.rs"
+PROMPTS_RS = PROJECT_ROOT / "src-tauri" / "src" / "prompts.rs"
 
 
 def _extract_rust_string(source: str, const_name: str) -> str:
@@ -25,20 +25,20 @@ def _extract_rust_string(source: str, const_name: str) -> str:
         rf'const {const_name}: &str = (?:r#"(?P<raw>.*?)"#|"(?P<normal>.*?)")', re.DOTALL
     )
     match = pattern.search(source)
-    assert match, f"未在 provider.rs 中找到 {const_name}"
+    assert match, f"未在 prompts.rs 中找到 {const_name}"
     return match.group("raw") if match.group("raw") is not None else match.group("normal")
 
 
 def _rust_system_prompt() -> str:
-    return _extract_rust_string(PROVIDER_RS.read_text(encoding="utf-8"), "SYSTEM_PROMPT")
+    return _extract_rust_string(PROMPTS_RS.read_text(encoding="utf-8"), "SYSTEM_PROMPT")
 
 
 def _rust_version() -> str:
-    return _extract_rust_string(PROVIDER_RS.read_text(encoding="utf-8"), "SYSTEM_PROMPT_VERSION")
+    return _extract_rust_string(PROMPTS_RS.read_text(encoding="utf-8"), "SYSTEM_PROMPT_VERSION")
 
 
 def test_system_prompt_byte_identical():
-    assert enhancer.SYSTEM_PROMPT == _rust_system_prompt(), "SYSTEM_PROMPT 与 provider.rs 不一致！"
+    assert enhancer.SYSTEM_PROMPT == _rust_system_prompt(), "SYSTEM_PROMPT 与 prompts.rs 不一致！"
 
 
 def test_system_prompt_version_identical():

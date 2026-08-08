@@ -1,5 +1,6 @@
 mod attachments;
 mod models;
+mod prompts;
 mod provider;
 mod security;
 mod storage;
