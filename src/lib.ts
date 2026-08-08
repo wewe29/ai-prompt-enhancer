@@ -3,6 +3,7 @@ import { Channel } from "@tauri-apps/api/core";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { BackendEvent, EnhancementRequest, EnhancementResult, HistoryRecord, LocalSettings, PromptChange, ProviderConfig, Suggestion, UsageRecord } from "./types";
+import { EnhancementResultSchema } from "./schemas";
 
 export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -193,21 +194,12 @@ export function extractStreamedPrompt(buffer: string): string {
 export function safeParseResult(buffer: string): EnhancementResult | null {
   try {
     const parsed = JSON.parse(buffer) as EnhancementResult;
-    if (!parsed.primary_prompt || !Array.isArray(parsed.suggestions)) return null;
-    return normalizeResult(parsed);
+    return EnhancementResultSchema.safeParse(parsed).success ? normalizeResult(parsed) : null;
   } catch { return null; }
 }
 
 export function normalizeResult(result: EnhancementResult): EnhancementResult {
-  return {
-    ...result,
-    task_type: result.task_type ?? "",
-    assumptions: result.assumptions ?? [],
-    questions: result.questions ?? [],
-    changes: (result.changes ?? []).map((item) => ({ ...item, state: item.state ?? "pending" })),
-    suggestions: (result.suggestions ?? []).map((item) => ({ ...item, applied: item.applied ?? false })),
-    risk_flags: result.risk_flags ?? [],
-  };
+  return EnhancementResultSchema.parse(result) as EnhancementResult;
 }
 
 export function applySuggestionToText(text: string, suggestion: Suggestion): string {
