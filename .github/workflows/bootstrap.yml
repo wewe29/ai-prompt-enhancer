@@ -1,70 +1,34 @@
 name: Bootstrap release
 
-# This workflow is a one-shot helper to:
-#   1. Update repository description and topics
-#   2. Enable GitHub Discussions
-#   3. Publish the v0.1.0 GitHub Release with portable assets
-#   4. List any open Dependabot pull requests
+# This workflow publishes the v0.1.0 GitHub Release with portable assets
+# and lists any open Dependabot pull requests.
 #
 # Trigger: manual "Run workflow" from the Actions tab.
-# This workflow avoids installing the GitHub CLI inside the runner — every
-# step uses only the tools that ship with `ubuntu-latest` (curl, bash) or
-# the official `actions/*` actions.
+#
+# What this workflow does NOT do (and why):
+#   - Update repository description and topics. The GitHub Actions
+#     `GITHUB_TOKEN` does not carry admin/owner scope, and the
+#     PATCH /repos/{owner}/{repo} endpoint requires admin/owner.
+#     Set description and topics via the GitHub web UI instead.
+#   - Enable Discussions. Same reason. Enable it in
+#     Settings → General → Features.
+#
+# Uses only tools that ship with `ubuntu-latest` plus the official
+# `actions/*` actions — no gh CLI install required.
 on:
   workflow_dispatch:
 
-permissions: write-all
+permissions:
+  contents: write
 
 jobs:
   bootstrap:
-    name: Bootstrap metadata and publish v0.1.0
+    name: Publish v0.1.0 and list Dependabot PRs
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
-      - name: Update repository description and topics
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          curl -fsS -X PATCH \
-            -H "Authorization: token ${GITHUB_TOKEN}" \
-            -H "Accept: application/vnd.github+json" \
-            -H "Content-Type: application/json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}" \
-            --data @- <<'JSON'
-          {
-            "description": "PromptCraft is a local Windows AI prompt enhancer powered by user-configured DeepSeek APIs. It analyses your raw requirement and reference materials, asks up to three rounds of clarification, and uses your DeepSeek API to produce an editable main prompt, a list of changes, and five optional supplementary suggestions.",
-            "topics": [
-              "tauri",
-              "prompt-engineering",
-              "deepseek",
-              "windows",
-              "react",
-              "typescript",
-              "rust",
-              "sqlcipher",
-              "llm",
-              "opensource"
-            ]
-          }
-          JSON
-          echo "Description and topics updated."
-
-      - name: Enable Discussions
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          curl -fsS -X PATCH \
-            -H "Authorization: token ${GITHUB_TOKEN}" \
-            -H "Accept: application/vnd.github+json" \
-            -H "Content-Type: application/json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}" \
-            -d '{"has_discussions": true}'
-          echo "Discussions flag toggled to true."
 
       - name: Publish v0.1.0 release
         uses: softprops/action-gh-release@v2
@@ -101,4 +65,3 @@ jobs:
           echo "Bootstrap complete."
           echo "Repository : https://github.com/${GITHUB_REPOSITORY}"
           echo "Release    : https://github.com/${GITHUB_REPOSITORY}/releases/tag/v0.1.0"
-          echo "Discussions: https://github.com/${GITHUB_REPOSITORY}/discussions"
