@@ -74,7 +74,9 @@ pub struct PromptChange {
     pub state: String,
 }
 
-fn pending_state() -> String { "pending".to_string() }
+fn pending_state() -> String {
+    "pending".to_string()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Suggestion {
@@ -197,5 +199,9 @@ impl Default for AppSettings {
     }
 }
 
-fn default_warning_limit() -> f64 { 8.0 }
-fn default_true() -> bool { true }
+fn default_warning_limit() -> f64 {
+    8.0
+}
+fn default_true() -> bool {
+    true
+}
