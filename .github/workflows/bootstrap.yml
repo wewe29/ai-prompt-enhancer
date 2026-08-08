@@ -12,13 +12,7 @@ name: Bootstrap release
 on:
   workflow_dispatch:
 
-permissions:
-  contents: write
-  metadata: write
-  discussions: write
-  pages: write
-  pull-requests: read
-  issues: read
+permissions: write-all
 
 jobs:
   bootstrap:
