@@ -79,7 +79,7 @@ export function EnhanceView(props: EnhanceViewProps) {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.ctrlKey && event.key === "Enter") {
         event.preventDefault();
-        if (state === "streaming" || showSecurity) return;
+        if (state === "streaming" || state === "needs_clarification" || showSecurity) return;
         runEnhance();
         return;
       }

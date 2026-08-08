@@ -166,7 +166,14 @@ export default function App() {
         if (generationId !== generationRef.current) return;
         if (event.type === "delta" && event.data) setOutput((value) => value + event.data);
         if (event.type === "result" && event.result) {
-          const normalized = normalizeResult(event.result);
+          let normalized: EnhancementResult;
+          try {
+            normalized = normalizeResult(event.result);
+          } catch {
+            setState("error");
+            setError("模型返回的字段超出预期，请重新生成。");
+            return;
+          }
           setResult(normalized);
           setOutput(normalized.primary_prompt);
           setState(normalized.status === "needs_clarification" ? "needs_clarification" : "ready");

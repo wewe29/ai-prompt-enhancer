@@ -7,6 +7,7 @@ parse_result、validate_result 均与 Rust 源码逐字一致，由 tests 通过
 from __future__ import annotations
 
 import json
+import math
 import re
 import time
 from typing import Any
@@ -191,7 +192,7 @@ def normalize_result(result: dict[str, Any]) -> dict[str, Any]:
 
 # ---- 成本估算（复刻 provider.rs estimate_tokens / calculate_cost）----
 def estimate_tokens(text: str) -> int:
-    return max(1, int((len(text) / 1.8) + 0.999))
+    return math.ceil(len(text) / 1.8)
 
 
 def calculate_cost(input_tokens: int, output_tokens: int, input_price: float, output_price: float) -> float:
