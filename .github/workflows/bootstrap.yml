@@ -48,7 +48,8 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const prs = await github.paginate(github.pulls.list, {
+            // github-script v7: REST API methods are under github.rest.*
+            const prs = await github.paginate(github.rest.pulls.list, {
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
