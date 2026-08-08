@@ -26,6 +26,7 @@ evaluation/.venv/
 evaluation/.browser_profile/
 evaluation/results/
 evaluation/__pycache__/
+evaluation/**/__pycache__/
 evaluation/.pytest_cache/
 evaluation/*.egg-info/
 evaluation/answers.json
