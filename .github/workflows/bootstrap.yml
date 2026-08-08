@@ -1,0 +1,101 @@
+name: Bootstrap release
+
+# This workflow is a one-shot helper to:
+#   1. Update repository description and topics
+#   2. Enable GitHub Discussions
+#   3. Publish the v0.1.0 GitHub Release with portable assets
+#   4. List any open Dependabot pull requests
+#
+# Trigger: manual "Run workflow" from the Actions tab.
+# Re-running it after the release exists will fail at the release step, which is
+# intentional — the workflow is meant to run exactly once per release line.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  metadata: write
+  discussions: write
+  pages: write
+  pull-requests: read
+  issues: read
+
+jobs:
+  bootstrap:
+    name: Bootstrap metadata and publish v0.1.0
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install GitHub CLI
+        run: |
+          set -euo pipefail
+          curl -fsSL https://cli.github.com/install.sh | sh
+          gh --version
+
+      - name: Update repository description and topics
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh repo edit wewe29/ai-prompt-enhancer \
+            --description "PromptCraft is a local Windows AI prompt enhancer powered by user-configured DeepSeek APIs. It analyses your raw requirement and reference materials, asks up to three rounds of clarification, and uses your DeepSeek API to produce an editable main prompt, a list of changes, and five optional supplementary suggestions." \
+            --add-topic tauri \
+            --add-topic prompt-engineering \
+            --add-topic deepseek \
+            --add-topic windows \
+            --add-topic react \
+            --add-topic typescript \
+            --add-topic rust \
+            --add-topic sqlcipher \
+            --add-topic llm \
+            --add-topic opensource
+
+      - name: Enable Discussions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          curl -fsS -X PATCH \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/wewe29/ai-prompt-enhancer \
+            -d '{"has_discussions": true}'
+          echo "Discussions flag toggled to true."
+
+      - name: Publish v0.1.0 release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release create v0.1.0 \
+            --repo wewe29/ai-prompt-enhancer \
+            --title "PromptCraft 0.1.0 — Initial open-source release" \
+            --notes-file release-assets/RELEASE_NOTES-v0.1.0.md \
+            --target main \
+            release/PromptCraft-0.1.0-windows-x64-portable.zip \
+            release-assets/SHA256-zip.txt \
+            release-assets/SHA256-webview2.txt \
+            release-assets/README.txt
+
+      - name: List open Dependabot pull requests
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          echo "Open Dependabot pull requests (review and merge when ready):"
+          gh pr list \
+            --repo wewe29/ai-prompt-enhancer \
+            --state open \
+            --author app/dependabot \
+            --json number,title,author,createdAt,url \
+            --template '{{range .}}- #{{.number}} {{.title}} ({{.url}}){{"\n"}}{{end}}'
+
+      - name: Summary
+        run: |
+          echo "Bootstrap complete."
+          echo "Repository : https://github.com/wewe29/ai-prompt-enhancer"
+          echo "Release    : https://github.com/wewe29/ai-prompt-enhancer/releases/tag/v0.1.0"
+          echo "Discussions: https://github.com/wewe29/ai-prompt-enhancer/discussions"

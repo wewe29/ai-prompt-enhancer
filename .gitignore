@@ -1,7 +1,10 @@
 node_modules/
 dist/
 src-tauri/target/
-release/
+release/*
+!release/*.zip
+!release/*.md
+
 release-assets/*.exe
 .env
 .env.*
