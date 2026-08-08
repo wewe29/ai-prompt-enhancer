@@ -20,3 +20,12 @@ screenshots/
 *.user
 *.suo
 .cargo/config.toml
+
+# 评测脚本运行产物（evaluation/）
+evaluation/.venv/
+evaluation/.browser_profile/
+evaluation/results/
+evaluation/__pycache__/
+evaluation/.pytest_cache/
+evaluation/*.egg-info/
+evaluation/answers.json

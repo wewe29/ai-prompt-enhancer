@@ -1,0 +1,40 @@
+"""API 直连目标模型适配器（备用/降级方案，默认关闭）。
+
+当没有网页访问权限或网页版不稳定时，可将 target 的 mode 改为 api，
+直接通过 OpenAI 兼容接口把提示词发给目标模型。
+"""
+from __future__ import annotations
+
+from typing import Any
+
+import openai
+
+from .base import NetworkError, TargetAdapter
+
+
+class ApiAdapter(TargetAdapter):
+    def __init__(self, name: str, target_cfg: dict[str, Any], global_cfg: dict[str, Any], api_key: str = ""):
+        super().__init__(name, target_cfg, global_cfg)
+        self.base_url = (target_cfg.get("base_url") or "").rstrip("/")
+        self.model = target_cfg.get("model") or ""
+        self.temperature = float(target_cfg.get("temperature", 0.7))
+        self._api_key = api_key
+
+    def health_check(self) -> None:
+        if not self.base_url or not self.model:
+            raise NetworkError(f"[{self.name}] api target 缺少 base_url/model 配置")
+        if not self._api_key:
+            raise NetworkError(f"[{self.name}] api target 需要提供 API Key")
+
+    def infer(self, text: str) -> str:
+        self.health_check()
+        client = openai.OpenAI(api_key=self._api_key, base_url=self.base_url)
+        try:
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": text}],
+                temperature=self.temperature,
+            )
+            return response.choices[0].message.content or ""
+        except openai.APIError as exc:
+            raise NetworkError(f"[{self.name}] API 调用失败：{exc}") from exc
