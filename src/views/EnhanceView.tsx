@@ -1,5 +1,5 @@
 import { AlertTriangle, ArrowRight, Check, ChevronDown, Clipboard, FileCode2, FilePlus2, LoaderCircle, MessageSquareText, Plus, RefreshCw, RotateCw, Send, Sparkles, Square, Undo2, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { copyText, targetModels } from "../lib";
 import { preflight } from "../preflight";
@@ -65,6 +65,41 @@ export function EnhanceView(props: EnhanceViewProps) {
   } = props;
   const [preflightDismissed, setPreflightDismissed] = useState(false);
   const findings = useMemo(() => preflight(original, context.length > 0), [original, context]);
+  useEffect(() => {
+    const isTyping = () => {
+      const el = document.activeElement;
+      return !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || (el as HTMLElement).isContentEditable);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey && event.key === "Enter") {
+        event.preventDefault();
+        if (state === "streaming" || document.querySelector(".modal-backdrop")) return;
+        runEnhance();
+        return;
+      }
+      if (event.ctrlKey && event.key === "z") {
+        if (isTyping()) return;
+        event.preventDefault();
+        if (event.shiftKey) redo();
+        else undo();
+        return;
+      }
+      if (event.ctrlKey && event.key === "y") {
+        if (isTyping()) return;
+        event.preventDefault();
+        redo();
+        return;
+      }
+      if (event.key === "Escape") {
+        const backdrop = document.querySelector(".modal-backdrop");
+        if (backdrop) { (backdrop.querySelector(".secondary") as HTMLElement | null)?.click(); return; }
+        if (error) { setError(""); return; }
+        setSelectedSuggestion(null);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [state, error, runEnhance, undo, redo, setError, setSelectedSuggestion]);
   return <main className="workspace">
     <header className="topbar">
       <div><h1>提示词增强</h1><p>保留原意，只补充真正影响结果的信息</p></div>
