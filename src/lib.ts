@@ -201,6 +201,7 @@ export function safeParseResult(buffer: string): EnhancementResult | null {
 export function normalizeResult(result: EnhancementResult): EnhancementResult {
   return {
     ...result,
+    task_type: result.task_type ?? "",
     assumptions: result.assumptions ?? [],
     questions: result.questions ?? [],
     changes: (result.changes ?? []).map((item) => ({ ...item, state: item.state ?? "pending" })),

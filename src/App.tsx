@@ -34,6 +34,8 @@ const defaultRules: ProfileRule[] = [
 
 const detailLabels: Record<Verbosity, string> = { concise: "简洁", standard: "标准", deep: "深入", custom: "自定义" };
 
+const taskTypeLabels: Record<string, string> = { code: "代码", creative: "创意", writing: "写作", qa: "问答解释", data: "数据分析", translation: "翻译", other: "其他" };
+
 function localFindings(text: string): string[] {
   const findings: string[] = [];
   if (/\bsk-[A-Za-z0-9_-]{12,}\b/.test(text)) findings.push("疑似 API Key，将在发送前强制遮蔽");
@@ -295,6 +297,7 @@ export default function App() {
             <textarea value={output} onChange={(event) => commitOutput(event.target.value)} placeholder="增强后的提示词会显示在这里" />
           </div>
           <div className="result-footer">
+            {result?.task_type ? <span className={`task-type-badge ${result.task_type}`}>任务类型：{taskTypeLabels[result.task_type] ?? result.task_type}</span> : null}
             <div>{usage ? <span>{usage.inputTokens + usage.outputTokens} tokens · 约 ¥{usage.estimatedCost.toFixed(4)} · 本月 ¥{usage.monthTotal.toFixed(2)}</span> : <span>API 费用由你的供应商账户承担</span>}</div>
             <button className="secondary" onClick={() => copyText(output).catch((cause) => setError(`复制失败：${cause instanceof Error ? cause.message : String(cause)}`))} disabled={!output}><Clipboard size={16} />复制</button>
             <button className="primary" onClick={handleCopyOpen} disabled={!output}><ArrowRight size={16} />复制并打开 {currentTarget.label}</button>

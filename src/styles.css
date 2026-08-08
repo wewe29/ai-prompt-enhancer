@@ -257,3 +257,22 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .page-header { align-items: flex-start; flex-direction: column; padding: 16px; }
   .search { width: 100%; }
 }
+
+.task-type-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4f46e5;
+  white-space: nowrap;
+}
+
+.task-type-badge.code { background: #eef2ff; color: #4f46e5; }
+.task-type-badge.creative { background: #fdf2f8; color: #db2777; }
+.task-type-badge.writing { background: #ecfdf5; color: #059669; }
+.task-type-badge.qa { background: #fffbeb; color: #d97706; }
+.task-type-badge.data { background: #eff6ff; color: #2563eb; }
+.task-type-badge.translation { background: #f5f3ff; color: #7c3aed; }
+.task-type-badge.other { background: #f3f4f6; color: #4b5563; }
