@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PromptCraft 增强效果评测报告</title>
+<style>
+  :root {
+    --bg: #11141b; --panel: #1a1f2b; --panel2: #222838; --border: #2c3347;
+    --text: #e5e7eb; --muted: #9aa3b5; --accent: #6ea8fe; --good: #4ade80;
+    --bad: #f87171; --tie: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.7 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 28px 20px 60px; }
+  h1 { font-size: 22px; margin: 0 0 6px; }
+  h2 { font-size: 17px; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-top: 36px; }
+  h3 { font-size: 15px; margin: 22px 0 10px; color: var(--accent); }
+  .meta { color: var(--muted); font-size: 12.5px; margin-bottom: 4px; }
+  .meta b { color: var(--text); font-weight: 600; }
+  .cards { display: flex; flex-wrap: wrap; gap: 12px; margin: 18px 0; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+          padding: 14px 18px; min-width: 150px; }
+  .card .num { font-size: 26px; font-weight: 700; }
+  .card .lab { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .up { color: var(--good); } .down { color: var(--bad); } .zero { color: var(--tie); }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0 18px; }
+  th, td { border: 1px solid var(--border); padding: 7px 10px; text-align: left; font-size: 13px; }
+  th { background: var(--panel2); color: var(--muted); font-weight: 600; }
+  tr:nth-child(even) td { background: rgba(255,255,255,.02); }
+  details { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+            margin: 10px 0; overflow: hidden; }
+  summary { cursor: pointer; padding: 11px 16px; font-weight: 600; user-select: none; }
+  summary:hover { background: var(--panel2); }
+  details .body { padding: 4px 16px 16px; }
+  .tag { display: inline-block; font-size: 11.5px; padding: 1px 9px; border-radius: 20px;
+         margin-left: 8px; vertical-align: 2px; }
+  .tag.ok { background: rgba(74,222,128,.15); color: var(--good); }
+  .tag.win { background: rgba(74,222,128,.15); color: var(--good); }
+  .tag.lose { background: rgba(248,113,113,.15); color: var(--bad); }
+  .tag.tie { background: rgba(251,191,36,.15); color: var(--tie); }
+  .tag.err { background: rgba(248,113,113,.25); color: var(--bad); }
+  pre { background: #0d1117; border: 1px solid var(--border); border-radius: 8px;
+        padding: 12px 14px; overflow-x: auto; font-size: 12.5px; line-height: 1.6;
+        white-space: pre-wrap; word-break: break-word; }
+  code { font-family: Consolas, "Courier New", monospace; }
+  .prompt-label { color: var(--muted); font-size: 12.5px; margin: 12px 0 4px; }
+  .scoretable td, .scoretable th { text-align: center; }
+  .winner { margin: 6px 0 10px; }
+  .reason { color: var(--muted); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+  .small { font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>PromptCraft 提示词增强前后效果评测报告</h1>
+<div class="meta">
+  生成时间：<b>{{ data.meta.generated_at }}</b> ·
+  样本数：<b>{{ data.samples | length }}</b> ·
+  目标模型：<b>{{ data.meta.targets | join('、') or '无' }}</b><br>
+  增强模型：<b>{{ data.meta.enhance_model }}</b> ·
+  裁判模型：<b>{{ data.meta.judge_model }}</b> ·
+  预估成本：<b>${{ '%.4f' | format(data.meta.estimated_cost or 0) }}</b>
+</div>
+
+<h2>一、整体结论</h2>
+{% set s = agg.summary %}
+<div class="cards">
+  <div class="card"><div class="num">{{ s.total }}</div><div class="lab">有效对比样本</div></div>
+  <div class="card"><div class="num up">{{ s.improved }}（{{ s.improved_pct }}%）</div><div class="lab">增强后更优（任一维度 +{{ improve_threshold }} 分）</div></div>
+  <div class="card"><div class="num up">{{ s.wins }}</div><div class="lab">胜（增强更优）</div></div>
+  <div class="card"><div class="num zero">{{ s.ties }}</div><div class="lab">平局</div></div>
+  <div class="card"><div class="num down">{{ s.losses }}</div><div class="lab">负（原始更优）</div></div>
+</div>
+
+<table>
+  <tr><th>维度</th><th>平均 Delta（增强 − 原始）</th></tr>
+  {% for d in dims %}
+  <tr>
+    <td>{{ dim_labels[d] }}</td>
+    <td><span class="{{ 'up' if agg.dimensions[d].mean > 0 else ('down' if agg.dimensions[d].mean < 0 else 'zero') }}">
+      {{ '%+.2f' | format(agg.dimensions[d].mean) }}</span> <span class="small">(n={{ agg.dimensions[d].n }})</span></td>
+  </tr>
+  {% endfor %}
+</table>
+
+{% if agg.by_scenario %}
+<h3>按场景分项</h3>
+<table>
+  <tr><th>场景</th>{% for d in dims %}<th>{{ dim_labels[d] }}</th>{% endfor %}</tr>
+  {% for sc, dims_map in agg.by_scenario.items() %}
+  <tr><td>{{ sc }}</td>{% for d in dims %}<td>{{ '%+.2f' | format(dims_map[d].mean) }}</td>{% endfor %}</tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+{% if agg.by_target %}
+<h3>按目标模型分项</h3>
+<table>
+  <tr><th>目标模型</th>{% for d in dims %}<th>{{ dim_labels[d] }}</th>{% endfor %}</tr>
+  {% for tid, dims_map in agg.by_target.items() %}
+  <tr><td>{{ tid }}</td>{% for d in dims %}<td>{{ '%+.2f' | format(dims_map[d].mean) }}</td>{% endfor %}</tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<h2>二、逐样本对比详情</h2>
+{% for sample in data.samples %}
+<details {% if loop.first %}open{% endif %}>
+  <summary>
+    {{ loop.index }}. {{ sample.id }} <span class="small">（{{ sample.scenario }}）</span>
+    {% set errors = sample.results.values() | selectattr('judge', 'none') | list %}
+    {% if sample.enhance_error %}<span class="tag err">增强失败</span>{% endif %}
+    {% for tid, r in sample.results.items() %}
+      {% if r.judge and r.judge.winner == 'enhanced' %}<span class="tag win">增强胜</span>
+      {% elif r.judge and r.judge.winner == 'original' %}<span class="tag lose">原始胜</span>
+      {% elif r.judge %}<span class="tag tie">平局</span>
+      {% else %}<span class="tag err">获取失败</span>{% endif %}
+    {% endfor %}
+  </summary>
+  <div class="body">
+    <div class="prompt-label">原始提示词</div>
+    <pre>{{ sample.original }}</pre>
+    <div class="prompt-label">增强后提示词
+      {% if sample.enhance_status == 'needs_clarification' %}<span class="tag tie">需澄清</span>{% endif %}
+    </div>
+    {% if sample.enhance_error %}
+      <pre class="down">增强失败：{{ sample.enhance_error }}</pre>
+    {% else %}
+      <pre>{{ sample.enhanced_text }}</pre>
+      {% if sample.enhance_questions %}
+      <div class="small">增强器提出的澄清问题：
+        {% for q in sample.enhance_questions %}{{ q.text }}；{% endfor %}
+      </div>
+      {% endif %}
+      {% if sample.enhance_suggestions %}
+      <div class="small">可选建议：{% for s in sample.enhance_suggestions %}{{ s.title }}{% if not loop.last %}、{% endif %}{% endfor %}</div>
+      {% endif %}
+    {% endif %}
+
+    {% for tid, r in sample.results.items() %}
+    <h3>目标模型：{{ tid }}</h3>
+    {% if r.judge %}
+      <table class="scoretable">
+        <tr><th>维度</th><th>原始回答</th><th>增强回答</th><th>Delta</th></tr>
+        {% for d in dims %}
+        <tr>
+          <td>{{ dim_labels[d] }}</td>
+          <td>{{ r.judge.original[d] }}</td>
+          <td>{{ r.judge.enhanced[d] }}</td>
+          <td class="{{ 'up' if r.judge.deltas[d] > 0 else ('down' if r.judge.deltas[d] < 0 else 'zero') }}">{{ '%+d' | format(r.judge.deltas[d]) }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      <div class="winner">裁判结论：<span class="tag {{ 'win' if r.judge.winner == 'enhanced' else ('lose' if r.judge.winner == 'original' else 'tie') }}">{{ winner_label[r.judge.winner] }}</span> 更优</div>
+      <div class="reason">理由：{{ r.judge.reason or '（无）' }}</div>
+    {% else %}
+      <div class="small down">该组合未完成评测</div>
+    {% endif %}
+    <div class="grid2">
+      <div>
+        <div class="prompt-label">原始版回答
+          {% if r.original_error %}<span class="tag err">失败</span>{% endif %}
+        </div>
+        {% if r.original_error %}<pre class="down">{{ r.original_error }}</pre>
+        {% else %}<pre>{{ r.original_output }}</pre>{% endif %}
+      </div>
+      <div>
+        <div class="prompt-label">增强版回答
+          {% if r.enhanced_error %}<span class="tag err">失败</span>{% endif %}
+        </div>
+        {% if r.enhanced_error %}<pre class="down">{{ r.enhanced_error }}</pre>
+        {% else %}<pre>{{ r.enhanced_output }}</pre>{% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</details>
+{% endfor %}
+
+<div class="small" style="margin-top:36px">本报告由 evaluation/run_eval.py 自动生成。详细原始数据见 raw/ 与 summary.json。</div>
+</div>
+</body>
+</html>

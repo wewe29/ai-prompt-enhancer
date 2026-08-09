@@ -43,6 +43,7 @@ export interface RiskFlag {
 
 export interface EnhancementResult {
   status: "ready" | "needs_clarification";
+  task_type?: string;
   primary_prompt: string;
   assumptions: Assumption[];
   questions: ClarifyingQuestion[];
@@ -68,6 +69,7 @@ export interface ProviderConfig {
   v4FlashModelId: string;
   inputPrice: number;
   outputPrice: number;
+  models: string[];
 }
 
 export interface UsageRecord {

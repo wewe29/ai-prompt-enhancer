@@ -1,0 +1,7 @@
+import { z } from "zod";
+export const SuggestionSchema = z.object({ id: z.string(), kind: z.enum(["goal","context","format","constraint","alternate_intent"]), title: z.string(), purpose: z.string(), content: z.string(), operation: z.enum(["insert","replace"]), anchor: z.string().default(""), applied: z.boolean().default(false) });
+export const PromptChangeSchema = z.object({ id: z.string(), type: z.enum(["clarify","add_context","add_constraint","format","safety","remove_redundancy"]), before: z.string().default(""), after: z.string(), reason: z.string(), state: z.enum(["pending","accepted","rejected"]).default("pending") });
+export const AssumptionSchema = z.object({ id: z.string(), text: z.string(), confirmed: z.boolean().default(false) });
+export const ClarifyingQuestionSchema = z.object({ id: z.string(), text: z.string(), why_needed: z.string().default("") });
+export const RiskFlagSchema = z.object({ category: z.string(), message: z.string(), required_protection: z.string() });
+export const EnhancementResultSchema = z.object({ status: z.enum(["ready","needs_clarification"]), task_type: z.string().default(""), primary_prompt: z.string(), assumptions: z.array(AssumptionSchema).default([]), questions: z.array(ClarifyingQuestionSchema).default([]), changes: z.array(PromptChangeSchema).default([]), suggestions: z.array(SuggestionSchema).default([]), risk_flags: z.array(RiskFlagSchema).default([]) });

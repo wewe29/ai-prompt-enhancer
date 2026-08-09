@@ -1,0 +1,12 @@
+# 用户画像定义：模拟不同类别的用户会怎样写出原始提示词。
+# 评测时用 --personas novice,student,office 展开；不指定时行为与旧版完全一致。
+personas:
+  novice:
+    label: 纯AI小白
+    note: 口语化、碎片化短句、"帮我"开头、缺对象与上下文
+  student:
+    label: 学生
+    note: 有作业/课程背景、表达笼统、缺格式与验收要求
+  office:
+    label: 普通办公员工
+    note: 以工作目标开头、缺读者/篇幅/格式与验收标准

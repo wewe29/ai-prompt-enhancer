@@ -31,6 +31,8 @@ pub struct ClarificationAnswer {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnhancementResult {
     pub status: String,
+    #[serde(default)]
+    pub task_type: String,
     pub primary_prompt: String,
     #[serde(default)]
     pub assumptions: Vec<Assumption>,
@@ -72,7 +74,9 @@ pub struct PromptChange {
     pub state: String,
 }
 
-fn pending_state() -> String { "pending".to_string() }
+fn pending_state() -> String {
+    "pending".to_string()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Suggestion {
@@ -104,8 +108,14 @@ pub struct ProviderConfig {
     pub v4_flash_model_id: String,
     pub input_price: f64,
     pub output_price: f64,
+    #[serde(default = "default_models")]
+    pub models: Vec<String>,
     #[serde(default, skip_serializing)]
     pub api_key: Option<String>,
+}
+
+fn default_models() -> Vec<String> {
+    vec!["deepseek-chat".into()]
 }
 
 impl Default for ProviderConfig {
@@ -117,6 +127,7 @@ impl Default for ProviderConfig {
             v4_flash_model_id: "deepseek-v4-flash".into(),
             input_price: 0.001,
             output_price: 0.002,
+            models: default_models(),
             api_key: None,
         }
     }
@@ -188,5 +199,9 @@ impl Default for AppSettings {
     }
 }
 
-fn default_warning_limit() -> f64 { 8.0 }
-fn default_true() -> bool { true }
+fn default_warning_limit() -> f64 {
+    8.0
+}
+fn default_true() -> bool {
+    true
+}

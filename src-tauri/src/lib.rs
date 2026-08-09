@@ -1,16 +1,20 @@
 mod attachments;
 mod models;
+mod prompts;
 mod provider;
 mod security;
 mod storage;
 
 use crate::{
-    models::{AppSettings, BackendEvent, EnhancementRequest, ExtractedAttachment, HistoryRecord, ProviderConfig},
+    models::{
+        AppSettings, BackendEvent, EnhancementRequest, ExtractedAttachment, HistoryRecord,
+        ProviderConfig,
+    },
     storage::Storage,
 };
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
-use tauri::{ipc::Channel, Manager, State};
+use tauri::{Manager, State, ipc::Channel};
 use tokio::sync::Mutex as AsyncMutex;
 use tokio_util::sync::CancellationToken;
 use url::Url;
@@ -32,7 +36,9 @@ async fn enhance_prompt(
 
 #[tauri::command]
 async fn cancel_enhancement(state: State<'_, AppState>) -> Result<(), String> {
-    if let Some(token) = state.cancellation.lock().await.take() { token.cancel(); }
+    if let Some(token) = state.cancellation.lock().await.take() {
+        token.cancel();
+    }
     Ok(())
 }
 
@@ -42,20 +48,36 @@ fn get_provider_config(state: State<'_, AppState>) -> Result<ProviderConfig, Str
 }
 
 #[tauri::command]
-fn save_provider_config(mut config: ProviderConfig, state: State<'_, AppState>) -> Result<(), String> {
+fn save_provider_config(
+    mut config: ProviderConfig,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
     validate_base_url(&config.base_url)?;
     config.base_url = config.base_url.trim_end_matches('/').to_string();
     state.storage.save_provider_config(&config)
 }
 
 #[tauri::command]
-async fn validate_provider(api_key: String, base_url: String, state: State<'_, AppState>) -> Result<(), String> {
+async fn validate_provider(
+    api_key: String,
+    base_url: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
     validate_base_url(&base_url)?;
-    if api_key.trim().is_empty() { return Err("请输入 API Key".into()); }
+    if api_key.trim().is_empty() {
+        return Err("请输入 API Key".into());
+    }
     let endpoint = format!("{}/models", base_url.trim_end_matches('/'));
-    let response = state.client.get(endpoint).bearer_auth(api_key.trim()).send().await
+    let response = state
+        .client
+        .get(endpoint)
+        .bearer_auth(api_key.trim())
+        .send()
+        .await
         .map_err(|error| format!("连接 DeepSeek 失败：{error}"))?;
-    if response.status().is_success() { return Ok(()); }
+    if response.status().is_success() {
+        return Ok(());
+    }
     match response.status().as_u16() {
         401 | 403 => Err("API Key 无效或没有访问权限".into()),
         status => Err(format!("连接验证失败，DeepSeek 返回 HTTP {status}")),
@@ -64,17 +86,28 @@ async fn validate_provider(api_key: String, base_url: String, state: State<'_, A
 
 #[tauri::command]
 async fn extract_attachment(path: String) -> Result<ExtractedAttachment, String> {
-    tauri::async_runtime::spawn_blocking(move || attachments::extract(&path)).await
+    tauri::async_runtime::spawn_blocking(move || attachments::extract(&path))
+        .await
         .map_err(|error| format!("文件处理任务失败：{error}"))?
 }
 
 #[tauri::command]
-async fn copy_and_open(text: String, target_url: String, clear_clipboard: bool) -> Result<(), String> {
-    if text.trim().is_empty() { return Err("没有可复制的提示词".into()); }
+async fn copy_and_open(
+    text: String,
+    target_url: String,
+    clear_clipboard: bool,
+) -> Result<(), String> {
+    if text.trim().is_empty() {
+        return Err("没有可复制的提示词".into());
+    }
     validate_target_url(&target_url)?;
-    let mut clipboard = arboard::Clipboard::new().map_err(|error| format!("无法访问剪贴板：{error}"))?;
-    clipboard.set_text(text.clone()).map_err(|error| format!("无法写入剪贴板：{error}"))?;
-    open::that(&target_url).map_err(|error| format!("提示词已复制，但无法打开目标网页：{error}"))?;
+    let mut clipboard =
+        arboard::Clipboard::new().map_err(|error| format!("无法访问剪贴板：{error}"))?;
+    clipboard
+        .set_text(text.clone())
+        .map_err(|error| format!("无法写入剪贴板：{error}"))?;
+    open::that(&target_url)
+        .map_err(|error| format!("提示词已复制，但无法打开目标网页：{error}"))?;
 
     if clear_clipboard {
         let expected = Sha256::digest(text.as_bytes()).to_vec();
@@ -94,9 +127,14 @@ async fn copy_and_open(text: String, target_url: String, clear_clipboard: bool) 
 
 #[tauri::command]
 fn copy_text(text: String) -> Result<(), String> {
-    if text.trim().is_empty() { return Err("没有可复制的提示词".into()); }
-    let mut clipboard = arboard::Clipboard::new().map_err(|error| format!("无法访问剪贴板：{error}"))?;
-    clipboard.set_text(text).map_err(|error| format!("无法写入剪贴板：{error}"))
+    if text.trim().is_empty() {
+        return Err("没有可复制的提示词".into());
+    }
+    let mut clipboard =
+        arboard::Clipboard::new().map_err(|error| format!("无法访问剪贴板：{error}"))?;
+    clipboard
+        .set_text(text)
+        .map_err(|error| format!("无法写入剪贴板：{error}"))
 }
 
 #[tauri::command]
@@ -110,7 +148,10 @@ fn save_history(record: HistoryRecord, state: State<'_, AppState>) -> Result<(),
 }
 
 #[tauri::command]
-fn list_history(query: Option<String>, state: State<'_, AppState>) -> Result<Vec<HistoryRecord>, String> {
+fn list_history(
+    query: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<Vec<HistoryRecord>, String> {
     state.storage.list_history(query.as_deref())
 }
 
@@ -155,7 +196,9 @@ fn validate_base_url(value: &str) -> Result<(), String> {
 
 fn validate_target_url(value: &str) -> Result<(), String> {
     let parsed = Url::parse(value).map_err(|_| "目标网页地址无效".to_string())?;
-    if !matches!(parsed.scheme(), "http" | "https") { return Err("只允许打开 HTTP 或 HTTPS 网页".into()); }
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return Err("只允许打开 HTTP 或 HTTPS 网页".into());
+    }
     Ok(())
 }
 
@@ -204,21 +247,34 @@ pub fn run() {
 fn ensure_webview2_runtime() {
     use std::{env, path::PathBuf, process::Command};
 
-    let reg = env::var_os("WINDIR").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(r"C:\Windows"))
-        .join("System32").join("reg.exe");
+    let reg = env::var_os("WINDIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(r"C:\Windows"))
+        .join("System32")
+        .join("reg.exe");
     let registry_roots = [
         r"HKLM\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients",
         r"HKCU\Software\Microsoft\EdgeUpdate\Clients",
     ];
     let installed = registry_roots.iter().any(|root| {
-        Command::new(&reg).args(["query", root, "/s", "/f", "Microsoft Edge WebView2 Runtime"])
-            .output().map(|output| output.status.success()).unwrap_or(false)
+        Command::new(&reg)
+            .args(["query", root, "/s", "/f", "Microsoft Edge WebView2 Runtime"])
+            .output()
+            .map(|output| output.status.success())
+            .unwrap_or(false)
     });
-    if installed { return; }
+    if installed {
+        return;
+    }
 
-    let installer = env::current_exe().ok().and_then(|path| path.parent().map(|parent| parent.join("MicrosoftEdgeWebView2Setup.exe")));
+    let installer = env::current_exe().ok().and_then(|path| {
+        path.parent()
+            .map(|parent| parent.join("MicrosoftEdgeWebView2Setup.exe"))
+    });
     if let Some(installer) = installer.filter(|path| path.is_file()) {
-        let _ = Command::new(installer).args(["/silent", "/install"]).status();
+        let _ = Command::new(installer)
+            .args(["/silent", "/install"])
+            .status();
     }
 }
 

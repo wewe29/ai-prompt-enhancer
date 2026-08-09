@@ -1,0 +1,144 @@
+# PromptCraft 评测样本集
+# 覆盖编程 / 写作 / 问答 / 翻译 / 数据分析 / 创意 等场景
+# 最后一条故意较模糊，用于展示增强器补全信息的能力
+
+samples:
+  - id: code_fix_memory_leak
+    scenario: 编程
+    original: |
+      帮我看看这段 Python 代码为什么内存一直涨，修复一下：
+      ```python
+      import time
+
+      def load_data():
+          rows = []
+          while True:
+              rows.append("x" * 1024 * 1024)
+              if len(rows) % 10 == 0:
+                  rows.clear()
+              time.sleep(0.1)
+
+       load_data()
+       ```
+       这个程序跑几分钟内存就爆了，问题出在哪？
+    personas:
+      novice: 帮我看看这个python代码,内存一直涨,一直涨,几分钟就爆了,怎么办啊,帮我修一下
+      student: 老师布置的作业,这段代码运行几分钟内存就爆了,帮我看看问题出在哪,需要交作业用,最好给个解释
+      office: 我们程序跑几分钟内存就爆了,需要尽快处理,帮我分析一下原因并给出修复方案
+
+  - id: git_rebase_conflict
+    scenario: 编程
+    original: |
+      git rebase 的时候报这个错，怎么处理？
+      ```
+      CONFLICT (content): Merge conflict in src/config.py
+      Automatic merge failed; fix conflicts and then commit the result.
+      ```
+       我不太懂 rebase 和 merge 的区别，帮我解释一下，再告诉我在这个情况下应该怎么一步步解决。
+    personas:
+      novice: git rebase的时候报错了,上面写了一堆英文,好像是冲突,怎么办啊,我不懂这个,帮我看一下
+      student: 老师布置的作业,要我们用git rebase处理代码冲突,我敲了命令报错了,不知道怎么解决,还要说明rebase和merge的区别
+      office: 我们项目合并代码时git rebase报了冲突,卡住提交不了,帮我看看怎么一步步解决,顺便说下和merge有什么区别
+
+  - id: product_launch_announcement
+    scenario: 写作
+    original: |
+      我们公司下周要发布一款新的协作工具「轻舟」，支持多人实时编辑、任务看板和在线会议，主打中小团队。
+       帮我写一份正式的产品发布公告，要包括标题、正文，最后加个行动号召让大家去官网注册试用。
+    personas:
+      novice: 我们要发个产品公告,就是我们公司那个新出的软件,叫轻舟,帮我写一个,要正式一点的
+      student: 老师布置的作业,要我们为公司的新产品写一篇发布公告,产品叫「轻舟」,帮我写个带标题和正文的
+      office: 我们公司下周发布新协作工具「轻舟」,需要一份正式的产品发布公告,含标题正文和官网注册的号召
+
+  - id: tech_to_layman
+    scenario: 写作
+    original: |
+      把下面这段技术文档改成让不懂技术的人也能看懂的科普说明，语气轻松一点：
+       「本系统采用微服务架构，通过消息队列实现服务间异步解耦，使用分布式事务保证最终一致性，
+       配合容器编排平台实现弹性伸缩，多副本部署提升可用性。」
+    personas:
+      novice: 这段话是什么意思啊,我都看不懂,用大白话给我讲讲,越简单越好
+      student: 老师布置的作业,要把这段技术文档改写成不懂技术的人也能看懂的科普说明,语气轻松一点
+      office: 我们要把这页技术介绍改成客户能看懂的版本,客户都不懂技术,帮我改写成大白话,轻松一点
+
+  - id: qa_deepseek_arch
+    scenario: 问答
+    original: |
+      DeepSeek 的上下文窗口有多大？它的 MoE 结构是怎么回事？参数量到底是多少？
+       如果我不确定，请明确说出来，不要编造。另外对比一下它和传统 Dense 模型在推理成本上的差别。
+    personas:
+      novice: DeepSeek是啥,听人家说很厉害,它最多能记住多少东西啊,还有里面那个什么结构,帮我查查呗
+      student: 老师布置的作业,要我们研究DeepSeek的模型,包括上下文窗口、MoE结构和参数量,不确定的要说明,不能编
+      office: 我们评估DeepSeek能否用于项目,需要了解它的上下文窗口、MoE结构、参数量,以及和传统模型推理成本的差别
+
+  - id: qa_distributed_tx_cap
+    scenario: 问答
+    original: |
+      用大白话给我讲清楚分布式事务和 CAP 定理的关系。什么场景下必须用分布式事务？
+       2PC、TCC、Saga 各自适合什么情况？最好给个电商下单的例子。
+    personas:
+      novice: 分布式事务是啥,还有CAP是啥,好难懂,用大白话讲一下,最好举个例子
+      student: 老师布置的作业,分布式事务和CAP定理的关系没听懂,什么时候用分布式事务,2PC、TCC、Saga怎么选,要交作业,帮我讲清楚
+      office: 我们下单功能涉及多个系统,客户担心数据不一致,帮我用大白话解释下分布式事务和CAP,给个电商下单的例子
+
+  - id: translate_contract_clause
+    scenario: 翻译
+    original: |
+      把下面这段合同条款翻译成英文，要用正式的法律语言，专有名词保留原名，不要添加或删减意思：
+      「乙方应在合同生效后三十个工作日内完成交付，逾期超过十五日的，甲方有权解除本合同，
+      并要求乙方支付合同总金额百分之十的违约金。双方因履行本合同发生争议的，
+       应提交中国国际经济贸易仲裁委员会按其届时有效的仲裁规则仲裁解决。」
+    personas:
+      novice: 这段合同的话帮我翻译成英语,要正式一点的,别翻错了
+      student: 老师布置的作业,把这段合同条款翻译成英文,要用正式法律语言,专有名词保留原名,不能增减意思
+      office: 我们和客户签合同,这段条款需要译成英文给法务,要正式法律语言,专有名词保留原名,意思不能变
+
+  - id: data_analysis_sql
+    scenario: 数据分析
+    original: |
+      我有一张销售订单表 orders：id, user_id, product_id, amount, city, order_date。
+      帮我写 SQL 统计：每个城市每月的销售额、订单数、客单价，还要和上月对比环比变化。
+       顺便告诉我这个结果应该怎么解读，重点看什么。
+    personas:
+      novice: 我有一张卖东西的表格,帮我统计每个城市每个月的销售额和订单数,还想和上个月比,不会写
+      student: 老师布置的作业,有一张销售订单表orders,字段是id,user_id,product_id,amount,city,order_date,统计每个城市每月销售额、订单数、客单价,还要环比
+      office: 我们数据分析要看每个城市每月的销售额、订单数、客单价,还要和上月环比,帮我把SQL写出来并说明怎么解读
+
+  - id: creative_ad_copy
+    scenario: 创意
+    original: |
+      帮我写3版暑期少儿编程班的广告文案。目标人群是 8-12 岁孩子的家长，
+       卖点是培养逻辑思维、Scratch/Python 入门、小班教学。每版风格不同，都要有标题和一句话 slogan。
+    personas:
+      novice: 帮我写个广告文案,就是那个少儿编程班的,暑假招生的,写3个版本的,每个要有标题
+      student: 老师布置的作业,给暑期少儿编程班写广告文案,面向8-12岁孩子家长,卖点是逻辑思维、Scratch/Python入门、小班教学,3版不同风格,都要标题和slogan
+      office: 我们少儿编程班暑期招生,需要3版不同风格的广告文案,面向8-12岁孩子家长,突出逻辑思维、Scratch/Python入门和小班教学,每版都要标题和一句话slogan
+
+  - id: vague_request
+    scenario: 模糊请求
+    original: |
+      帮我写个方案。
+    personas:
+      novice: 帮我写个方案,我不知道写啥,你帮我写一个吧
+      student: 老师布置的作业,要写个方案,帮我写一下,要交的
+      office: 我们这边需要一份方案,帮我写一下
+
+  - id: minimal_intervention
+    scenario: 写作
+    original: |
+      帮我写一封给客户道歉的邮件，客户是中型企业的采购负责人，
+      原因是我们的产品交付延期了两周。语气要诚恳但不卑微，
+      长度控制在 200 字以内，最后给出补偿方案（延长 30 天免费支持）。
+    personas:
+      novice: 帮我写封邮件,跟客户道歉,我们东西交晚了,要诚恳一点但别太那啥,别超过200字,最后说一下给客户延长30天支持,客户是中型企业的采购负责人
+      student: 老师布置的商务写作作业:写一封给客户的道歉邮件,客户是中型企业采购负责人,因为产品交付延期两周,要诚恳但不卑微,200字以内,最后要写补偿方案,延长30天免费支持
+      office: 我们产品交付延期了两周,需要给客户发一封道歉邮件,客户是中型企业的采购负责人,语气诚恳但不卑微,200字以内,结尾给出延长30天免费支持的补偿方案
+
+  - id: creative_free_poem
+    scenario: 创意
+    original: |
+      用现代诗的风格写一首关于秋天下午的短诗，不要太长，别用太常见的意象。
+    personas:
+      novice: 帮我写一首诗,现代诗那种,写秋天下午的,短一点,别用那些大家都写烂了的词
+      student: 语文课作业,写一首关于秋天下午的现代诗,要求不要太长,意象别太俗套
+      office: 我们需要一首现代诗,主题是秋天下午,篇幅要短,避免常见的意象,用于内部活动
