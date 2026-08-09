@@ -95,7 +95,7 @@ evaluation/
 ├── judge.py               # LLM-as-judge 裁判
 ├── report.py              # 报告生成
 ├── targets/               # 目标适配层（web 网页版 / api 直连 / mock 离线）
-├── samples/samples.yaml   # 评测样本（12 条，可自行增改）
+├── samples/samples.yaml   # 评测样本（22 条，可自行增改）
 ├── personas.yaml          # 用户画像定义（--personas 模拟用，可自行增改）
 ├── templates/             # HTML 报告模板
 ├── test_enhancer.py       # 增强逻辑等价性测试（对照 Rust 源码）
