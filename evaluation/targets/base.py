@@ -80,7 +80,7 @@ class MockAdapter(TargetAdapter):
 
 
 def create_adapter(name: str, target_cfg: dict[str, Any], global_cfg: dict[str, Any], browser_manager: Any = None, api_key: str = "") -> TargetAdapter:
-    """按 target 的 mode 创建适配器：web | api | mock。
+    """按 target 的 mode 创建适配器：web | api | anthropic | mock。
 
     browser_manager：web 模式下可传入共享的 BrowserManager（由 run_eval 统一管理生命周期）。
     """
@@ -93,6 +93,10 @@ def create_adapter(name: str, target_cfg: dict[str, Any], global_cfg: dict[str, 
         from .api_adapter import ApiAdapter
 
         return ApiAdapter(name, target_cfg, global_cfg, api_key=api_key)
+    if mode == "anthropic":
+        from .anthropic_adapter import AnthropicAdapter
+
+        return AnthropicAdapter(name, target_cfg, global_cfg, api_key=api_key)
     if mode == "mock":
         return MockAdapter(name, target_cfg, global_cfg)
     raise ValueError(f"target {name}: 未知 mode={mode}")

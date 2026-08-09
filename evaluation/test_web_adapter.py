@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import json
 import sys
 import time
 from pathlib import Path
@@ -12,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from targets.web_adapter import WebTargetAdapter, _clean_text  # noqa: E402
 from targets.api_adapter import ApiAdapter  # noqa: E402
+from targets.anthropic_adapter import AnthropicAdapter  # noqa: E402
 from targets.base import NetworkError  # noqa: E402
 
 EVAL_ROOT = str(Path(__file__).resolve().parent)
@@ -219,3 +221,77 @@ def test_api_key_resolution_none_raises(monkeypatch):
         assert False, "应抛出 NetworkError"
     except NetworkError as exc:
         assert "API Key" in str(exc)
+
+
+def make_anthropic_adapter(**target_overrides) -> AnthropicAdapter:
+    target_cfg = {
+        "mode": "anthropic",
+        "base_url": "https://ark.cn-beijing.volces.com/api",
+        "model": "test-plan-model",
+        **target_overrides,
+    }
+    return AnthropicAdapter("fake-anthropic", target_cfg, {"browser": {}, "_eval_root": EVAL_ROOT})
+
+
+def test_anthropic_key_resolution_none_raises(monkeypatch):
+    """所有来源都为空（空 env + 无 cfg key + 空构造参数）→ health_check 抛 NetworkError。"""
+    monkeypatch.delenv("ARK_API_KEY", raising=False)
+    a = make_anthropic_adapter(api_key_env="ARK_API_KEY")
+    try:
+        a.health_check()
+        assert False, "应抛出 NetworkError"
+    except NetworkError as exc:
+        assert "API Key" in str(exc)
+
+
+def test_anthropic_key_resolution_prefers_env_var(monkeypatch):
+    """api_key_env 指向的环境变量已设置 → 使用环境变量值。"""
+    monkeypatch.setenv("ARK_API_KEY", "env-secret")
+    a = make_anthropic_adapter(api_key_env="ARK_API_KEY", api_key="cfg-key")
+    assert a._resolve_api_key() == "env-secret"
+    a.health_check()  # 不应抛错
+
+
+def test_anthropic_key_resolution_env_missing_falls_back_to_cfg(monkeypatch):
+    """api_key_env 设置但环境变量不存在 → 回退 target_cfg.api_key。"""
+    monkeypatch.delenv("ARK_API_KEY", raising=False)
+    a = make_anthropic_adapter(api_key_env="ARK_API_KEY", api_key="cfg-key")
+    assert a._resolve_api_key() == "cfg-key"
+
+
+def test_anthropic_key_resolution_falls_back_to_constructor_arg(monkeypatch):
+    """没有 api_key_env / api_key → 使用构造参数 api_key。"""
+    monkeypatch.delenv("ARK_API_KEY", raising=False)
+    a = make_anthropic_adapter(api_key="ctor-key")
+    assert a._resolve_api_key() == "ctor-key"
+
+
+def test_anthropic_infer_builds_request(monkeypatch):
+    """infer 走 POST {base_url}/v1/messages，x-api-key / anthropic-version 头正确，拼接所有 text 块。"""
+    monkeypatch.setenv("ARK_API_KEY", "env-secret")
+    captured = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return None
+
+        def read(self):
+            return json.dumps(
+                {"content": [{"type": "text", "text": "回答A"}, {"type": "text", "text": "回答B"}]}
+            ).encode("utf-8")
+
+    def fake_urlopen(req, timeout=120):
+        captured["req"] = req
+        return FakeResponse()
+
+    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
+    a = make_anthropic_adapter(api_key_env="ARK_API_KEY", api_key="cfg-key")
+    assert a.infer("你好") == "回答A回答B"
+    req = captured["req"]
+    headers = {k.lower(): v for k, v in req.headers.items()}
+    assert req.full_url.endswith("/v1/messages")
+    assert headers.get("x-api-key") == "env-secret"
+    assert headers.get("anthropic-version") == "2023-06-01"
