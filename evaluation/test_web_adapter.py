@@ -11,6 +11,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from targets.web_adapter import WebTargetAdapter, _clean_text  # noqa: E402
+from targets.api_adapter import ApiAdapter  # noqa: E402
+from targets.base import NetworkError  # noqa: E402
 
 EVAL_ROOT = str(Path(__file__).resolve().parent)
 
@@ -174,3 +176,46 @@ def test_send_prompt_fallback_not_found_still_continues():
     a._wait_generation_started = lambda: None
     a._send_prompt("你好")  # 不应抛异常
     assert page.keyboard.pressed == ["Enter"]
+
+
+def make_api_adapter(**target_overrides) -> ApiAdapter:
+    target_cfg = {
+        "mode": "api",
+        "base_url": "https://api.example.com/v1",
+        "model": "test-model",
+        **target_overrides,
+    }
+    return ApiAdapter("fake-api", target_cfg, {"browser": {}, "_eval_root": EVAL_ROOT})
+
+
+def test_api_key_resolution_prefers_env_var(monkeypatch):
+    """api_key_env 指向的环境变量已设置 → 使用环境变量值。"""
+    monkeypatch.setenv("VOLCANO_API_KEY", "env-secret")
+    a = make_api_adapter(api_key_env="VOLCANO_API_KEY", api_key="cfg-key")
+    assert a._resolve_api_key() == "env-secret"
+    a.health_check()  # 不应抛错
+
+
+def test_api_key_resolution_env_missing_falls_back_to_cfg(monkeypatch):
+    """api_key_env 设置但环境变量不存在 → 回退 target_cfg.api_key。"""
+    monkeypatch.delenv("VOLCANO_API_KEY", raising=False)
+    a = make_api_adapter(api_key_env="VOLCANO_API_KEY", api_key="cfg-key")
+    assert a._resolve_api_key() == "cfg-key"
+
+
+def test_api_key_resolution_falls_back_to_constructor_arg(monkeypatch):
+    """没有 api_key_env / api_key → 使用构造参数 api_key。"""
+    monkeypatch.delenv("VOLCANO_API_KEY", raising=False)
+    a = make_api_adapter(api_key="ctor-key")
+    assert a._resolve_api_key() == "ctor-key"
+
+
+def test_api_key_resolution_none_raises(monkeypatch):
+    """所有来源都为空 → health_check 抛 NetworkError 且包含 'API Key'。"""
+    monkeypatch.delenv("VOLCANO_API_KEY", raising=False)
+    a = make_api_adapter(api_key_env="VOLCANO_API_KEY")
+    try:
+        a.health_check()
+        assert False, "应抛出 NetworkError"
+    except NetworkError as exc:
+        assert "API Key" in str(exc)

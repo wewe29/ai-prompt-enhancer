@@ -172,7 +172,7 @@ def main() -> int:
 
     try:
         for tid, tcfg in enabled.items():
-            adapter = targets.create_adapter(tid, tcfg, cfg, browser_manager=browser_manager)
+            adapter = targets.create_adapter(tid, tcfg, cfg, browser_manager=browser_manager, api_key=api_key)
             print(f"\n========== 目标模型：{tid} ==========")
             login_failed = False
             for sample in samples:
