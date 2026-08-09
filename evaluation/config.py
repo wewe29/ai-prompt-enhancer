@@ -95,8 +95,8 @@ def validate(cfg: dict[str, Any]) -> None:
     if cfg.get("browser", {}).get("mode") not in ("playwright", "cdp"):
         raise ConfigError("browser.mode 必须是 playwright | cdp")
     for tid, tcfg in cfg.get("targets", {}).items():
-        if tcfg.get("enabled") and tcfg.get("mode") not in ("web", "api", "mock"):
-            raise ConfigError(f"target {tid}: mode 必须是 web | api | mock")
+        if tcfg.get("enabled") and tcfg.get("mode") not in ("web", "api", "anthropic", "mock"):
+            raise ConfigError(f"target {tid}: mode 必须是 web | api | anthropic | mock")
 
 
 def resolve_api_key(cfg: dict[str, Any]) -> str:
