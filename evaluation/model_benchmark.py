@@ -250,6 +250,8 @@ def main(argv: list[str] | None = None) -> int:
                 detail["usage"] = infer.get("usage", {})
                 if infer.get("error"):
                     detail["error"] = f"推理失败：{infer['error']}"
+                elif not (infer.get("text") or "").strip():
+                    detail["error"] = "推理输出为空，跳过裁判"
                 else:
                     cached = load_cache("judge", pid, mid)
                     if cached is not None:
