@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from config import ConfigError, load_config, resolve_api_key  # noqa: E402
 from enhancer import EnhanceError, enhance as api_enhance  # noqa: E402
-from judge import JudgeError, judge_pair, judge_prompt_level  # noqa: E402
+from judge import JudgeError, judge_agreement, judge_pair, judge_prompt_level  # noqa: E402
 import report as report_mod  # noqa: E402
 import targets  # noqa: E402
 
@@ -254,6 +254,9 @@ def main() -> int:
 
     # 阶段三：裁判
     judged = 0
+    jcfg = cfg.get("judge", {})
+    cross_check = bool(jcfg.get("cross_check")) and bool(jcfg.get("second_model"))
+    second_model = jcfg.get("second_model", "")
     for sample in samples:
         for tid, result in (sample.get("results") or {}).items():
             if result.get("judge") is not None:
@@ -271,6 +274,22 @@ def main() -> int:
                         cfg, "裁判",
                     )
                 judged += 1
+                if cross_check:
+                    try:
+                        if offline:
+                            result["judge2"] = judge_offline(sample, result["original_output"], result["enhanced_output"], cfg, "")
+                        else:
+                            result["judge2"] = run_with_budget(
+                                lambda s=sample, r=result: judge_pair(
+                                    s, r["original_output"], r["enhanced_output"], cfg, api_key, judge_model=second_model
+                                ),
+                                cfg, "第二裁判",
+                            )
+                    except JudgeError as exc:
+                        result["judge2"] = None
+                        print(f"  [第二裁判] {sample['id']} × {tid} 失败：{exc}")
+                    if result.get("judge2") is not None:
+                        result["agreement"] = judge_agreement(result["judge"], result["judge2"])
             except JudgeError as exc:
                 result["judge"] = None
                 print(f"  [裁判] {sample['id']} × {tid} 失败：{exc}")
@@ -342,6 +361,9 @@ def run_manual_answers(args: argparse.Namespace, cfg: dict[str, Any], samples: l
                 filled += 1
 
     judged = 0
+    jcfg = cfg.get("judge", {})
+    cross_check = bool(jcfg.get("cross_check")) and bool(jcfg.get("second_model"))
+    second_model = jcfg.get("second_model", "")
     for sample in samples:
         for tid, result in (sample.get("results") or {}).items():
             if not result.get("original_output") or not result.get("enhanced_output"):
@@ -356,6 +378,22 @@ def run_manual_answers(args: argparse.Namespace, cfg: dict[str, Any], samples: l
                         cfg, "裁判",
                     )
                 judged += 1
+                if cross_check:
+                    try:
+                        if args.offline:
+                            result["judge2"] = judge_offline(sample, result["original_output"], result["enhanced_output"], cfg, "")
+                        else:
+                            result["judge2"] = run_with_budget(
+                                lambda s=sample, r=result: judge_pair(
+                                    s, r["original_output"], r["enhanced_output"], cfg, api_key, judge_model=second_model
+                                ),
+                                cfg, "第二裁判",
+                            )
+                    except JudgeError as exc:
+                        result["judge2"] = None
+                        print(f"  [第二裁判] {sample['id']} × {tid} 失败：{exc}")
+                    if result.get("judge2") is not None:
+                        result["agreement"] = judge_agreement(result["judge"], result["judge2"])
             except JudgeError as exc:
                 result["judge"] = None
                 print(f"  [裁判] {sample['id']} × {tid} 失败：{exc}")

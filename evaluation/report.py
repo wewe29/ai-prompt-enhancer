@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import math
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,30 @@ DIMENSION_ORDER = ["accuracy", "completeness", "relevance", "clarity"]
 
 # 判定"改进"的阈值：任一维度提升 ≥ 2 分视为有实质改进
 IMPROVE_THRESHOLD = 2
+
+
+def wilson_ci(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
+    """Wilson score interval for proportion k/n; returns (low, high)."""
+    if n <= 0:
+        return (0.0, 0.0)
+    p = k / n
+    denom = 1 + z * z / n
+    center = (p + z * z / (2 * n)) / denom
+    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
+    return (max(0.0, center - half), min(1.0, center + half))
+
+
+def binomial_one_sided(wins: int, losses: int) -> float:
+    """单侧二项检验：X~Binomial(wins+losses, 0.5)，返回观察方向上的尾概率。
+
+    wins <= losses 时 p = P(X <= wins)，否则 p = P(X >= wins)。
+    """
+    n = wins + losses
+    if n <= 0:
+        return 1.0
+    if wins <= losses:
+        return sum(math.comb(n, i) for i in range(wins + 1)) / (2 ** n)
+    return sum(math.comb(n, i) for i in range(wins, n + 1)) / (2 ** n)
 
 
 def classify_magnitude(mean_delta: float) -> str:
@@ -43,6 +68,9 @@ def generate(results_dir: Path, data: dict[str, Any]) -> Path:
     raw_dir.mkdir(exist_ok=True)
 
     _write_raw_files(raw_dir, data)
+    (results_dir / "samples.json").write_text(
+        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     (results_dir / "summary.json").write_text(
         json.dumps(_aggregate(data), ensure_ascii=False, indent=2), encoding="utf-8"
     )
@@ -88,6 +116,8 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
         "regress": {"minor": 0, "moderate": 0, "major": 0},
     }
     by_prompt_judge: dict[str, dict[str, list[float]]] = {}
+    agreement_winners: list[float] = []
+    agreement_rhos: dict[str, list[float]] = {d: [] for d in DIMENSIONS}
 
     for sample in data.get("samples", []):
         scenario = sample.get("scenario", "未分类")
@@ -118,6 +148,14 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
                 if persona:
                     by_persona.setdefault(persona, {}).setdefault(dim, []).append(deltas.get(dim, 0))
 
+            ag = result.get("agreement")
+            if ag and ag.get("dim_corr"):
+                agreement_winners.append(1.0 if ag.get("winner_agreement") else 0.0)
+                for dim in DIMENSIONS:
+                    rho = ag["dim_corr"].get(dim)
+                    if isinstance(rho, (int, float)):
+                        agreement_rhos[dim].append(float(rho))
+
         pj = sample.get("prompt_judge")
         if pj and not pj.get("error"):
             for dim in PROMPT_JUDGE_DIMS:
@@ -129,6 +167,26 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
             return {"n": 0, "mean": 0.0}
         return {"n": n, "mean": round(sum(series) / n, 2)}
 
+    summary: dict[str, Any] = {
+        "total": total,
+        "improved": improved,
+        "improved_pct": round(100.0 * improved / total, 1) if total else 0.0,
+        "wins": wins,
+        "ties": ties,
+        "losses": losses,
+        "win_rate_ci": [round(v, 4) for v in wilson_ci(wins, total)],
+        "binomial_p": round(binomial_one_sided(wins, losses), 4),
+    }
+    if agreement_winners:
+        summary["judge_agreement"] = {
+            "winner_agreement": round(sum(agreement_winners) / len(agreement_winners), 4),
+            "n": len(agreement_winners),
+            "dim_corr": {
+                dim: round(sum(vals) / len(vals), 4) if vals else 0.0
+                for dim, vals in agreement_rhos.items()
+            },
+        }
+
     return {
         "dimensions": {dim: stat(by_dim[dim]) for dim in DIMENSIONS},
         "by_target": {tid: {dim: stat(vals) for dim, vals in dims.items()} for tid, dims in by_target.items()},
@@ -136,14 +194,7 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
         "by_persona": {pid: {dim: stat(vals) for dim, vals in dims.items()} for pid, dims in by_persona.items()},
         "by_prompt_judge": {sc: {dim: stat(vals) for dim, vals in dims.items()} for sc, dims in by_prompt_judge.items()},
         "by_magnitude": by_magnitude,
-        "summary": {
-            "total": total,
-            "improved": improved,
-            "improved_pct": round(100.0 * improved / total, 1) if total else 0.0,
-            "wins": wins,
-            "ties": ties,
-            "losses": losses,
-        },
+        "summary": summary,
     }
 
 
@@ -163,7 +214,25 @@ def _render_markdown(data: dict[str, Any]) -> str:
     summary = agg["summary"]
     lines.append(f"- 有效对比样本：**{summary['total']}** 组")
     lines.append(f"- 增强后更优（任一维度 +{IMPROVE_THRESHOLD} 分）：**{summary['improved']}** 组（{summary['improved_pct']}%）")
-    lines.append(f"- 胜负关系：胜（增强更优）**{summary['wins']}** / 平 **{summary['ties']}** / 负（原始更优）**{summary['losses']}**\n")
+    win_line = f"- 胜负关系：胜（增强更优）**{summary['wins']}** / 平 **{summary['ties']}** / 负（原始更优）**{summary['losses']}**"
+    if summary["total"] > 0:
+        ci = summary.get("win_rate_ci", (0.0, 0.0))
+        win_line += (
+            f"（胜率 {100.0 * summary['wins'] / summary['total']:.1f}%，"
+            f"95% CI: [{ci[0]:.3f}, {ci[1]:.3f}]，p={summary.get('binomial_p', 1.0):.4f}）"
+        )
+        if summary["total"] < 30:
+            win_line += "（样本数较少，结论仅供参考）"
+    lines.append(win_line + "\n")
+    ja = summary.get("judge_agreement")
+    if ja:
+        dim_corr = "；".join(
+            f"{DIMENSION_LABELS[d]} ρ={ja['dim_corr'].get(d, 0.0):.2f}" for d in DIMENSION_ORDER
+        )
+        lines.append(
+            f"- 裁判一致性：双裁判胜者一致率 **{100.0 * ja['winner_agreement']:.1f}%**"
+            f"（n={ja['n']}）｜{dim_corr}\n"
+        )
     lines.append("| 维度 | 平均 Delta（增强 − 原始） |")
     lines.append("|---|---|")
     for dim in DIMENSION_ORDER:

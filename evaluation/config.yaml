@@ -98,6 +98,77 @@ targets:
       new_chat: ["button:has-text('新对话')"]
       include_code: true
 
+  # 火山方舟 Agent Plan 目标（Anthropic Messages 协议，/api/plan 端点）
+  # 密钥从环境变量 ARK_PLAN_API_KEY 读取（api_key_env），不会写入本文件
+  plan_doubao:
+    enabled: true
+    mode: anthropic
+    base_url: https://ark.cn-beijing.volces.com/api/plan
+    model: doubao-seed-2.0-mini
+    api_key_env: ARK_PLAN_API_KEY
+    temperature: 0.7
+    max_tokens: 4096
+
+  plan_glm:
+    enabled: true
+    mode: anthropic
+    base_url: https://ark.cn-beijing.volces.com/api/plan
+    model: glm-5.2
+    api_key_env: ARK_PLAN_API_KEY
+    temperature: 0.7
+    max_tokens: 4096
+
+  plan_deepseek:
+    enabled: true
+    mode: anthropic
+    base_url: https://ark.cn-beijing.volces.com/api/plan
+    model: deepseek-v4-flash
+    api_key_env: ARK_PLAN_API_KEY
+    temperature: 0.7
+    max_tokens: 4096
+
+  # 火山方舟 API 直连目标（OpenAI 兼容接口，替代网页版抓取）
+  # 密钥从环境变量 ARK_API_KEY 读取（api_key_env），不会写入本文件
+  ark_doubao:
+    enabled: true
+    mode: api
+    base_url: https://ark.cn-beijing.volces.com/api/v3
+    model: doubao-seed-2-1-pro-260628
+    api_key_env: ARK_API_KEY
+    temperature: 0.7
+
+  ark_deepseek:
+    enabled: true
+    mode: api
+    base_url: https://ark.cn-beijing.volces.com/api/v3
+    model: deepseek-v4-flash-ga-260731
+    api_key_env: ARK_API_KEY
+    temperature: 0.7
+
+  ark_qwen:
+    enabled: false                # 控制台开通 qwen3-32b-20250429 后启用
+    mode: api
+    base_url: https://ark.cn-beijing.volces.com/api/v3
+    model: qwen3-32b-20250429
+    api_key_env: ARK_API_KEY
+    temperature: 0.7
+
+  ark_glm:
+    enabled: true
+    mode: api
+    base_url: https://ark.cn-beijing.volces.com/api/v3
+    model: glm-5-2-260617
+    api_key_env: ARK_API_KEY
+    temperature: 0.7
+
+  ark_kimi:
+    enabled: false                # 控制台开通 kimi-k2-250905 后启用
+    mode: api
+    base_url: https://ark.cn-beijing.volces.com/api/v3
+    model: kimi-k2-250905
+    api_key_env: ARK_API_KEY
+    temperature: 0.7
+
   # 备用：直接把提示词发给 OpenAI 兼容 API（无网页访问时使用，需 base_url/model/api_key）
   # custom_api:
   #   enabled: false
@@ -111,6 +182,7 @@ judge:
   temperature: 0
   randomize_order: true               # 随机互换 A/B 消除位置偏差
   cross_check: false                  # 每条独立再评一次交叉验证（增加成本）
+  # second_model: doubao-seed-2-1-pro  # 交叉验证的第二裁判模型（cross_check: true 时生效）
 
 samples: samples/samples.yaml
 

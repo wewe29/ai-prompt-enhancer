@@ -53,9 +53,14 @@ def judge_pair(
     enhanced_output: str,
     cfg: dict[str, Any],
     api_key: str,
+    judge_model: str | None = None,
 ) -> dict[str, Any]:
-    """对同一提示词的两组回答进行裁判，返回结构化对比结果。"""
+    """对同一提示词的两组回答进行裁判，返回结构化对比结果。
+
+    judge_model 可指定与 cfg["judge"]["model"] 不同的模型（第二裁判交叉验证时使用）。
+    """
     jcfg = cfg.get("judge", {})
+    model = judge_model or jcfg.get("model", "deepseek-chat")
     swapped = bool(jcfg.get("randomize_order", True)) and random.random() < 0.5
     prompt_a, answer_a, prompt_b, answer_b = _assign_labels(
         sample, original_output, enhanced_output, swapped
@@ -63,7 +68,7 @@ def judge_pair(
 
     user_message = _build_judge_message(sample, prompt_a, answer_a, prompt_b, answer_b)
     body = {
-        "model": jcfg.get("model", "deepseek-chat"),
+        "model": model,
         "messages": [
             {"role": "system", "content": JUDGE_SYSTEM_PROMPT},
             {"role": "user", "content": user_message},
@@ -119,6 +124,20 @@ def judge_pair(
     }
 
 
+def judge_agreement(a: dict, b: dict) -> dict:
+    """a/b 为两次 judge_pair 结果；返回 winner 一致性与四维 Spearman 相关。
+
+    单条对比在每个维度上只有一组 delta 值，无法按维度单独求相关，
+    因此对两个裁判的四维 delta 向量整体计算 Spearman ρ（四维相关），
+    并以同一 ρ 填入各维度键下，便于报告端按维度聚合均值。
+    """
+    winner_agreement = bool(a.get("winner") == b.get("winner"))
+    x = [float(a["deltas"][dim]) for dim in DIMENSIONS]
+    y = [float(b["deltas"][dim]) for dim in DIMENSIONS]
+    rho = _spearman(x, y)
+    return {"winner_agreement": winner_agreement, "dim_corr": {dim: rho for dim in DIMENSIONS}}
+
+
 def judge_prompt_level(
     original: str,
     enhanced: str,
@@ -168,6 +187,41 @@ def judge_prompt_level(
 
 
 # ---- 内部工具 ----
+
+def _rank(values: list[float]) -> list[float]:
+    """平均秩：并列值共享名次的平均值。"""
+    order = sorted(range(len(values)), key=lambda i: values[i])
+    ranks = [0.0] * len(values)
+    i = 0
+    while i < len(order):
+        j = i
+        while j + 1 < len(order) and values[order[j + 1]] == values[order[i]]:
+            j += 1
+        avg_rank = (i + j) / 2 + 1
+        for k in range(i, j + 1):
+            ranks[order[k]] = avg_rank
+        i = j + 1
+    return ranks
+
+
+def _pearson(x: list[float], y: list[float]) -> float:
+    n = len(x)
+    mx, my = sum(x) / n, sum(y) / n
+    sxx = sum((v - mx) ** 2 for v in x)
+    syy = sum((v - my) ** 2 for v in y)
+    sxy = sum((x[i] - mx) * (y[i] - my) for i in range(n))
+    denom = (sxx * syy) ** 0.5
+    if not denom:
+        return 0.0
+    return max(-1.0, min(1.0, sxy / denom))
+
+
+def _spearman(x: list[float], y: list[float]) -> float:
+    """Spearman 秩相关：平均秩处理并列后对秩做 Pearson 相关（无 scipy 依赖）。"""
+    if len(x) != len(y) or len(x) < 2:
+        return 0.0
+    return _pearson(_rank(x), _rank(y))
+
 
 def _assign_labels(sample, original_output, enhanced_output, swapped):
     if swapped:
