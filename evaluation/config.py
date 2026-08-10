@@ -28,10 +28,9 @@ EVAL_ROOT = Path(__file__).resolve().parent
 
 DEFAULTS: dict[str, Any] = {
     "enhancer": {
-        "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+        "base_url": "https://api.deepseek.com",
         "protocol": "openai",
-        "model": "doubao-seed-2-1-pro-260628",
-        "api_key_env": "ARK_API_KEY",
+        "model": "deepseek-v4-flash",
         "verbosity": "standard",
         "custom_instructions": "",
         "temperature": 0.35,

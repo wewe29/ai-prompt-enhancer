@@ -5,10 +5,9 @@
 # - 可运行 `python run_eval.py --login` 打开浏览器手动登录后，再用 `python run_eval.py` 全量评测
 
 enhancer:
-  base_url: https://ark.cn-beijing.volces.com/api/v3   # 火山方舟 OpenAI 兼容端点（探针确认 doubao-seed-2-1-pro-260628 可用）
+  base_url: https://api.deepseek.com     # DeepSeek 原账号（keyring 密钥），与火山目标模型解耦
   protocol: openai                  # openai | anthropic（当前使用 OpenAI 兼容协议）
-  model: doubao-seed-2-1-pro-260628 # 增强器模型（火山方舟 v3 端点可用模型 ID）
-  api_key_env: ARK_API_KEY          # 增强器密钥环境变量（火山方舟 v3 密钥，与 plan/DeepSeek 密钥不同）
+  model: deepseek-v4-flash          # 增强器模型（与火山 plan_deepseek 目标同模型但不同部署，可报告自偏风险）
   verbosity: standard               # concise | standard | deep | custom
   custom_instructions: ""           # 自定义增强要求（可选）
   temperature: 0.35                 # 与 PromptCraft 后端一致

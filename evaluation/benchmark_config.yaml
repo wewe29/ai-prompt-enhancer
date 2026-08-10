@@ -5,10 +5,10 @@ api:
   api_key_env: ARK_PLAN_API_KEY
   api_key_file: key.local
 enhancer:
-  base_url: https://ark.cn-beijing.volces.com/api/v3
+  base_url: https://api.deepseek.com
   protocol: openai
-  model: doubao-seed-2-1-pro-260628
-  api_key_env: ARK_API_KEY
+  model: deepseek-v4-flash
+  api_key_env: DEEPSEEK_API_KEY
   temperature: 0.35
 # 按场景的生成温度（场景关键字 → 温度）；样本自带 temperature 字段优先；未命中用 params.temperature
 scenario_temperatures:
