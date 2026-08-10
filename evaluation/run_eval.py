@@ -112,7 +112,16 @@ def main() -> int:
     if control_group:
         print("[模式] 长度控制组：启用（额外推理 padded 变体，与增强对照裁判）")
 
-    samples = load_samples(args.samples or cfg.get("samples"))
+    regression_mode = args.regression
+    samples_path = args.samples or cfg.get("samples")
+    if regression_mode:
+        samples_path = "samples_regression.yaml"
+    elif samples_path and "regression" in Path(str(samples_path)).name:
+        regression_mode = True
+    if regression_mode:
+        print("[模式] 回归测试：样本为已优化提示词，重点统计增强是否引入回退")
+
+    samples = load_samples(samples_path)
     if not samples:
         print("[错误] 样本集为空")
         return 1
@@ -350,6 +359,7 @@ def main() -> int:
         "estimated_cost": round(_total_cost(samples), 4),
         "offline": offline,
         "control_group": control_group,
+        "regression_mode": regression_mode,
     }
     payload = {"meta": meta, "samples": samples}
     out_dir = report_mod.timestamp_dir(RESULTS_ROOT)
@@ -359,6 +369,8 @@ def main() -> int:
     s = agg["summary"]
     print("\n================ 评测完成 ================")
     print(f"有效对比：{s['total']} 组 | 增强更优：{s['improved']}（{s['improved_pct']}%）| 胜/平/负：{s['wins']}/{s['ties']}/{s['losses']}")
+    if regression_mode:
+        print(f"回归失败率：{100.0 * s.get('regression_failure_rate', 0.0):.1f}% | 变差率：{100.0 * s.get('regression_worse_rate', 0.0):.1f}%")
     print("各维度平均 Delta：", {d: agg['dimensions'][d]['mean'] for d in ("accuracy", "completeness", "relevance", "clarity")})
     print(f"预估成本：${meta['estimated_cost']:.4f}")
     print(f"报告目录：{out_dir}")
@@ -662,6 +674,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="PromptCraft 增强效果评测")
     parser.add_argument("--config", default=None, help="config.yaml 路径（默认 evaluation/config.yaml）")
     parser.add_argument("--samples", default=None, help="样本 YAML 路径")
+    parser.add_argument("--regression", action="store_true",
+                        help="回归测试模式：使用 samples_regression.yaml，统计回归失败率/变差率")
     parser.add_argument("--target", action="extend", nargs="+", help="只评测指定 target，可写多个：--target doubao qwen")
     parser.add_argument("--personas", action="extend", nargs="+", help="按用户画像展开样本：--personas novice student office")
     parser.add_argument("--login", action="store_true", help="打开浏览器手动登录各网页站点后退出")

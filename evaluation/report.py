@@ -228,6 +228,8 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
         "losses": losses,
         "win_rate_ci": [round(v, 4) for v in wilson_ci(wins, total)],
         "binomial_p": round(binomial_one_sided(wins, losses), 4),
+        "regression_failure_rate": round((ties + losses) / total, 4) if total else 0.0,
+        "regression_worse_rate": round(losses / total, 4) if total else 0.0,
     }
     if agreement_winners:
         summary["judge_agreement"] = {
@@ -283,6 +285,14 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
 
 
 # ---- Markdown ----
+def _sample_has_loss(sample: dict[str, Any]) -> bool:
+    """样本在任一目标上被判为『原始更优』（增强引入回退）。"""
+    return any(
+        (result.get("judge") or {}).get("winner") == "original"
+        for result in (sample.get("results") or {}).values()
+    )
+
+
 def _render_markdown(data: dict[str, Any]) -> str:
     agg = _aggregate(data)
     lines: list[str] = []
@@ -308,6 +318,15 @@ def _render_markdown(data: dict[str, Any]) -> str:
         if summary["total"] < 30:
             win_line += "（样本数较少，结论仅供参考）"
     lines.append(win_line + "\n")
+    if meta.get("regression_mode"):
+        lines.append(f"- 回归失败率：**{100.0 * summary.get('regression_failure_rate', 0.0):.1f}%**（未获实质改进的比例）")
+        lines.append(f"- 变差率：**{100.0 * summary.get('regression_worse_rate', 0.0):.1f}%**")
+        regressed = [s["id"] for s in data.get("samples", []) if _sample_has_loss(s)]
+        if regressed:
+            lines.append("- 回归失败样本（增强后反而更差）：")
+            for sid in regressed:
+                lines.append(f"  - {sid}")
+        lines.append("")
     ja = summary.get("judge_agreement")
     if ja:
         dim_corr = "；".join(

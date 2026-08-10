@@ -1,0 +1,192 @@
+# PromptCraft 回归测试样本集（T13）
+# 20 条"已写清楚"的提示词：目标明确、约束完整、格式与长度有要求。
+# 用于回归测试——增强器对这类提示词应尽量少改动，任何过度改写/丢失约束
+# 都会体现在 report.md 的 回归失败率 / 变差率 上。
+# 覆盖：编程 4 / 写作 4 / 问答 3 / 翻译 3 / 数据分析 2 / 创意 2 / 模糊请求 1 / 其他 1。
+
+samples:
+  # ---- 编程（4）----
+  - id: reg_code_api_spec
+    scenario: 编程
+    original: |
+      为内部订单系统设计一个"创建订单"的 REST API 接口，并给出接口文档。
+      要求：POST /api/v1/orders，请求体包含 user_id、items（商品 id 与数量列表）、
+      coupon_code（可空）；响应包含 order_id、total_amount、status。
+      约束：总量不能超过 1000 字；用 OpenAPI 3.0 风格写出请求/响应示例；
+      补充鉴权方式与限流策略各一条；不要写完整实现代码。
+
+  - id: reg_code_refactor_function
+    scenario: 编程
+    original: |
+      重构下面这个 Python 函数，拆分职责、补齐类型标注，并保持行为完全一致：
+      ```python
+      def process(data, config):
+          result = []
+          for item in data:
+              if item["valid"] and config.get("filter", True):
+                  result.append(item["value"] * config.get("factor", 1))
+          return sorted(result)
+      ```
+      要求：输出重构后的完整代码（含 docstring 与类型标注），说明每处改动的理由，
+      控制在 150 行以内，不要引入新的第三方依赖。
+
+  - id: reg_code_csv_script
+    scenario: 编程
+    original: |
+      写一个 Python 脚本：读取 sales.csv（列：date, city, amount），
+      按 city 分组统计每月总销售额，输出到 monthly.csv，并在控制台打印每个城市的最高月销售额。
+      约束：只用标准库；处理空值和缺失列时要给出明确报错；脚本要能被
+      `python process.py sales.csv monthly.csv` 直接运行；总代码不超过 120 行。
+
+  - id: reg_code_deadlock_review
+    scenario: 编程
+    original: |
+      我在 Go 里写了下面这段代码，怀疑会有死锁，请帮我审查并指出问题：
+      ```go
+      func transfer(a, b *Account, amount float64) {
+          a.mu.Lock()
+          defer a.mu.Unlock()
+          b.mu.Lock()
+          defer b.mu.Unlock()
+          a.balance -= amount
+          b.balance += amount
+      }
+      ```
+      要求：说明死锁发生的具体场景；给出修复方案（写完整代码，保留函数签名）；
+      指出该方案在并发转账下的剩余风险；回答控制在 400 字以内。
+
+  # ---- 写作（4）----
+  - id: reg_write_apology_email
+    scenario: 写作
+    original: |
+      写一封给客户的道歉邮件：我们是 SaaS 服务商，上周五线上故障导致客户系统停机 6 小时，
+      客户是制造业企业的 IT 负责人。要求：开头直接致歉，说明故障原因与恢复时间线，
+      给出补偿（延长一个月专业版服务），语气诚恳但不卑微，300 字以内，正式邮件格式。
+
+  - id: reg_write_weekly_report
+    scenario: 写作
+    original: |
+      帮我写本周工作周报，我是后端工程师，本周完成了：订单接口超时优化（P99 从 2s 降到 800ms）、
+      修复了两个线上 bug（空指针与索引失效）、配合前端联调了导出功能。
+      要求：按"本周完成 / 遇到的问题 / 下周计划"三段式组织，每段列要点，
+      总计 200 字以内，语气平实，不要夸张或编造未做的事。
+
+  - id: reg_write_meeting_minutes
+    scenario: 写作
+    original: |
+      把下面的会议记录整理成正式会议纪要：
+      「产品说月底前上线搜索页改版；研发说接口要 3 天，测试排期要 2 天；
+      运营提出需要活动位支持；大家同意先做搜索改版，活动位下个迭代。」
+      要求：输出"会议主题 / 决议 / 责任人（可用角色替代人名）/ 时间节点"四部分，
+      只写会议中出现的内容，不补充虚构信息，全文 200 字以内。
+
+  - id: reg_write_article_outline
+    scenario: 写作
+    original: |
+      给面向产品经理的公众号写一篇科普文章提纲，主题是"如何做数据埋点"。
+      要求：标题给出 3 个备选（含一个提问式）；正文分 5 个小节，每节写清要点与示例；
+      结尾加一个行动号召；总字数 400 字以内；语气专业但不堆术语。
+
+  # ---- 问答（3）----
+  - id: reg_qa_redis_cluster
+    scenario: 问答
+    original: |
+      用大白话解释 Redis Cluster 的分片原理：槽位（slot）是什么、数据怎么分布、
+      客户端如何定位 key、扩容/缩容时会发生什么。
+      要求：面向刚接触 Redis 的初级开发，先给一句话结论，再分点展开，
+      避免贴大段配置；可以给一个 16384 槽位如何分配的简单例子；600 字以内。
+
+  - id: reg_qa_deployment_choice
+    scenario: 问答
+    original: |
+      我们想把一个 5 万行代码的微服务（QPS 峰值 300）部署上云，请对比三种方案的利弊：
+      ECS 自建、Kubernetes 托管集群、Serverless 容器。请从成本、运维复杂度、
+      扩容能力三个维度对比，最后给出适合我们的推荐及理由。
+      要求：先给结论再展开；表格对比 + 简短说明；800 字以内。
+
+  - id: reg_qa_http_vs_grpc
+    scenario: 问答
+    original: |
+      解释 HTTP/1.1、HTTP/2 与 gRPC 在服务间通信上的主要区别，
+      各自适合什么场景？我们现有系统是 Spring Boot 微服务 + REST，
+      想评估是否值得迁到 gRPC。要求：先给一句话结论；用对比表格；
+      迁移评估考虑改造成本、调试工具链、网关兼容性；600 字以内。
+
+  # ---- 翻译（3）----
+  - id: reg_trans_privacy_policy
+    scenario: 翻译
+    original: |
+      把下面这段隐私政策条款从英文翻译成中文，保持正式法律语体：
+      "We may share your personal data with third-party service providers
+      solely to the extent necessary to operate our services, and only
+      when such providers have agreed to comply with this policy."
+      要求：专有名词保留英文原名；不得增删或弱化任何语义；
+      输出纯译文，不要解释或加注释。
+
+  - id: reg_trans_contract_zh
+    scenario: 翻译
+    original: |
+      把下面这段中文合同条款翻译成英文，供外方律师审阅：
+      「若乙方交付的产品存在重大缺陷，甲方有权要求乙方在十五个工作日内免费修复；
+      逾期未修复的，甲方可按日扣除合同总额千分之五的违约金。」
+      要求：使用正式法律英文，术语准确一致，保留数字表述，
+      不得添加原文没有的义务或责任；只输出译文。
+
+  - id: reg_trans_tech_manual
+    scenario: 翻译
+    original: |
+      将下面这段中文产品手册翻译成英文，读者是海外客户的实施工程师：
+      「安装完成后，请先运行 ./healthcheck 确认服务状态。若输出包含
+      'status: ok'，则可继续配置数据源；否则请检查 8080 端口是否被占用。」
+      要求：命令与代码保持原样不翻译；语气为技术文档风格，简洁准确；
+      术语全篇保持一致；只输出译文。
+
+  # ---- 数据分析（2）----
+  - id: reg_data_sales_sql
+    scenario: 数据分析
+    original: |
+      我有一张订单表 orders（id, user_id, product_id, amount, city, order_date）。
+      请写一条 SQL 统计：2025 年每个城市每月的销售额与订单数，并计算各城市
+      销售额的月度环比增长率。要求：用一条 SQL 完成（MySQL 8+，允许窗口函数）；
+      字段命名清晰；注释说明每步逻辑；结果按 2025 年总销售额降序排列。
+
+  - id: reg_data_abtest_report
+    scenario: 数据分析
+    original: |
+      我们做了一版新首页 A/B 测试，样本量各 5000，转化率：对照组 3.2%，实验组 3.9%。
+      请帮我判断结果是否显著并解释。要求：用通俗语言解释显著性检验的逻辑；
+      给出 p 值的估算方法（说明原理即可，不必真的计算）；说明样本量是否足够、
+      还有哪些因素会干扰结论；500 字以内，面向非技术背景的业务同事。
+
+  # ---- 创意（2）----
+  - id: reg_creative_slogan_set
+    scenario: 创意
+    original: |
+      为一家主打"本地新鲜食材配送"的社区生鲜品牌设计 5 条中文 slogan。
+      要求：每条不超过 12 个字；覆盖"新鲜""快""社区信任"三个方向至少各一条；
+      口语化、易记、适合印在配送袋上；每条附一句 20 字以内的创意说明。
+
+  - id: reg_creative_short_story
+    scenario: 创意
+    original: |
+      写一篇 300 字左右的微型小说：主题是"深夜便利店"，主角是一位夜班店员，
+      结尾要求出现一个反转。要求：第三人称叙述；多用具体细节少用形容词；
+      语言简洁克制；不得出现科幻或灵异元素；控制在 300-350 字。
+
+  # ---- 模糊请求（1）----
+  - id: reg_vague_meeting_plan
+    scenario: 模糊请求
+    original: |
+      帮我写一份部门团建活动方案。背景：部门 15 人，预算人均 300 元以内，
+      活动时间一个下午，希望包含室内活动和聚餐两个环节。
+      要求：给出 2 个备选方案并对比，每个方案列明时间安排、人均费用明细、
+      需要提前准备的事项；最后给出推荐及理由；800 字以内。
+
+  # ---- 其他（1）----
+  - id: reg_other_travel_plan
+    scenario: 其他
+    original: |
+      规划一个 3 天 2 晚的成都自由行行程，出发地为北京。
+      要求：包含往返交通建议（高铁或飞机二选一并说明理由）、每天上午/下午/晚上
+      的安排、住宿区域建议、总预算估算（交通+住宿+门票+餐饮）；
+      节奏不要太赶，每天最多 3 个景点；篇幅控制在 900 字以内。

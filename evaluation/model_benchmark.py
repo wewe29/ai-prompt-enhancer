@@ -261,6 +261,7 @@ def main(argv: list[str] | None = None) -> int:
                 "prompt_id": pid,
                 "model_id": mid,
                 "model_label": label,
+                "scenario": prompt.get("scenario") or "未分类",
                 "scores": None,
                 "reason": "",
                 "latency_s": None,
@@ -299,14 +300,17 @@ def main(argv: list[str] | None = None) -> int:
                 if verdict.get("error"):
                     detail["error"] = f"裁判失败：{verdict['error']}"
                 else:
-                    detail["scores"] = {d: verdict[d] for d in bench_judge.DIMENSIONS}
+                    detail["scores"] = {d: verdict.get(d, verdict.get("relevance", 0)) for d in bench_judge.DIMENSIONS}
                     detail["reason"] = verdict.get("reason", "")
             if detail["error"]:
                 print(f"  [{mid} × {pid}] {detail['error']}")
             else:
+                q_dims = ("accuracy", "completeness", "clarity")
+                quality_mean = sum(detail["scores"][d] for d in q_dims) / len(q_dims)
+                novelty = detail["scores"].get("novelty")
+                novelty_suffix = f"，新颖度 {novelty:.0f}" if novelty is not None else ""
                 print(f"  [{mid} × {pid}] 完成（{detail['output_len']} 字符，"
-                      f"{detail['latency_s']:.1f}s，质量均分 "
-                      f"{sum(detail['scores'].values()) / 4:.1f}）")
+                      f"{detail['latency_s']:.1f}s，质量均分 {quality_mean:.1f}{novelty_suffix}）")
             details.append(detail)
 
     # 阶段四：聚合 + 报告
@@ -318,7 +322,8 @@ def main(argv: list[str] | None = None) -> int:
         "protocol": api_cfg.get("protocol", "anthropic"),
         "base_url": api_cfg.get("base_url", ""),
         "models": [{"id": m["id"], "label": m.get("label", m["id"])} for m in models],
-        "prompts": [{"id": p["id"], "len": len(p["text"])} for p in prompts],
+        "prompts": [{"id": p["id"], "scenario": p.get("scenario") or "未分类", "len": len(p["text"])} for p in prompts],
+        "scenario_weights": cfg.get("scenario_weights", {}),
         "prompt_count": len(prompts),
         "model_count": len(models),
         "params": params,
