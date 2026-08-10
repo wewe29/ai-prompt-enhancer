@@ -11,12 +11,29 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
-from judge import DIMENSIONS, DIMENSION_LABELS  # evaluation/ 目录已在 sys.path 中
+from judge import DIMENSIONS, DIMENSION_LABELS, PROMPT_JUDGE_DIMS  # evaluation/ 目录已在 sys.path 中
 
 DIMENSION_ORDER = ["accuracy", "completeness", "relevance", "clarity"]
 
 # 判定"改进"的阈值：任一维度提升 ≥ 2 分视为有实质改进
 IMPROVE_THRESHOLD = 2
+
+
+def classify_magnitude(mean_delta: float) -> str:
+    """按平均 Delta 分类：方向（improve/regress/tie）+ 幅度（minor/moderate/major）。
+
+    |mean_delta| ≥ 3 → major；≥ 1 → moderate；否则 minor。正号归 improve，负号归 regress。
+    """
+    magnitude = (
+        "major" if abs(mean_delta) >= 3.0
+        else "moderate" if abs(mean_delta) >= 1.0
+        else "minor"
+    )
+    if mean_delta > 0:
+        return f"improve-{magnitude}"
+    if mean_delta < 0:
+        return f"regress-{magnitude}"
+    return f"tie-{magnitude}"
 
 
 def generate(results_dir: Path, data: dict[str, Any]) -> Path:
@@ -66,6 +83,11 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
     by_target: dict[str, dict[str, list[float]]] = {}
     by_scenario: dict[str, dict[str, list[float]]] = {}
     by_persona: dict[str, dict[str, list[float]]] = {}
+    by_magnitude: dict[str, dict[str, int]] = {
+        "improve": {"minor": 0, "moderate": 0, "major": 0},
+        "regress": {"minor": 0, "moderate": 0, "major": 0},
+    }
+    by_prompt_judge: dict[str, dict[str, list[float]]] = {}
 
     for sample in data.get("samples", []):
         scenario = sample.get("scenario", "未分类")
@@ -83,12 +105,23 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
             wins += winner == "enhanced"
             losses += winner == "original"
             ties += winner == "tie"
+            mean_delta = (sum(deltas.values()) / len(deltas)) if deltas else 0.0
+            magnitude = classify_magnitude(mean_delta).split("-", 1)[1]
+            if winner == "enhanced":
+                by_magnitude["improve"][magnitude] += 1
+            elif winner == "original":
+                by_magnitude["regress"][magnitude] += 1
             for dim in DIMENSIONS:
                 by_dim[dim].append(deltas.get(dim, 0))
                 by_target.setdefault(target_id, {}).setdefault(dim, []).append(deltas.get(dim, 0))
                 by_scenario.setdefault(scenario, {}).setdefault(dim, []).append(deltas.get(dim, 0))
                 if persona:
                     by_persona.setdefault(persona, {}).setdefault(dim, []).append(deltas.get(dim, 0))
+
+        pj = sample.get("prompt_judge")
+        if pj and not pj.get("error"):
+            for dim in PROMPT_JUDGE_DIMS:
+                by_prompt_judge.setdefault(scenario, {}).setdefault(dim, []).append(float(pj.get(dim, 0)))
 
     def stat(series: list[float]) -> dict[str, float]:
         n = len(series)
@@ -101,6 +134,8 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
         "by_target": {tid: {dim: stat(vals) for dim, vals in dims.items()} for tid, dims in by_target.items()},
         "by_scenario": {sc: {dim: stat(vals) for dim, vals in dims.items()} for sc, dims in by_scenario.items()},
         "by_persona": {pid: {dim: stat(vals) for dim, vals in dims.items()} for pid, dims in by_persona.items()},
+        "by_prompt_judge": {sc: {dim: stat(vals) for dim, vals in dims.items()} for sc, dims in by_prompt_judge.items()},
+        "by_magnitude": by_magnitude,
         "summary": {
             "total": total,
             "improved": improved,
@@ -137,6 +172,14 @@ def _render_markdown(data: dict[str, Any]) -> str:
         lines.append(f"| {DIMENSION_LABELS[dim]} | {mark}{st['mean']} |")
     lines.append("")
 
+    if summary["total"] > 0:
+        by_mag = agg["by_magnitude"]
+        lines.append("| 改进幅度 | 增强更优 | 原始更优 |")
+        lines.append("|---|---|---|")
+        for mag in ("minor", "moderate", "major"):
+            lines.append(f"| {mag} | {by_mag['improve'][mag]} | {by_mag['regress'][mag]} |")
+        lines.append("")
+
     if agg["by_scenario"]:
         lines.append("### 按场景分项\n")
         lines.append("| 场景 | " + " | ".join(DIMENSION_LABELS[d] for d in DIMENSION_ORDER) + " |")
@@ -168,6 +211,26 @@ def _render_markdown(data: dict[str, Any]) -> str:
             row = [f"{dims[d]['mean']:+.2f}" for d in DIMENSION_ORDER]
             lines.append(f"| {persona_labels.get(pid, pid)} | " + " | ".join(row) + " |")
         lines.append("")
+
+    prompt_judged = [
+        s for s in data.get("samples", [])
+        if s.get("prompt_judge") and not s["prompt_judge"].get("error")
+    ]
+    if prompt_judged:
+        lines.append("### 增强质量(prompt 级)\n")
+        lines.append("| 场景 | 结构清晰度 | 约束保留率 | 信息增益 | 过度增强(均分) |")
+        lines.append("|---|---|---|---|---|")
+        for scenario, dims in agg["by_prompt_judge"].items():
+            row = [f"{dims[d]['mean']:.2f}" for d in PROMPT_JUDGE_DIMS]
+            lines.append(f"| {scenario} | " + " | ".join(row) + " |")
+        lines.append("")
+        over = [s for s in prompt_judged if s["prompt_judge"].get("over_enhancement", 0) >= 7]
+        if over:
+            lines.append("**过度干预候选清单**（over_enhancement ≥ 7）：\n")
+            for s in over:
+                pj = s["prompt_judge"]
+                lines.append(f"- {s['id']}（{s.get('scenario', '未分类')}）over_enhancement={pj.get('over_enhancement')}：{pj.get('reason', '')}")
+            lines.append("")
 
     lines.append("## 二、逐样本对比详情\n")
     for sample in data.get("samples", []):

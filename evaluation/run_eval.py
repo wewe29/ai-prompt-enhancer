@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from config import ConfigError, load_config, resolve_api_key  # noqa: E402
 from enhancer import EnhanceError, enhance as api_enhance  # noqa: E402
-from judge import JudgeError, judge_pair  # noqa: E402
+from judge import JudgeError, judge_pair, judge_prompt_level  # noqa: E402
 import report as report_mod  # noqa: E402
 import targets  # noqa: E402
 
@@ -67,6 +67,14 @@ def judge_offline(_sample, original_output: str, enhanced_output: str, _cfg, _ke
         "reason": "离线模拟：更长的回答视为更完整",
         "swapped": False,
         "heuristics": {},
+        "usage": {"input_tokens": 0, "output_tokens": 0},
+    }
+
+
+def prompt_judge_offline() -> dict[str, Any]:
+    return {
+        "structure": 8, "constraint_retention": 9, "info_gain": 7,
+        "over_enhancement": 2, "reason": "离线模拟",
         "usage": {"input_tokens": 0, "output_tokens": 0},
     }
 
@@ -142,6 +150,28 @@ def main() -> int:
         sample["enhanced_text"] = sample["enhanced"].get("primary_prompt", "")
         if sample["enhanced"].get("error"):
             print(f"[增强] {sample['id']} 失败：{sample['enhanced']['error']}")
+
+        # 阶段一.5：增强质量（prompt 级）裁判
+        cached_pj = load_cache("prompt_judge", sample["id"], persona=sample.get("persona") or "")
+        if cached_pj is not None:
+            sample["prompt_judge"] = cached_pj
+        elif args.manual or args.skip_prompt_judge or sample["enhanced"].get("error"):
+            sample["prompt_judge"] = None
+        else:
+            try:
+                if offline:
+                    sample["prompt_judge"] = prompt_judge_offline()
+                else:
+                    sample["prompt_judge"] = run_with_budget(
+                        lambda s=sample: judge_prompt_level(s["original"], s["enhanced_text"], cfg, api_key),
+                        cfg, "提示词裁判",
+                    )
+                save_cache("prompt_judge", sample["id"], payload=sample["prompt_judge"],
+                           persona=sample.get("persona") or "")
+                time.sleep(float(cfg["run"].get("delay_between", 2)))
+            except JudgeError as exc:
+                sample["prompt_judge"] = {"error": str(exc)}
+                print(f"  [提示词裁判] {sample['id']} 失败：{exc}")
 
     # 人工答案模式：用户粘贴的回答 → 直接裁判 + 报告（跳过增强与网页抓取）
     if args.manual_answers:
@@ -549,6 +579,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--login", action="store_true", help="打开浏览器手动登录各网页站点后退出")
     parser.add_argument("--skip-enhance", action="store_true", help="复用缓存的增强结果")
     parser.add_argument("--skip-infer", action="store_true", help="复用缓存的目标回答")
+    parser.add_argument("--skip-prompt-judge", action="store_true", help="跳过增强质量(prompt 级)裁判")
     parser.add_argument("--max-cost", type=float, default=None, help="覆盖 max_cost_usd 预算")
     parser.add_argument("--offline", action="store_true", help="离线自测模式（mock 目标 + 确定性裁判）")
     parser.add_argument("--manual", action="store_true",

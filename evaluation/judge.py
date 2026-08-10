@@ -22,6 +22,16 @@ DIMENSION_LABELS = {
     "clarity": "清晰度",
 }
 
+PROMPT_JUDGE_SYSTEM_PROMPT = """你是提示词质量评测裁判。请对"增强后的提示词"本身进行评分(不是回答),四个维度各 1-10 分(整数):
+- structure(结构清晰度): 是否明确分层了角色/任务/约束/输出格式
+- constraint_retention(约束保留率): 原始提示词的约束是否被完整保留,遗漏则扣分
+- info_gain(信息增益): 是否补充了合理的隐含需求;编造原文没有的内容则扣分
+- over_enhancement(过度增强): 是否添加了原始没有的约束或偏见(高分=越过度)
+只输出一个 JSON 对象,不要输出任何其他内容,格式:
+{"structure":1,"constraint_retention":1,"info_gain":1,"over_enhancement":1,"reason":"一句话评价"}"""
+
+PROMPT_JUDGE_DIMS = ["structure", "constraint_retention", "info_gain", "over_enhancement"]
+
 JUDGE_SYSTEM_PROMPT = """你是公正的提示词评测裁判。同一任务分别使用"提示词A"和"提示词B"得到回答A与回答B。
 请分别对两个回答按四个维度各打 1-10 分（整数）：
 - 准确性：事实、数据、代码、措辞是否正确、无幻觉
@@ -109,6 +119,54 @@ def judge_pair(
     }
 
 
+def judge_prompt_level(
+    original: str,
+    enhanced: str,
+    cfg: dict[str, Any],
+    api_key: str,
+) -> dict[str, Any]:
+    """对增强后的 prompt 打分；返回四指标 + reason，或 {"error": ...}。"""
+    jcfg = cfg.get("judge", {})
+    body = {
+        "model": jcfg.get("model", "deepseek-chat"),
+        "messages": [
+            {"role": "system", "content": PROMPT_JUDGE_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": f"原始提示词：\n{original}\n\n增强后的提示词：\n{enhanced}\n",
+            },
+        ],
+        "temperature": float(jcfg.get("temperature", 0)),
+        "stream": False,
+        "response_format": {"type": "json_object"},
+    }
+    client = openai.OpenAI(api_key=api_key, base_url=cfg["enhancer"]["base_url"].rstrip("/"))
+
+    parsed: dict[str, Any] | None = None
+    last_error: Exception | None = None
+    usage: dict[str, int] | None = None
+    for _ in range(2):
+        try:
+            response = client.chat.completions.create(**body)
+            content = response.choices[0].message.content or ""
+            parsed = _parse_prompt_judge_result(content)
+            if getattr(response, "usage", None):
+                usage = {
+                    "input_tokens": response.usage.prompt_tokens or 0,
+                    "output_tokens": response.usage.completion_tokens or 0,
+                }
+            break
+        except (ValueError, openai.APIError) as exc:
+            last_error = exc
+    if parsed is None:
+        return {"error": f"提示词裁判解析失败：{last_error}"}
+
+    result: dict[str, Any] = {dim: parsed[dim] for dim in PROMPT_JUDGE_DIMS}
+    result["reason"] = str(parsed.get("reason", "")).strip()
+    result["usage"] = usage or {"input_tokens": 0, "output_tokens": 0}
+    return result
+
+
 # ---- 内部工具 ----
 
 def _assign_labels(sample, original_output, enhanced_output, swapped):
@@ -142,6 +200,19 @@ def _parse_judge_result(content: str) -> dict[str, Any]:
             scores[dim] = int(round(float(value)))
     if parsed.get("winner") not in ("a", "b", "tie"):
         raise ValueError(f"裁判 winner 非法：{parsed.get('winner')}")
+    return parsed
+
+
+def _parse_prompt_judge_result(content: str) -> dict[str, Any]:
+    parsed = enhancer.parse_result(content)
+    for dim in PROMPT_JUDGE_DIMS:
+        value = parsed.get(dim)
+        if not isinstance(value, (int, float)):
+            raise ValueError(f"提示词裁判结果缺少 {dim} 或非数字")
+        score = int(round(float(value)))
+        if not 1 <= score <= 10:
+            raise ValueError(f"提示词裁判 {dim} 越界：{value}")
+        parsed[dim] = score
     return parsed
 
 
