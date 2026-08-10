@@ -19,7 +19,7 @@ from typing import Any
 # 允许从 evaluation 目录直接运行
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from config import ConfigError, load_config, resolve_api_key  # noqa: E402
+from config import ConfigError, load_config, resolve_api_key, resolve_judge_key  # noqa: E402
 from enhancer import EnhanceError, enhance as api_enhance  # noqa: E402
 from judge import JudgeError, judge_agreement, judge_pair, judge_prompt_level  # noqa: E402
 import report as report_mod  # noqa: E402
@@ -122,9 +122,11 @@ def main() -> int:
         samples = expanded
 
     api_key = ""
+    judge_key = ""
     if not offline:
         try:
             api_key = resolve_api_key(cfg)
+            judge_key = resolve_judge_key(cfg, api_key)
         except ConfigError as exc:
             print(f"[错误] {exc}")
             return 1
@@ -163,7 +165,7 @@ def main() -> int:
                     sample["prompt_judge"] = prompt_judge_offline()
                 else:
                     sample["prompt_judge"] = run_with_budget(
-                        lambda s=sample: judge_prompt_level(s["original"], s["enhanced_text"], cfg, api_key),
+                        lambda s=sample: judge_prompt_level(s["original"], s["enhanced_text"], cfg, judge_key),
                         cfg, "提示词裁判",
                     )
                 save_cache("prompt_judge", sample["id"], payload=sample["prompt_judge"],
@@ -222,8 +224,11 @@ def main() -> int:
                     if login_failed:
                         result[f"{variant}_error"] = "目标站点登录失败，已跳过"
                         continue
+                    temp = sample.get("temperature")
+                    if temp is None:
+                        temp = cfg.get("scenario_temperatures", {}).get(sample.get("scenario", ""))
                     try:
-                        output = adapter.infer(prompt)
+                        output = adapter.infer(prompt, temperature=temp)
                         result[f"{variant}_output"] = output
                         save_cache("infer", sample["id"], tid, variant, {"output": output}, persona=sample.get("persona") or "")
                         print(f"  [{sample['id']}][{variant}] 完成（{len(output)} 字符）")
@@ -236,7 +241,7 @@ def main() -> int:
                         print(f"  [{sample['id']}][{variant}] 限流，等待 {wait:.0f}s 后重试一次")
                         time.sleep(wait)
                         try:
-                            output = adapter.infer(prompt)
+                            output = adapter.infer(prompt, temperature=temp)
                             result[f"{variant}_output"] = output
                             save_cache("infer", sample["id"], tid, variant, {"output": output}, persona=sample.get("persona") or "")
                         except targets.TargetError as retry_exc:
@@ -270,7 +275,7 @@ def main() -> int:
                     result["judge"] = judge_offline(sample, result["original_output"], result["enhanced_output"], cfg, "")
                 else:
                     result["judge"] = run_with_budget(
-                        lambda s=sample, r=result: judge_pair(s, r["original_output"], r["enhanced_output"], cfg, api_key),
+                        lambda s=sample, r=result: judge_pair(s, r["original_output"], r["enhanced_output"], cfg, judge_key),
                         cfg, "裁判",
                     )
                 judged += 1
@@ -281,7 +286,7 @@ def main() -> int:
                         else:
                             result["judge2"] = run_with_budget(
                                 lambda s=sample, r=result: judge_pair(
-                                    s, r["original_output"], r["enhanced_output"], cfg, api_key, judge_model=second_model
+                                    s, r["original_output"], r["enhanced_output"], cfg, judge_key, judge_model=second_model
                                 ),
                                 cfg, "第二裁判",
                             )
@@ -336,9 +341,11 @@ def run_manual_answers(args: argparse.Namespace, cfg: dict[str, Any], samples: l
     answers = data.get("answers", data)
 
     api_key = ""
+    judge_key = ""
     if not args.offline:
         try:
             api_key = resolve_api_key(cfg)
+            judge_key = resolve_judge_key(cfg, api_key)
         except ConfigError as exc:
             print(f"[错误] {exc}")
             return 1
@@ -374,7 +381,7 @@ def run_manual_answers(args: argparse.Namespace, cfg: dict[str, Any], samples: l
                     result["judge"] = judge_offline(sample, result["original_output"], result["enhanced_output"], cfg, "")
                 else:
                     result["judge"] = run_with_budget(
-                        lambda s=sample, r=result: judge_pair(s, r["original_output"], r["enhanced_output"], cfg, api_key),
+                        lambda s=sample, r=result: judge_pair(s, r["original_output"], r["enhanced_output"], cfg, judge_key),
                         cfg, "裁判",
                     )
                 judged += 1
@@ -385,7 +392,7 @@ def run_manual_answers(args: argparse.Namespace, cfg: dict[str, Any], samples: l
                         else:
                             result["judge2"] = run_with_budget(
                                 lambda s=sample, r=result: judge_pair(
-                                    s, r["original_output"], r["enhanced_output"], cfg, api_key, judge_model=second_model
+                                    s, r["original_output"], r["enhanced_output"], cfg, judge_key, judge_model=second_model
                                 ),
                                 cfg, "第二裁判",
                             )

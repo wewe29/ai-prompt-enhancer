@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import time
@@ -41,7 +42,22 @@ DEFAULTS: dict[str, Any] = {
         "api_key_file": "key.local",
         "api_key": None,
     },
-    "enhancer": {"model": "deepseek-v4-flash", "temperature": 0.35},
+    "enhancer": {
+        "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+        "protocol": "openai",
+        "model": "doubao-seed-2-1-pro-260628",
+        "api_key_env": "ARK_API_KEY",
+        "temperature": 0.35,
+    },
+    "scenario_temperatures": {
+        "编程": 0.2,
+        "翻译": 0.2,
+        "数据分析": 0.2,
+        "问答": 0.4,
+        "写作": 0.5,
+        "模糊请求": 0.5,
+        "创意": 0.7,
+    },
     "judge": {
         "model": "deepseek-v4-flash",
         "temperature": 0,
@@ -52,10 +68,11 @@ DEFAULTS: dict[str, Any] = {
     "samples_file": "samples/samples.yaml",
     "params": {
         "max_tokens": 4096,
-        "timeout_s": 120,
+        "timeout_s": 240,
         "retries": 2,
         "retry_backoff_s": [2, 5],
         "delay_between_s": 1.0,
+        "temperature": 0.7,  # 推理默认温度（样本 temperature / scenario_temperatures 未命中时使用）
     },
     "run": {"out_dir": "results/benchmark"},
 }
@@ -111,6 +128,8 @@ def load_prompts(cfg: dict[str, Any]) -> list[dict[str, Any]]:
             prompts.append({
                 "id": str(item.get("id") or f"prompt_{i + 1}"),
                 "text": str(item.get("text") or "").strip(),
+                "scenario": str(item.get("scenario") or ""),
+                "temperature": item.get("temperature"),
             })
         return [p for p in prompts if p["text"]]
     import yaml
@@ -128,6 +147,8 @@ def load_prompts(cfg: dict[str, Any]) -> list[dict[str, Any]]:
         prompts.append({
             "id": str(sample.get("id") or f"sample_{i + 1}"),
             "text": str(sample.get("original") or "").strip(),
+            "scenario": str(sample.get("scenario") or ""),
+            "temperature": sample.get("temperature"),
         })
     return [p for p in prompts if p["text"]]
 
@@ -189,6 +210,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[错误] {exc}")
         return 1
 
+    enh_cfg = cfg.get("enhancer") or {}
+    enh_env = str(enh_cfg.get("api_key_env") or "").strip()
+    enh_key = os.environ.get(enh_env, "").strip() if enh_env else ""
+    if not enh_key:
+        enh_key = api_key
+        print(f"[配置] 增强器环境变量 {enh_env or '(未配置)'} 未设置，回退 api 密钥")
+
     params = cfg.get("params") or {}
     retries = int(params.get("retries", 2))
     backoff_s = [float(x) for x in (params.get("retry_backoff_s") or [2, 5])]
@@ -213,7 +241,7 @@ def main(argv: list[str] | None = None) -> int:
         elif args.skip_enhance:
             prompt["enhanced"] = {"error": "无增强缓存（--skip-enhance）"}
         else:
-            prompt["enhanced"] = _enhance_prompt(prompt["text"], cfg, api_cfg, api_key,
+            prompt["enhanced"] = _enhance_prompt(prompt["text"], cfg, enh_cfg, enh_key,
                                                  params, retries, backoff_s, timeout_s)
             save_cache("enhance", pid, "", prompt["enhanced"])
             if prompt["enhanced"].get("error"):
@@ -243,8 +271,13 @@ def main(argv: list[str] | None = None) -> int:
             if enhanced.get("error"):
                 detail["error"] = f"增强失败：{enhanced['error']}"
             else:
+                temp = prompt.get("temperature")
+                if temp is None:
+                    temp = cfg.get("scenario_temperatures", {}).get(prompt.get("scenario", ""))
+                if temp is None:
+                    temp = float(params.get("temperature", INFER_TEMPERATURE))
                 infer = _infer_one(mid, pid, enhanced.get("enhanced", ""), cfg, api_cfg, api_key,
-                                   params, retries, backoff_s, timeout_s, args.skip_infer)
+                                   params, retries, backoff_s, timeout_s, args.skip_infer, temperature=temp)
                 detail["latency_s"] = infer.get("latency_s")
                 detail["output_len"] = len(infer.get("text") or "")
                 detail["usage"] = infer.get("usage", {})
@@ -313,9 +346,9 @@ def main(argv: list[str] | None = None) -> int:
 
 
 # ---- 各阶段调用 ----
-def _enhance_prompt(original: str, cfg: dict, api_cfg: dict, api_key: str,
+def _enhance_prompt(original: str, cfg: dict, enh_cfg: dict, enh_key: str,
                     params: dict, retries: int, backoff_s: list[float], timeout_s: float) -> dict:
-    enh_cfg = cfg.get("enhancer") or {}
+    """增强使用独立配置（enhancer 走 v3 openai 端点，与 targets 的 plan 端点解耦）。"""
     user_message = enhancer.build_user_message(
         original,
         target_model="评测目标",
@@ -327,9 +360,9 @@ def _enhance_prompt(original: str, cfg: dict, api_cfg: dict, api_key: str,
     ]
     result = bench_api.call_with_retry(
         lambda: bench_api.call_chat(
-            base_url=api_cfg.get("base_url", ""),
-            api_key=api_key,
-            protocol=api_cfg.get("protocol", "anthropic"),
+            base_url=enh_cfg.get("base_url", ""),
+            api_key=enh_key,
+            protocol=enh_cfg.get("protocol", "openai"),
             model=enh_cfg.get("model", ""),
             messages=messages,
             temperature=float(enh_cfg.get("temperature", 0.35)),
@@ -356,7 +389,7 @@ def _enhance_prompt(original: str, cfg: dict, api_cfg: dict, api_key: str,
 
 def _infer_one(mid: str, pid: str, enhanced: str, cfg: dict, api_cfg: dict, api_key: str,
                params: dict, retries: int, backoff_s: list[float], timeout_s: float,
-               skip: bool) -> dict:
+               skip: bool, temperature: float = INFER_TEMPERATURE) -> dict:
     cached = load_cache("infer", pid, mid)
     if cached is not None:
         return cached
@@ -370,7 +403,7 @@ def _infer_one(mid: str, pid: str, enhanced: str, cfg: dict, api_cfg: dict, api_
             protocol=api_cfg.get("protocol", "anthropic"),
             model=mid,
             messages=messages,
-            temperature=INFER_TEMPERATURE,
+            temperature=temperature,
             max_tokens=int(params.get("max_tokens", 4096)),
             timeout_s=timeout_s,
         ),

@@ -46,8 +46,11 @@ class TargetAdapter(ABC):
         """检查可用性（登录态/配置），失败抛 TargetError。"""
 
     @abstractmethod
-    def infer(self, text: str) -> str:
-        """发送提示词并返回模型回答文本。"""
+    def infer(self, text: str, temperature: float | None = None) -> str:
+        """发送提示词并返回模型回答文本。
+
+        temperature：可选覆盖值（None 表示使用 target 自身配置的温度）。
+        """
 
     def new_chat(self) -> None:
         """开启新会话/清空上下文，避免串扰（默认无操作）。"""
@@ -68,7 +71,7 @@ class MockAdapter(TargetAdapter):
     def health_check(self) -> None:
         return None
 
-    def infer(self, text: str) -> str:
+    def infer(self, text: str, temperature: float | None = None) -> str:
         summary = text.strip().replace("\n", " ")[:80]
         return (
             f"【{self.name}·模拟回答】\n"

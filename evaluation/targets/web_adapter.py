@@ -153,7 +153,8 @@ class WebTargetAdapter(TargetAdapter):
             )
         print(f"[{self.name}] 健康检查通过（已定位输入框）")
 
-    def infer(self, text: str) -> str:
+    def infer(self, text: str, temperature: float | None = None) -> str:
+        # 网页版无温度控制，参数仅用于保持统一接口
         self.health_check()
         self.new_chat()
         self._send_prompt(text)

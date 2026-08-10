@@ -77,7 +77,10 @@ def judge_pair(
         "stream": False,
         "response_format": {"type": "json_object"},
     }
-    client = openai.OpenAI(api_key=api_key, base_url=cfg["enhancer"]["base_url"].rstrip("/"))
+    client = openai.OpenAI(
+        api_key=api_key,
+        base_url=(cfg.get("judge", {}).get("base_url") or cfg["enhancer"]["base_url"]).rstrip("/"),
+    )
 
     parsed: dict[str, Any] | None = None
     last_error: Exception | None = None
@@ -159,7 +162,10 @@ def judge_prompt_level(
         "stream": False,
         "response_format": {"type": "json_object"},
     }
-    client = openai.OpenAI(api_key=api_key, base_url=cfg["enhancer"]["base_url"].rstrip("/"))
+    client = openai.OpenAI(
+        api_key=api_key,
+        base_url=(cfg.get("judge", {}).get("base_url") or cfg["enhancer"]["base_url"]).rstrip("/"),
+    )
 
     parsed: dict[str, Any] | None = None
     last_error: Exception | None = None

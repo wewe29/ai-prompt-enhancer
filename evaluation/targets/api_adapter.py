@@ -38,14 +38,14 @@ class ApiAdapter(TargetAdapter):
         if not self._resolve_api_key():
             raise NetworkError(f"[{self.name}] api target 需要提供 API Key")
 
-    def infer(self, text: str) -> str:
+    def infer(self, text: str, temperature: float | None = None) -> str:
         self.health_check()
         client = openai.OpenAI(api_key=self._resolve_api_key(), base_url=self.base_url)
         try:
             response = client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": text}],
-                temperature=self.temperature,
+                temperature=self.temperature if temperature is None else temperature,
             )
             return response.choices[0].message.content or ""
         except openai.APIError as exc:

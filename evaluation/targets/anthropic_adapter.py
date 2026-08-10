@@ -40,12 +40,12 @@ class AnthropicAdapter(TargetAdapter):
         if not self._resolve_api_key():
             raise NetworkError(f"[{self.name}] anthropic target 需要提供 API Key")
 
-    def infer(self, text: str) -> str:
+    def infer(self, text: str, temperature: float | None = None) -> str:
         self.health_check()
         body = {
             "model": self.model,
             "max_tokens": self.max_tokens,
-            "temperature": self.temperature,
+            "temperature": self.temperature if temperature is None else temperature,
             "messages": [{"role": "user", "content": text}],
         }
         payload = json.dumps(body).encode("utf-8")

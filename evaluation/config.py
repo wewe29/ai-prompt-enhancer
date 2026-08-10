@@ -28,11 +28,22 @@ EVAL_ROOT = Path(__file__).resolve().parent
 
 DEFAULTS: dict[str, Any] = {
     "enhancer": {
-        "base_url": "https://api.deepseek.com",
-        "model": "deepseek-chat",
+        "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+        "protocol": "openai",
+        "model": "doubao-seed-2-1-pro-260628",
+        "api_key_env": "ARK_API_KEY",
         "verbosity": "standard",
         "custom_instructions": "",
         "temperature": 0.35,
+    },
+    "scenario_temperatures": {
+        "编程": 0.2,
+        "翻译": 0.2,
+        "数据分析": 0.2,
+        "问答": 0.4,
+        "写作": 0.5,
+        "模糊请求": 0.5,
+        "创意": 0.7,
     },
     "key_source": "keyring",
     "api_key": None,
@@ -44,7 +55,10 @@ DEFAULTS: dict[str, Any] = {
         "input_delay_ms": 30,
     },
     "judge": {
-        "model": "deepseek-chat",
+        "base_url": "https://ark.cn-beijing.volces.com/api/plan/v1",
+        "api_key_env": "ARK_PLAN_API_KEY",
+        "api_key_file": "key.local",
+        "model": "deepseek-v4-flash",
         "temperature": 0,
         "randomize_order": True,
         "cross_check": False,  # 每条独立再评一次交叉验证（增加成本，默认关闭）
@@ -100,7 +114,17 @@ def validate(cfg: dict[str, Any]) -> None:
 
 
 def resolve_api_key(cfg: dict[str, Any]) -> str:
-    """按 key_source 解析 DeepSeek API Key。"""
+    """按优先级解析 API Key。
+
+    1. enhancer.api_key_env 指向的环境变量（增强器密钥，如 ARK_API_KEY）
+    2. 由 key_source 控制的 DeepSeek Key（keyring → DEEPSEEK_API_KEY → config.api_key）
+    """
+    enh_env = str(cfg.get("enhancer", {}).get("api_key_env") or "").strip()
+    if enh_env:
+        key = os.environ.get(enh_env, "").strip()
+        if key:
+            return key
+        print(f"[config] 环境变量 {enh_env} 未设置，回退 key_source 解析")
     source = cfg.get("key_source", "keyring")
     if source == "keyring":
         key = _read_from_keyring()
@@ -119,11 +143,31 @@ def resolve_api_key(cfg: dict[str, Any]) -> str:
         if key:
             return key
     raise ConfigError(
-        "未找到 DeepSeek API Key。请任选其一：\n"
-        f"  1) 在 PromptCraft 应用中配置（脚本通过 keyring 读取，SERVICE={KEYRING_SERVICE}）；\n"
-        f"  2) 设置环境变量 {ENV_API_KEY}；\n"
+        "未找到 API Key。请任选其一：\n"
+        f"  1) 设置增强器密钥环境变量 {enh_env or 'ARK_API_KEY'}；\n"
+        f"  2) 在 PromptCraft 应用中配置（脚本通过 keyring 读取，SERVICE={KEYRING_SERVICE}）；\n"
         f"  3) 在 evaluation/config.yaml 中填写 api_key（请勿提交到版本库）。"
     )
+
+
+def resolve_judge_key(cfg: dict[str, Any], fallback: str = "") -> str:
+    """解析裁判（judge）密钥：judge.api_key_env 环境变量 → judge.api_key_file → fallback。"""
+    jcfg = cfg.get("judge", {}) or {}
+    env_name = str(jcfg.get("api_key_env") or "").strip()
+    if env_name:
+        key = os.environ.get(env_name, "").strip()
+        if key:
+            return key
+    key_file = str(jcfg.get("api_key_file") or "").strip()
+    if key_file:
+        path = Path(key_file)
+        if not path.is_absolute():
+            path = EVAL_ROOT / path
+        if path.exists():
+            key = path.read_text(encoding="utf-8").strip()
+            if key:
+                return key
+    return fallback
 
 
 def _read_from_keyring() -> str | None:
