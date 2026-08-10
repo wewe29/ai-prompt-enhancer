@@ -11,6 +11,7 @@ generate() 在 payload 缺 "models" 时自动先聚合再渲染。
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,11 @@ REPORT_NAME = "report_benchmark.md"
 DEFAULT_WEIGHTS = {"quality": 0.6, "relevance": 0.2, "speed": 0.2}
 LATENCY_CAP_S = 120.0
 QUALITY_DIMS = ("accuracy", "completeness", "clarity")
+
+
+def estimate_tokens(text: str) -> int:
+    """粗略估算 token 数：字符数 / 1.8（中英混合经验值，向上取整）。"""
+    return math.ceil(len(text) / 1.8)
 
 
 def compute_composite(
@@ -40,6 +46,36 @@ def compute_composite(
 
 def _mean(values: list[float]) -> float:
     return sum(values) / len(values) if values else 0.0
+
+
+def _cost_block(payload: dict[str, Any]) -> list[str]:
+    """原始 prompt vs 增强 prompt 的 token 成本对比块（按提示词平均）。
+
+    meta.prompts 条目含 len（原始字符数）与 enhanced_len（增强字符数，可选）时生效。
+    """
+    prompts = payload.get("meta", {}).get("prompts") or []
+    orig_lens: list[float] = []
+    enh_lens: list[float] = []
+    for p in prompts:
+        o, e = p.get("len"), p.get("enhanced_len")
+        if isinstance(o, (int, float)) and o > 0:
+            orig_lens.append(float(o))
+        if isinstance(e, (int, float)) and e > 0:
+            enh_lens.append(float(e))
+    if not orig_lens and not enh_lens:
+        return []
+    lines = ["### 成本与 token（原始 prompt vs 增强 prompt）\n"]
+    if orig_lens:
+        orig_mean = sum(orig_lens) / len(orig_lens)
+        lines.append(f"- 平均原始 prompt 长度：**{orig_mean:.1f}** 字符（估算 {math.ceil(orig_mean / 1.8)} token）")
+    if enh_lens:
+        enh_mean = sum(enh_lens) / len(enh_lens)
+        lines.append(f"- 平均增强 prompt 长度：**{enh_mean:.1f}** 字符（估算 {math.ceil(enh_mean / 1.8)} token）")
+    if orig_lens and enh_lens:
+        ratio = (sum(enh_lens) / len(enh_lens)) / (sum(orig_lens) / len(orig_lens))
+        lines.append(f"- 增强膨胀比：**×{ratio:.2f}**（增强长度 / 原始长度）")
+    lines.append("")
+    return lines
 
 
 def aggregate(
@@ -165,6 +201,8 @@ def _render_markdown(payload: dict[str, Any]) -> str:
             f"{m['dims'].get('relevance', 0):.2f} | {m['latency_mean']:.2f} | {m['composite']:.3f} |"
         )
     lines.append("")
+
+    lines.extend(_cost_block(payload))
 
     lines.append("## 二、按提示词详情\n")
     by_prompt: dict[str, list[dict[str, Any]]] = {}

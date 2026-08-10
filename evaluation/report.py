@@ -20,6 +20,17 @@ DIMENSION_ORDER = ["accuracy", "completeness", "relevance", "clarity"]
 IMPROVE_THRESHOLD = 2
 
 
+def estimate_tokens(text: str) -> int:
+    """粗略估算 token 数：字符数 / 1.8（中英混合经验值，向上取整）。"""
+    return math.ceil(len(text) / 1.8)
+
+
+def _mean_of_dims(dims: dict[str, Any]) -> float:
+    """四维 delta 均分：dims 为 {dim: stat} 时取各维度 mean 的平均。"""
+    vals = [dims[d]["mean"] for d in DIMENSION_ORDER if d in dims]
+    return sum(vals) / len(vals) if vals else 0.0
+
+
 def wilson_ci(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
     """Wilson score interval for proportion k/n; returns (low, high)."""
     if n <= 0:
@@ -118,6 +129,15 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
     by_prompt_judge: dict[str, dict[str, list[float]]] = {}
     agreement_winners: list[float] = []
     agreement_rhos: dict[str, list[float]] = {d: [] for d in DIMENSIONS}
+    cost_orig_chars: list[float] = []
+    cost_enh_chars: list[float] = []
+    cost_orig_tokens: list[float] = []
+    cost_enh_tokens: list[float] = []
+    cost_ratios: list[float] = []
+    cost_quality_deltas: list[float] = []
+    ctrl_enh_vs_padded: dict[str, dict[str, list[float]]] = {}
+    ctrl_padded_vs_orig: dict[str, dict[str, list[float]]] = {}
+    ctrl_ratios: list[float] = []
 
     for sample in data.get("samples", []):
         scenario = sample.get("scenario", "未分类")
@@ -129,6 +149,29 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
             total += 1
             original, enhanced = judge["original"], judge["enhanced"]
             deltas = judge.get("deltas", {})
+            orig_text = sample.get("original") or ""
+            enh_text = sample.get("enhanced_text") or ""
+            cost_orig_chars.append(float(len(orig_text)))
+            cost_enh_chars.append(float(len(enh_text)))
+            cost_orig_tokens.append(float(estimate_tokens(orig_text)))
+            cost_enh_tokens.append(float(estimate_tokens(enh_text)))
+            if orig_text:
+                cost_ratios.append(len(enh_text) / len(orig_text))
+            if deltas:
+                cost_quality_deltas.append(sum(deltas.values()) / len(deltas))
+
+            jc = result.get("judge_control")
+            jpv = result.get("judge_padded_vs_orig")
+            if jc:
+                jc_deltas = jc.get("deltas", {})
+                for dim in DIMENSIONS:
+                    ctrl_enh_vs_padded.setdefault(scenario, {}).setdefault(dim, []).append(jc_deltas.get(dim, 0))
+            if jpv:
+                jpv_deltas = jpv.get("deltas", {})
+                for dim in DIMENSIONS:
+                    ctrl_padded_vs_orig.setdefault(scenario, {}).setdefault(dim, []).append(jpv_deltas.get(dim, 0))
+            if (jc or jpv) and orig_text:
+                ctrl_ratios.append(len(enh_text) / len(orig_text))
             if any(v >= IMPROVE_THRESHOLD for v in deltas.values()):
                 improved += 1
             winner = judge.get("winner", "tie")
@@ -187,6 +230,35 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
             },
         }
 
+    cost: dict[str, Any] = {}
+    if cost_orig_chars:
+        orig_tokens_mean = round(sum(cost_orig_tokens) / len(cost_orig_tokens), 1)
+        enh_tokens_mean = round(sum(cost_enh_tokens) / len(cost_enh_tokens), 1)
+        cost = {
+            "orig_chars_mean": round(sum(cost_orig_chars) / len(cost_orig_chars), 1),
+            "enh_chars_mean": round(sum(cost_enh_chars) / len(cost_enh_chars), 1),
+            "orig_tokens_mean": orig_tokens_mean,
+            "enh_tokens_mean": enh_tokens_mean,
+            "pad_ratio": round(sum(cost_ratios) / len(cost_ratios), 2) if cost_ratios else 0.0,
+        }
+        delta_tokens = enh_tokens_mean - orig_tokens_mean
+        if delta_tokens > 0 and cost_quality_deltas:
+            cost["quality_gain_per_1k_tokens"] = round(
+                (sum(cost_quality_deltas) / len(cost_quality_deltas)) / (delta_tokens / 1000.0), 2
+            )
+        else:
+            cost["quality_gain_per_1k_tokens"] = None
+
+    by_control: dict[str, Any] = {
+        "enhanced_vs_padded": {
+            sc: {dim: stat(vals) for dim, vals in dims.items()} for sc, dims in ctrl_enh_vs_padded.items()
+        },
+        "padded_vs_original": {
+            sc: {dim: stat(vals) for dim, vals in dims.items()} for sc, dims in ctrl_padded_vs_orig.items()
+        },
+        "pad_ratio": round(sum(ctrl_ratios) / len(ctrl_ratios), 2) if ctrl_ratios else 0.0,
+    }
+
     return {
         "dimensions": {dim: stat(by_dim[dim]) for dim in DIMENSIONS},
         "by_target": {tid: {dim: stat(vals) for dim, vals in dims.items()} for tid, dims in by_target.items()},
@@ -194,6 +266,8 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
         "by_persona": {pid: {dim: stat(vals) for dim, vals in dims.items()} for pid, dims in by_persona.items()},
         "by_prompt_judge": {sc: {dim: stat(vals) for dim, vals in dims.items()} for sc, dims in by_prompt_judge.items()},
         "by_magnitude": by_magnitude,
+        "by_control": by_control,
+        "cost": cost,
         "summary": summary,
     }
 
@@ -240,6 +314,18 @@ def _render_markdown(data: dict[str, Any]) -> str:
         mark = "+" if st["mean"] >= 0 else ""
         lines.append(f"| {DIMENSION_LABELS[dim]} | {mark}{st['mean']} |")
     lines.append("")
+
+    cost = agg.get("cost") or {}
+    if cost:
+        lines.append("### 成本与 token\n")
+        lines.append(f"- 平均原始提示词长度：**{cost['orig_chars_mean']:.1f}** 字符（估算 {cost['orig_tokens_mean']:.0f} token）")
+        lines.append(f"- 平均增强提示词长度：**{cost['enh_chars_mean']:.1f}** 字符（估算 {cost['enh_tokens_mean']:.0f} token）")
+        lines.append(f"- 增强膨胀比：**×{cost['pad_ratio']:.2f}**（增强长度 / 原始长度）")
+        gain = cost.get("quality_gain_per_1k_tokens")
+        if gain is not None:
+            mark = "+" if gain >= 0 else ""
+            lines.append(f"- 每千 token 质量提升：**{mark}{gain:.2f}** 分（每增加 1000 token）")
+        lines.append("")
 
     if summary["total"] > 0:
         by_mag = agg["by_magnitude"]
@@ -300,6 +386,19 @@ def _render_markdown(data: dict[str, Any]) -> str:
                 pj = s["prompt_judge"]
                 lines.append(f"- {s['id']}（{s.get('scenario', '未分类')}）over_enhancement={pj.get('over_enhancement')}：{pj.get('reason', '')}")
             lines.append("")
+
+    by_control = agg.get("by_control") or {}
+    if by_control.get("enhanced_vs_padded") or by_control.get("padded_vs_original"):
+        lines.append("## 长度控制组\n")
+        lines.append("| 场景 | enhanced−padded 四维 delta 均分 | padded−original 四维 delta 均分 | 平均填充比(增强长度/原文长度) |")
+        lines.append("|---|---|---|---|")
+        scenarios = sorted(set(by_control.get("enhanced_vs_padded", {})) | set(by_control.get("padded_vs_original", {})))
+        for scenario in scenarios:
+            m1 = _mean_of_dims(by_control.get("enhanced_vs_padded", {}).get(scenario, {}))
+            m2 = _mean_of_dims(by_control.get("padded_vs_original", {}).get(scenario, {}))
+            lines.append(f"| {scenario} | {m1:+.2f} | {m2:+.2f} | {by_control.get('pad_ratio', 0.0):.2f}× |")
+        lines.append("")
+        lines.append("> 提示：若 enhanced−padded ≈ 0 且 padded−original > 0,说明增益主要来自加字而非改写\n")
 
     lines.append("## 二、逐样本对比详情\n")
     for sample in data.get("samples", []):

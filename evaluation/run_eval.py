@@ -28,6 +28,19 @@ import targets  # noqa: E402
 RESULTS_ROOT = Path(__file__).resolve().parent / "results"
 CACHE_DIR = RESULTS_ROOT / "_cache"
 
+_FILLER = "请确保回答完整、准确、结构清晰，先给结论再展开，并检查是否有遗漏。"
+
+
+def pad_to_length(text: str, target_len: int) -> str:
+    """在原文后追加中性说明句,直至长度接近 target_len(±5%)。"""
+    if len(text) >= target_len:
+        return text
+    parts = [text]
+    while len("".join(parts)) < target_len * 0.95:
+        parts.append(_FILLER)
+    joined = "".join(parts)
+    return joined[:target_len] if len(joined) > target_len else joined
+
 
 # ---- 离线确定性实现（--offline，用于无网络自测）----
 def enhance_offline(original_text: str, _cfg: dict, _key: str, **_kw) -> dict[str, Any]:
@@ -95,6 +108,9 @@ def main() -> int:
         print("[模式] 离线自测模式：全部目标使用 mock，增强与裁判使用确定性实现")
         for tcfg in cfg.setdefault("targets", {}).values():
             tcfg["mode"] = "mock"
+    control_group = args.control_group
+    if control_group:
+        print("[模式] 长度控制组：启用（额外推理 padded 变体，与增强对照裁判）")
 
     samples = load_samples(args.samples or cfg.get("samples"))
     if not samples:
@@ -210,14 +226,22 @@ def main() -> int:
             for sample in samples:
                 sample.setdefault("results", {})[tid] = {"judge": None}
                 result = sample["results"][tid]
-                for variant in ("original", "enhanced"):
+                variants = ["original", "enhanced"]
+                if control_group and sample["enhanced_text"]:
+                    variants.append("padded")
+                for variant in variants:
                     key = f"infer_{sample['id']}_{tid}_{variant}"
                     cached = load_cache("infer", sample["id"], tid, variant, persona=sample.get("persona") or "") if args.skip_infer else None
                     if cached is not None:
                         result[f"{variant}_output"] = cached["output"]
                         result[f"{variant}_error"] = cached.get("error")
                         continue
-                    prompt = sample["original"] if variant == "original" else sample["enhanced_text"]
+                    if variant == "original":
+                        prompt = sample["original"]
+                    elif variant == "enhanced":
+                        prompt = sample["enhanced_text"]
+                    else:
+                        prompt = pad_to_length(sample["original"], len(sample["enhanced_text"]))
                     if not prompt:
                         result[f"{variant}_error"] = "无提示词（增强失败）"
                         continue
@@ -298,6 +322,24 @@ def main() -> int:
             except JudgeError as exc:
                 result["judge"] = None
                 print(f"  [裁判] {sample['id']} × {tid} 失败：{exc}")
+            if control_group:
+                for ckey, a_out, b_out in (
+                    ("judge_control", result.get("padded_output"), result.get("enhanced_output")),
+                    ("judge_padded_vs_orig", result.get("padded_output"), result.get("original_output")),
+                ):
+                    if not a_out or not b_out:
+                        continue
+                    try:
+                        if offline:
+                            result[ckey] = judge_offline(sample, a_out, b_out, cfg, "")
+                        else:
+                            result[ckey] = run_with_budget(
+                                lambda s=sample, a=a_out, b=b_out: judge_pair(s, a, b, cfg, judge_key),
+                                cfg, "控制组裁判",
+                            )
+                    except JudgeError as exc:
+                        result[ckey] = None
+                        print(f"  [控制组裁判] {sample['id']} × {tid} 失败：{exc}")
 
     # 阶段四：报告
     meta = {
@@ -307,6 +349,7 @@ def main() -> int:
         "judge_model": cfg.get("judge", {}).get("model", ""),
         "estimated_cost": round(_total_cost(samples), 4),
         "offline": offline,
+        "control_group": control_group,
     }
     payload = {"meta": meta, "samples": samples}
     out_dir = report_mod.timestamp_dir(RESULTS_ROOT)
@@ -627,6 +670,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--skip-prompt-judge", action="store_true", help="跳过增强质量(prompt 级)裁判")
     parser.add_argument("--max-cost", type=float, default=None, help="覆盖 max_cost_usd 预算")
     parser.add_argument("--offline", action="store_true", help="离线自测模式（mock 目标 + 确定性裁判）")
+    parser.add_argument("--control-group", action="store_true",
+                        help="启用长度控制组：额外推理填充长度版本的提示词，并对照裁判（增强 vs 填充、填充 vs 原始）")
     parser.add_argument("--manual", action="store_true",
                         help="只生成人工评测清单（原始+增强提示词），供手动复制粘贴，不联网抓取")
     parser.add_argument("--manual-answers", default=None,
