@@ -19,9 +19,10 @@ from bench_judge import DIMENSIONS, DIMENSION_LABELS  # evaluation/ 目录已在
 
 REPORT_NAME = "report_benchmark.md"
 
-DEFAULT_WEIGHTS = {"quality": 0.6, "relevance": 0.2, "speed": 0.2}
+DEFAULT_WEIGHTS = {"quality": 0.7, "relevance": 0.2, "speed": 0.1}
 LATENCY_CAP_S = 120.0
 QUALITY_DIMS = ("accuracy", "completeness", "clarity")
+COMPOSITE_DIMS = ("accuracy", "completeness", "relevance", "clarity", "novelty")
 
 
 def estimate_tokens(text: str) -> int:
@@ -33,13 +34,43 @@ def compute_composite(
     scores: dict[str, Any],
     latency_s: float | None,
     weights: dict[str, float] | None = None,
+    scenario: str = "",
+    scenario_weights: dict[str, dict[str, float]] | None = None,
 ) -> float:
-    """综合分 = 0.6×质量均分 + 0.2×相关性 + 0.2×速度分；速度分 = 1 - min(latency,120)/120。"""
+    """综合分计算。
+
+    场景权重命中（scenario_weights 含该场景且权重和为正值）时：
+      composite = Σ (w_i / Σw) × dim_i，dim 取 accuracy/completeness/relevance/clarity/novelty，
+      映射外的维度权重为 0；维度缺失（旧缓存无 novelty）时 novelty 回退用 relevance。
+    未命中时：
+      composite = q_w×质量均分(准确/完整/清晰) + r_w×相关性 + s_w×速度分；
+      速度分 = 1 - min(latency,120)/120。
+    """
     if not scores:
         return 0.0
+    sw = (scenario_weights or {}).get(scenario)
+    if sw:
+        wmap = {
+            d: float(v)
+            for d, v in sw.items()
+            if isinstance(v, (int, float)) and float(v) != 0
+        }
+        total_w = sum(wmap.values())
+        if total_w > 0:
+            total = 0.0
+            for dim in COMPOSITE_DIMS:
+                w = wmap.get(dim, 0.0)
+                if w == 0:
+                    continue
+                value = scores.get(dim)
+                if value is None and dim == "novelty":
+                    value = scores.get("relevance")
+                total += (w / total_w) * float(value or 0)
+            return total
     w = {**DEFAULT_WEIGHTS, **(weights or {})}
-    quality = sum(scores.get(d, 0) for d in QUALITY_DIMS) / len(QUALITY_DIMS)
-    relevance = scores.get("relevance", 0)
+    q_dims = [d for d in QUALITY_DIMS if d in scores]
+    quality = sum(scores[d] for d in q_dims) / len(q_dims) if q_dims else 0.0
+    relevance = float(scores.get("relevance") or 0)
     speed = 1.0 - min(float(latency_s or LATENCY_CAP_S), LATENCY_CAP_S) / LATENCY_CAP_S
     return w["quality"] * quality + w["relevance"] * relevance + w["speed"] * speed
 
@@ -81,12 +112,29 @@ def _cost_block(payload: dict[str, Any]) -> list[str]:
 def aggregate(
     payload: dict[str, Any],
     weights: dict[str, float] | None = None,
+    scenario_weights: dict[str, dict[str, float]] | None = None,
 ) -> dict[str, Any]:
-    """按模型聚合：四维度均分、平均延迟、平均输出长度、胜率、综合分，按综合分降序排名。
+    """按模型聚合：各维度均分、平均延迟、平均输出长度、胜率、综合分，按综合分降序排名。
+
+    weights 为 quality/relevance/speed 回退权重（缺省 0.7/0.2/0.1）；
+    scenario_weights 为 {场景: {维度: 权重}}（未传时从 payload.meta.scenario_weights 读取），
+    命中场景的 (模型×提示词) 条目改用纯维度加权综合分。
+    场景来源：detail.scenario 优先，其次 meta.prompts[id].scenario。
+    缺失的维度（如旧缓存的 novelty）不参与均分，只按条目实际含有的维度收集。
 
     details 中的每条会补充 composite（该条综合分）与 winner（该提示词上是否严格最高）。
     有 error 或无 scores 的条目不参与评分聚合。
     """
+    if scenario_weights is None:
+        scenario_weights = payload.get("meta", {}).get("scenario_weights") or {}
+    prompt_scenarios = {
+        str(p.get("id")): str(p.get("scenario") or "")
+        for p in (payload.get("meta", {}).get("prompts") or [])
+    }
+
+    def scenario_of(item: dict[str, Any]) -> str:
+        return str(item.get("scenario") or prompt_scenarios.get(item.get("prompt_id", ""), ""))
+
     per_model: dict[str, dict[str, Any]] = {}
     per_prompt_composite: dict[str, dict[str, float]] = {}
 
@@ -97,9 +145,17 @@ def aggregate(
             continue
         bucket = per_model.setdefault(mid, {})
         scores = item["scores"]
-        composite = compute_composite(scores, item.get("latency_s"), weights)
+        composite = compute_composite(
+            scores, item.get("latency_s"), weights, scenario_of(item), scenario_weights
+        )
         for dim in DIMENSIONS:
-            bucket.setdefault("dims", {}).setdefault(dim, []).append(float(scores.get(dim, 0)))
+            if dim in scores:
+                bucket.setdefault("dims", {}).setdefault(dim, []).append(float(scores[dim]))
+        q_dims = [d for d in QUALITY_DIMS if d in scores]
+        if q_dims:
+            bucket.setdefault("qualities", []).append(
+                sum(scores[d] for d in q_dims) / len(q_dims)
+            )
         bucket.setdefault("composites", []).append(composite)
         if item.get("latency_s") is not None:
             bucket.setdefault("latencies", []).append(float(item["latency_s"]))
@@ -123,19 +179,13 @@ def aggregate(
     }
     for mid, bucket in per_model.items():
         dims = bucket.get("dims", {})
-        quality_mean = _mean(
-            [
-                (sum(dims[d][i] for d in QUALITY_DIMS) / len(QUALITY_DIMS))
-                for i in range(len(dims.get("accuracy", [])))
-            ]
-        )
         judged = len(bucket.get("composites", []))
         wins = sum(1 for pid, wmid in prompt_winners.items() if wmid == mid)
         models.append({
             "id": mid,
             "label": label_map.get(mid, mid),
-            "dims": {d: round(_mean(dims.get(d, [])), 2) for d in DIMENSIONS},
-            "quality_mean": round(quality_mean, 2),
+            "dims": {d: round(_mean(dims.get(d, [])), 2) for d in DIMENSIONS if dims.get(d)},
+            "quality_mean": round(_mean(bucket.get("qualities", [])), 2),
             "latency_mean": round(_mean(bucket.get("latencies", [])), 2),
             "output_len_mean": round(_mean(bucket.get("output_lens", [])), 1),
             "win_rate": round(wins / judged, 3) if judged else 0.0,
@@ -156,7 +206,10 @@ def aggregate(
         mid = item.get("model_id", "")
         if not item.get("error") and item.get("scores"):
             entry["composite"] = round(
-                compute_composite(item["scores"], item.get("latency_s"), weights), 3
+                compute_composite(
+                    item["scores"], item.get("latency_s"), weights, scenario_of(item), scenario_weights
+                ),
+                3,
             )
             entry["winner"] = prompt_winners.get(item.get("prompt_id", "")) == mid
         else:
@@ -190,7 +243,14 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     labels = ", ".join(m.get("label", m.get("id", "")) for m in models) or "无"
     lines.append(f"- 模型列表：{labels}")
     lines.append(f"- 增强模型：{meta.get('enhancer_model', '')} | 裁判模型：{meta.get('judge_model', '')}")
-    lines.append(f"- 接口协议：{meta.get('protocol', '')} | {meta.get('base_url', '')}\n")
+    lines.append(f"- 接口协议：{meta.get('protocol', '')} | {meta.get('base_url', '')}")
+    sw = meta.get("scenario_weights") or {}
+    sw_desc = "、".join(sw) if sw else "（未配置）"
+    lines.append(
+        f"- 综合分：场景命中 scenario_weights（{sw_desc}）→ Σ 各维度×场景权重（归一化）；"
+        f"未命中 → {DEFAULT_WEIGHTS['quality']}×质量均分（准确/完整/清晰）+ "
+        f"{DEFAULT_WEIGHTS['relevance']}×相关性 + {DEFAULT_WEIGHTS['speed']}×速度分\n"
+    )
 
     lines.append("## 一、总览表\n")
     lines.append("| 排名 | 模型 | 质量均分 | 相关性 | 延迟(s) | 综合分 |")
@@ -212,18 +272,19 @@ def _render_markdown(payload: dict[str, Any]) -> str:
         lines.append("> 无有效评测条目。\n")
     for pid, items in by_prompt.items():
         lines.append(f"### {pid}\n")
-        lines.append("| 模型 | 准确性 | 完整性 | 相关性 | 清晰度 | 延迟(s) | 综合分 |")
-        lines.append("|---|---:|---:|---:|---:|---:|---:|")
+        lines.append("| 模型 | 准确性 | 完整性 | 相关性 | 清晰度 | 新颖度 | 延迟(s) | 综合分 |")
+        lines.append("|---|---:|---:|---:|---:|---:|---:|---:|")
         for item in items:
             label = item.get("model_label", item.get("model_id", ""))
             if item.get("error") or not item.get("scores"):
-                lines.append(f"| {label} | 失败 | - | - | - | - | - |")
+                lines.append(f"| {label} | 失败 | - | - | - | - | - | - |")
                 continue
             scores = item["scores"]
             mark = " ★" if item.get("winner") else ""
             lines.append(
                 f"| {label}{mark} | {scores.get('accuracy', 0)} | {scores.get('completeness', 0)} | "
                 f"{scores.get('relevance', 0)} | {scores.get('clarity', 0)} | "
+                f"{scores.get('novelty', '-')} | "
                 f"{item.get('latency_s', 0):.2f} | {item.get('composite', 0):.3f} |"
             )
         lines.append("")

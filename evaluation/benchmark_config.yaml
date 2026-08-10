@@ -22,7 +22,11 @@ scenario_temperatures:
 judge:
   model: deepseek-v4-flash
   temperature: 0
-  weights: { quality: 0.6, relevance: 0.2, speed: 0.2 }
+  weights: { quality: 0.7, relevance: 0.2, speed: 0.1 }
+# 按场景的综合分维度权重（命中时 composite = Σ 各维度×场景权重，归一化到 1；未命中用 judge.weights 公式）
+scenario_weights:
+  编程: { accuracy: 0.4, completeness: 0.3, relevance: 0.2, clarity: 0.1 }
+  创意: { accuracy: 0.15, completeness: 0.15, relevance: 0.25, clarity: 0.2, novelty: 0.25 }
 models:
   - { id: doubao-seed-2.0-mini, label: 豆包 2.0 mini }
   - { id: glm-5.2, label: GLM-5.2 }

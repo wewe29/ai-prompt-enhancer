@@ -14,7 +14,7 @@ from jinja2 import Environment, FileSystemLoader
 
 from judge import DIMENSIONS, DIMENSION_LABELS, PROMPT_JUDGE_DIMS  # evaluation/ 目录已在 sys.path 中
 
-DIMENSION_ORDER = ["accuracy", "completeness", "relevance", "clarity"]
+DIMENSION_ORDER = ["accuracy", "completeness", "relevance", "clarity", "novelty"]
 
 # 判定"改进"的阈值：任一维度提升 ≥ 2 分视为有实质改进
 IMPROVE_THRESHOLD = 2
@@ -26,9 +26,14 @@ def estimate_tokens(text: str) -> int:
 
 
 def _mean_of_dims(dims: dict[str, Any]) -> float:
-    """四维 delta 均分：dims 为 {dim: stat} 时取各维度 mean 的平均。"""
+    """各维度 delta 均分：dims 为 {dim: stat} 时取各维度 mean 的平均。"""
     vals = [dims[d]["mean"] for d in DIMENSION_ORDER if d in dims]
     return sum(vals) / len(vals) if vals else 0.0
+
+
+def _delta_cell(st: dict[str, Any]) -> str:
+    """统计单元格渲染：无数据（旧数据缺该维度）显示 "-"。"""
+    return "-" if st["n"] == 0 else f"{st['mean']:+.2f}"
 
 
 def wilson_ci(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
@@ -165,11 +170,13 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
             if jc:
                 jc_deltas = jc.get("deltas", {})
                 for dim in DIMENSIONS:
-                    ctrl_enh_vs_padded.setdefault(scenario, {}).setdefault(dim, []).append(jc_deltas.get(dim, 0))
+                    if dim in jc_deltas:
+                        ctrl_enh_vs_padded.setdefault(scenario, {}).setdefault(dim, []).append(jc_deltas[dim])
             if jpv:
                 jpv_deltas = jpv.get("deltas", {})
                 for dim in DIMENSIONS:
-                    ctrl_padded_vs_orig.setdefault(scenario, {}).setdefault(dim, []).append(jpv_deltas.get(dim, 0))
+                    if dim in jpv_deltas:
+                        ctrl_padded_vs_orig.setdefault(scenario, {}).setdefault(dim, []).append(jpv_deltas[dim])
             if (jc or jpv) and orig_text:
                 ctrl_ratios.append(len(enh_text) / len(orig_text))
             if any(v >= IMPROVE_THRESHOLD for v in deltas.values()):
@@ -185,11 +192,13 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
             elif winner == "original":
                 by_magnitude["regress"][magnitude] += 1
             for dim in DIMENSIONS:
-                by_dim[dim].append(deltas.get(dim, 0))
-                by_target.setdefault(target_id, {}).setdefault(dim, []).append(deltas.get(dim, 0))
-                by_scenario.setdefault(scenario, {}).setdefault(dim, []).append(deltas.get(dim, 0))
+                if dim not in deltas:
+                    continue
+                by_dim[dim].append(deltas[dim])
+                by_target.setdefault(target_id, {d: [] for d in DIMENSIONS})[dim].append(deltas[dim])
+                by_scenario.setdefault(scenario, {d: [] for d in DIMENSIONS})[dim].append(deltas[dim])
                 if persona:
-                    by_persona.setdefault(persona, {}).setdefault(dim, []).append(deltas.get(dim, 0))
+                    by_persona.setdefault(persona, {d: [] for d in DIMENSIONS})[dim].append(deltas[dim])
 
             ag = result.get("agreement")
             if ag and ag.get("dim_corr"):
@@ -227,6 +236,7 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
             "dim_corr": {
                 dim: round(sum(vals) / len(vals), 4) if vals else 0.0
                 for dim, vals in agreement_rhos.items()
+                if vals
             },
         }
 
@@ -311,8 +321,8 @@ def _render_markdown(data: dict[str, Any]) -> str:
     lines.append("|---|---|")
     for dim in DIMENSION_ORDER:
         st = agg["dimensions"][dim]
-        mark = "+" if st["mean"] >= 0 else ""
-        lines.append(f"| {DIMENSION_LABELS[dim]} | {mark}{st['mean']} |")
+        cell = "-" if st["n"] == 0 else f"{'+' if st['mean'] >= 0 else ''}{st['mean']}"
+        lines.append(f"| {DIMENSION_LABELS[dim]} | {cell} |")
     lines.append("")
 
     cost = agg.get("cost") or {}
@@ -340,7 +350,7 @@ def _render_markdown(data: dict[str, Any]) -> str:
         lines.append("| 场景 | " + " | ".join(DIMENSION_LABELS[d] for d in DIMENSION_ORDER) + " |")
         lines.append("|---|" + "---|" * len(DIMENSION_ORDER))
         for scenario, dims in agg["by_scenario"].items():
-            row = [f"{dims[d]['mean']:+.2f}" for d in DIMENSION_ORDER]
+            row = [_delta_cell(dims[d]) for d in DIMENSION_ORDER]
             lines.append(f"| {scenario} | " + " | ".join(row) + " |")
         lines.append("")
 
@@ -349,7 +359,7 @@ def _render_markdown(data: dict[str, Any]) -> str:
         lines.append("| 目标模型 | " + " | ".join(DIMENSION_LABELS[d] for d in DIMENSION_ORDER) + " |")
         lines.append("|---|" + "---|" * len(DIMENSION_ORDER))
         for tid, dims in agg["by_target"].items():
-            row = [f"{dims[d]['mean']:+.2f}" for d in DIMENSION_ORDER]
+            row = [_delta_cell(dims[d]) for d in DIMENSION_ORDER]
             lines.append(f"| {tid} | " + " | ".join(row) + " |")
         lines.append("")
 
@@ -363,7 +373,7 @@ def _render_markdown(data: dict[str, Any]) -> str:
         lines.append("| 用户画像 | " + " | ".join(DIMENSION_LABELS[d] for d in DIMENSION_ORDER) + " |")
         lines.append("|---|" + "---|" * len(DIMENSION_ORDER))
         for pid, dims in agg["by_persona"].items():
-            row = [f"{dims[d]['mean']:+.2f}" for d in DIMENSION_ORDER]
+            row = [_delta_cell(dims[d]) for d in DIMENSION_ORDER]
             lines.append(f"| {persona_labels.get(pid, pid)} | " + " | ".join(row) + " |")
         lines.append("")
 
@@ -434,8 +444,13 @@ def _render_markdown(data: dict[str, Any]) -> str:
                 lines.append("| 维度 | 原始回答 | 增强回答 | Delta |")
                 lines.append("|---|---|---|---|")
                 for dim in DIMENSION_ORDER:
-                    delta = judge["deltas"][dim]
-                    lines.append(f"| {DIMENSION_LABELS[dim]} | {o[dim]} | {e[dim]} | {delta:+.0f} |")
+                    delta = judge["deltas"].get(dim)
+                    if delta is None:
+                        lines.append(f"| {DIMENSION_LABELS[dim]} | - | - | - |")
+                    else:
+                        lines.append(
+                            f"| {DIMENSION_LABELS[dim]} | {o.get(dim, '-')} | {e.get(dim, '-')} | {delta:+.0f} |"
+                        )
                 winner_label = {"enhanced": "增强版", "original": "原始版", "tie": "平局"}.get(judge["winner"], judge["winner"])
                 lines.append(f"\n**裁判结论：** {winner_label} 更优。{judge.get('reason', '')}\n")
             for variant, label in (("original", "原始版回答"), ("enhanced", "增强版回答")):
@@ -455,6 +470,26 @@ def _render_markdown(data: dict[str, Any]) -> str:
 
 
 # ---- HTML ----
+def _fill_missing_dims_for_html(sample: dict[str, Any]) -> None:
+    """HTML 模板按 DIMENSION_ORDER 渲染全部维度；旧缓存缺 novelty 时以 relevance 回退补齐显示。"""
+    for result in (sample.get("results") or {}).values():
+        for key in ("judge", "judge2", "judge_control", "judge_padded_vs_orig"):
+            judge = result.get(key)
+            if not isinstance(judge, dict):
+                continue
+            o, e = judge.get("original"), judge.get("enhanced")
+            if not isinstance(o, dict) or not isinstance(e, dict):
+                continue
+            for side in (o, e):
+                for dim in DIMENSION_ORDER:
+                    if dim not in side:
+                        side[dim] = side.get("relevance", 0)
+            deltas = judge.setdefault("deltas", {})
+            for dim in DIMENSION_ORDER:
+                if dim not in deltas:
+                    deltas[dim] = int(e.get(dim, 0)) - int(o.get(dim, 0))
+
+
 def _render_html(data: dict[str, Any]) -> str:
     env = Environment(loader=FileSystemLoader(Path(__file__).resolve().parent / "templates"))
     template = env.get_template("report.html.j2")
@@ -467,6 +502,7 @@ def _render_html(data: dict[str, Any]) -> str:
         sample["enhance_status"] = enhanced.get("status")
         sample["enhance_questions"] = enhanced.get("questions", [])
         sample["enhance_suggestions"] = enhanced.get("suggestions", [])
+        _fill_missing_dims_for_html(sample)
     return template.render(
         data=data,
         agg=agg,
