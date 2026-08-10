@@ -30,3 +30,4 @@ evaluation/**/__pycache__/
 evaluation/.pytest_cache/
 evaluation/*.egg-info/
 evaluation/answers.json
+evaluation/key.local
