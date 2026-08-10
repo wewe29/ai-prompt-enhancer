@@ -742,8 +742,18 @@ def load_cache(kind: str, sample_id: str, target: str = "", variant: str = "", p
 def save_cache(kind: str, sample_id: str, target: str = "", variant: str = "", payload: Any = None, persona: str = "") -> None:
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     name = f"{kind}_{sample_id}" + (f"_{persona}" if persona else "") + (f"_{target}" if target else "") + (f"_{variant}" if variant else "")
-    with open(CACHE_DIR / f"{name}.json", "w", encoding="utf-8") as fh:
-        json.dump(payload, fh, ensure_ascii=False, indent=2)
+    path = CACHE_DIR / f"{name}.json"
+    text = json.dumps(payload, ensure_ascii=False, indent=2)
+    for attempt in range(2):
+        try:
+            with open(path, "w", encoding="utf-8", errors="replace", newline="\n") as fh:
+                fh.write(text)
+            return
+        except OSError:
+            if attempt == 0:
+                time.sleep(1.0)
+                continue
+            raise
 
 
 def _total_cost(samples: list[dict[str, Any]]) -> float:
