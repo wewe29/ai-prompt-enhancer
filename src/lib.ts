@@ -15,6 +15,9 @@ export async function command<T>(name: string, args?: Record<string, unknown>): 
 export function blankResult(text: string): EnhancementResult {
   return {
     status: "ready",
+    delivery_status: "complete",
+    enhancement_level: "light",
+    notices: [],
     primary_prompt: text,
     assumptions: [],
     questions: [],
@@ -28,6 +31,9 @@ function mockResult(request: EnhancementRequest): EnhancementResult {
   const text = request.originalText.trim();
   return {
     status: "needs_clarification",
+    delivery_status: "complete",
+    enhancement_level: "clarify",
+    notices: [],
     task_type: "other",
     primary_prompt: `「${text || "我的需求"}」\n\n请先确认我提供的对象或上下文。若信息不足，先列出你需要的具体信息，并基于明确假设给出临时方案。`,
     assumptions: [{ id: "a1", text: "临时版本不替用户猜测对象和上下文。", confirmed: false }],
@@ -202,7 +208,23 @@ export function safeParseResult(buffer: string): EnhancementResult | null {
 }
 
 export function normalizeResult(result: EnhancementResult): EnhancementResult {
-  return EnhancementResultSchema.parse(result) as EnhancementResult;
+  const legacy = {
+    ...result,
+    delivery_status: result.delivery_status ?? "complete",
+    enhancement_level: result.enhancement_level ?? (result.status === "needs_clarification" ? "clarify" : "light"),
+    notices: result.notices ?? [],
+  };
+  return EnhancementResultSchema.parse(legacy) as EnhancementResult;
+}
+
+export function rebuildAfterKeepEssential(changes: PromptChange[], original: string): string {
+  let text = original;
+  for (const change of changes) {
+    if (change.type === "safety" || change.state === "accepted") {
+      text = applyChangeDecision(text, change, "accepted");
+    }
+  }
+  return text;
 }
 
 export function applySuggestionToText(text: string, suggestion: Suggestion): string {

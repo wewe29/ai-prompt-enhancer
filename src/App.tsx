@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   applyChangeDecision, applySuggestionToText, cancelEnhancement, clearAllData, copyAndOpen, deleteHistoryRecord, extractAttachment,
   getLocalSettings, getProviderConfig, listHistoryRecords, normalizeResult, pickAttachments,
-  pushUndoSnapshot, saveHistoryRecord, saveLocalSettings, saveProviderConfig, startEnhancement,
+  pushUndoSnapshot, rebuildAfterKeepEssential, saveHistoryRecord, saveLocalSettings, saveProviderConfig, startEnhancement,
   targetModels, validateProvider,
 } from "./lib";
 import type {
@@ -46,6 +46,7 @@ export default function App() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [output, setOutput] = useState("");
   const [result, setResult] = useState<EnhancementResult | null>(null);
+  const [notices, setNotices] = useState<string[]>([]);
   const [state, setState] = useState<EnhancementState>("idle");
   const [error, setError] = useState("");
   const [model, setModel] = useState("deepseek-chat");
@@ -130,8 +131,11 @@ export default function App() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
   };
 
-  const persistHistory = (enhanced: string) => {
+  const persistHistory = (enhanced: string, opts?: { deliveryStatus?: "complete" | "partial" | "fallback"; enhancementLevel?: string; promptVersion?: string }) => {
     const item: HistoryRecord = { id: crypto.randomUUID(), title: original.trim().slice(0, 32) || "未命名提示词", original, enhanced, createdAt: new Date().toISOString(), model, target };
+    if (opts?.deliveryStatus) item.deliveryStatus = opts.deliveryStatus;
+    if (opts?.enhancementLevel) item.enhancementLevel = opts.enhancementLevel;
+    if (opts?.promptVersion) item.promptVersion = opts.promptVersion;
     setHistory((items) => [item, ...items].slice(0, 200));
     saveHistoryRecord(item).catch(() => undefined);
   };
@@ -148,7 +152,7 @@ export default function App() {
     if (monthlyLimit > 0 && projectedMonthTotal > monthlyLimit) { setError(`预计本次请求会使本月费用达到约 ¥${projectedMonthTotal.toFixed(2)}，超过强制额度 ¥${monthlyLimit.toFixed(2)}，已阻止调用。`); return; }
 
     const generationId = ++generationRef.current;
-    setShowSecurity(false); setError(monthlyWarningLimit > 0 && projectedMonthTotal >= monthlyWarningLimit ? `费用提醒：预计本次后本月累计约 ¥${projectedMonthTotal.toFixed(2)}，仍允许继续。` : ""); setState("streaming"); setResult(null); setOutput(""); setUndoStack([]); setRedoStack([]);
+    setShowSecurity(false); setError(monthlyWarningLimit > 0 && projectedMonthTotal >= monthlyWarningLimit ? `费用提醒：预计本次后本月累计约 ¥${projectedMonthTotal.toFixed(2)}，仍允许继续。` : ""); setState("streaming"); setResult(null); setOutput(""); setUndoStack([]); setRedoStack([]); setNotices([]);
     const request: EnhancementRequest = {
       originalText: original,
       contextText: overrideContext ?? context,
@@ -170,14 +174,20 @@ export default function App() {
           try {
             normalized = normalizeResult(event.result);
           } catch {
-            setState("error");
-            setError("模型返回的字段超出预期，请重新生成。");
+            setOutput((current) => current || original);
+            setState("incomplete");
+            setError("模型返回的字段超出预期，已保留你的输入；可点击重新生成。");
             return;
           }
           setResult(normalized);
+          const nextNotices = [...new Set(normalized.notices ?? [])];
+          if (normalized.delivery_status === "fallback" && nextNotices.length === 0) {
+            nextNotices.push("已保留原文（增强服务未返回可用结构）");
+          }
+          setNotices(nextNotices);
           setOutput(normalized.primary_prompt);
           setState(normalized.status === "needs_clarification" ? "needs_clarification" : "ready");
-          persistHistory(normalized.primary_prompt);
+          persistHistory(normalized.primary_prompt, { deliveryStatus: normalized.delivery_status, enhancementLevel: normalized.enhancement_level });
         }
         if (event.type === "status" && event.data === "retrying_structure") setOutput("");
         if (event.type === "usage" && event.usage) setUsage(event.usage);
@@ -220,6 +230,17 @@ export default function App() {
     setResult((current) => current ? { ...current, changes: current.changes.map((item) => item.id === id ? { ...item, state: nextState } : item) } : current);
   };
 
+  const hasActionableChanges = result?.changes.some((change) => change.state === "pending" || change.state === "accepted") ?? false;
+
+  const restoreOriginal = () => { if (output !== original) commitOutput(original); };
+
+  const keepEssentialEdits = () => {
+    if (!result) return;
+    commitOutput(rebuildAfterKeepEssential(result.changes, original));
+  };
+
+  const regenerate = () => runEnhance();
+
   const handleCopyOpen = async () => {
     if (!output.trim()) return;
     if (!currentTarget.url) { setError("请先填写自定义目标网页地址"); return; }
@@ -249,7 +270,7 @@ export default function App() {
 
   return <div className="app-shell">
     <Sidebar view={view} onView={setView} collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />
-    {view !== "enhance" ? mainContent : <EnhanceView model={model} setModel={setModel} provider={provider} target={target} setTarget={setTarget} verbosity={verbosity} setVerbosity={setVerbosity} state={state} setState={setState} stop={stop} runEnhance={runEnhance} customInstructions={customInstructions} setCustomInstructions={setCustomInstructions} customTargetUrl={customTargetUrl} setCustomTargetUrl={setCustomTargetUrl} error={error} setError={setError} original={original} setOriginal={setOriginal} context={context} setContext={setContext} totalChars={totalChars} attachments={attachments} setAttachments={setAttachments} addAttachments={addAttachments} output={output} commitOutput={commitOutput} undo={undo} redo={redo} undoStack={undoStack} redoStack={redoStack} result={result} setResult={setResult} usage={usage} handleCopyOpen={handleCopyOpen} currentTarget={currentTarget} clarificationRound={clarificationRound} answers={answers} setAnswers={setAnswers} submitClarification={submitClarification} changeState={changeState} setSelectedSuggestion={setSelectedSuggestion} showSecurity={showSecurity} setShowSecurity={setShowSecurity} selectedSuggestionData={selectedSuggestionData ?? null} />}
+    {view !== "enhance" ? mainContent : <EnhanceView model={model} setModel={setModel} provider={provider} target={target} setTarget={setTarget} verbosity={verbosity} setVerbosity={setVerbosity} state={state} setState={setState} stop={stop} runEnhance={runEnhance} customInstructions={customInstructions} setCustomInstructions={setCustomInstructions} customTargetUrl={customTargetUrl} setCustomTargetUrl={setCustomTargetUrl} error={error} setError={setError} original={original} setOriginal={setOriginal} context={context} setContext={setContext} totalChars={totalChars} attachments={attachments} setAttachments={setAttachments} addAttachments={addAttachments} output={output} commitOutput={commitOutput} undo={undo} redo={redo} undoStack={undoStack} redoStack={redoStack} result={result} setResult={setResult} usage={usage} handleCopyOpen={handleCopyOpen} currentTarget={currentTarget} clarificationRound={clarificationRound} answers={answers} setAnswers={setAnswers} submitClarification={submitClarification} changeState={changeState} setSelectedSuggestion={setSelectedSuggestion} showSecurity={showSecurity} setShowSecurity={setShowSecurity} selectedSuggestionData={selectedSuggestionData ?? null} notices={notices} deliveryStatus={result?.delivery_status} restoreOriginal={restoreOriginal} keepEssentialEdits={keepEssentialEdits} hasActionableChanges={hasActionableChanges} regenerate={regenerate} />}
     {showSecurity && <SecurityModal findings={securityFindings} onCancel={() => setShowSecurity(false)} onConfirm={() => runEnhance(true)} />}
     {selectedSuggestionData && <SuggestionModal suggestion={selectedSuggestionData} onCancel={() => setSelectedSuggestion(null)} onApply={applySuggestion} />}
   </div>;

@@ -2,6 +2,26 @@
 
 本项目遵循语义化版本。发布日期使用 `YYYY-MM-DD`。
 
+## [0.2.1] - 2026-08-12
+
+### 可靠性修复
+
+- 解析流水线重构:直接 JSON → 去围栏 → 字符串感知平衡扫描,正确处理字符串内花括号/转义,不再用"首 `{` 到末 `}`"误截取。
+- 核心校验与完整校验分离:`primary_prompt` 有效即可交付,不再因"恰好 5 条建议"等附属字段缺失而整体丢弃。
+- 新增交付状态 `delivery_status`(complete/partial/fallback)与 `enhancement_level`(none/light/clarify)、`notices`;partial 保留主提示词,fallback 回退原文并保证可复制。
+- 结构修复重试:第二次请求使用专门修复指令;仍失败时从流式内容提取或回退原文,始终发送结果,不抛异常。
+- 稳定错误码(REQUEST_INVALID/AUTH_FAILED/RATE_LIMITED/STRUCTURE_FALLBACK 等)写入本地用量日志;日志不落提示词/响应正文/API Key。
+- 前端降级体验:partial 黄色提示、fallback 显示"已保留原文"、新增 恢复原文/仅保留必要修改/重新生成 按钮、notices 非模态提示;失败时输入不丢失。
+- 历史记录新增 deliveryStatus/enhancementLevel/promptVersion(可选,旧数据兼容),fallback 历史标注"原文回退"。
+- 评测:单条增强失败不再终止整批;报告统计 complete/partial/fallback/hard_failure 与有效率;基准评测增强失败按提示词去重。
+- 工程:Vite/pytest/Cargo 可写临时目录;`build-check.cmd test` 统一 7 步验证;CI 增加 Python 评测测试;`release/*.zip` 恢复忽略。
+
+### 测试
+
+- Rust:四步解析、归一化、partial/fallback、100 条结构压力测试(可交付率 100%,完整结构 95%)。
+- 前端:旧结果兼容、partial/fallback 行为、恢复原文进撤销栈、重新生成不清输入。
+- 评测:失败隔离、交付统计、基准失败去重。
+
 ## [0.2.0] - 2026-08-09
 
 ### Added

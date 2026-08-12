@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { applyChangeDecision, applySuggestionToText, normalizeResult, pushUndoSnapshot, safeParseResult } from "./lib";
-import type { EnhancementResult, PromptChange, Suggestion } from "./types";
+import { applyChangeDecision, applySuggestionToText, normalizeResult, pushUndoSnapshot, rebuildAfterKeepEssential, safeParseResult } from "./lib";
+import type { EnhancementResult, HistoryRecord, PromptChange, Suggestion } from "./types";
 
 const suggestion: Suggestion = {
   id: "s1",
@@ -51,5 +51,109 @@ describe("prompt result helpers", () => {
 
   it("rejects malformed streamed JSON", () => {
     expect(safeParseResult("not json")).toBeNull();
+  });
+
+  it("fills legacy results without new fields into complete/light with empty notices", () => {
+    const legacy = {
+      status: "ready",
+      primary_prompt: "旧版结果",
+      assumptions: [],
+      questions: [],
+      changes: [],
+      suggestions: [],
+      risk_flags: [],
+    } as unknown as EnhancementResult;
+    const result = normalizeResult(legacy);
+    expect(result.delivery_status).toBe("complete");
+    expect(result.enhancement_level).toBe("light");
+    expect(result.notices).toEqual([]);
+  });
+
+  it("derives clarify enhancement level for legacy needs_clarification results", () => {
+    const legacy = {
+      status: "needs_clarification",
+      primary_prompt: "需要澄清",
+      assumptions: [],
+      questions: [{ id: "q1", text: "对象是什么？", why_needed: "缺少对象" }],
+      changes: [],
+      suggestions: [],
+      risk_flags: [],
+    } as unknown as EnhancementResult;
+    const result = normalizeResult(legacy);
+    expect(result.delivery_status).toBe("complete");
+    expect(result.enhancement_level).toBe("clarify");
+  });
+
+  it("keeps primary_prompt and notices for partial results", () => {
+    const partial = {
+      status: "ready",
+      delivery_status: "partial",
+      enhancement_level: "light",
+      notices: ["模型未返回完整建议，主提示词仍可使用。"],
+      primary_prompt: "部分增强结果",
+      assumptions: [],
+      questions: [],
+      changes: [],
+      suggestions: [],
+      risk_flags: [],
+    } as unknown as EnhancementResult;
+    const result = normalizeResult(partial);
+    expect(result.delivery_status).toBe("partial");
+    expect(result.enhancement_level).toBe("light");
+    expect(result.primary_prompt).toBe("部分增强结果");
+    expect(result.notices).toEqual(["模型未返回完整建议，主提示词仍可使用。"]);
+  });
+
+  it("normalizes fallback results to the original prompt with a notice", () => {
+    const fallback = {
+      status: "ready",
+      delivery_status: "fallback",
+      enhancement_level: "none",
+      notices: ["增强服务未返回可用结构，本次已保留原始提示词"],
+      primary_prompt: "我的原始提示词",
+      assumptions: [],
+      questions: [],
+      changes: [],
+      suggestions: [],
+      risk_flags: [],
+    } as unknown as EnhancementResult;
+    const result = normalizeResult(fallback);
+    expect(result.delivery_status).toBe("fallback");
+    expect(result.enhancement_level).toBe("none");
+    expect(result.primary_prompt).toBe("我的原始提示词");
+    expect(result.notices).toHaveLength(1);
+  });
+
+  it("rebuilds text keeping only safety and accepted changes", () => {
+    const changes: PromptChange[] = [
+      { id: "c1", type: "clarify", before: "解释代码", after: "解释这段代码的用途", reason: "明确范围", state: "pending" },
+      { id: "c2", type: "format", before: "输出格式", after: "输出格式（列表）", reason: "固定结构", state: "accepted" },
+      { id: "c3", type: "safety", before: "删除文件", after: "确认后再删除文件", reason: "防止误删", state: "pending" },
+    ];
+    const original = "请解释代码，输出格式，删除文件。";
+    expect(rebuildAfterKeepEssential(changes, original)).toBe("请解释代码，输出格式（列表），确认后再删除文件。");
+  });
+
+  it("returns the original text when no changes are applicable", () => {
+    const changes: PromptChange[] = [
+      { id: "c1", type: "clarify", before: "不存在的片段", after: "新内容", reason: "r", state: "pending" },
+      { id: "c2", type: "format", before: "也不存在", after: "新内容2", reason: "r2", state: "rejected" },
+    ];
+    expect(rebuildAfterKeepEssential(changes, "原文")).toBe("原文");
+  });
+
+  it("accepts legacy HistoryRecord literals without the optional delivery fields", () => {
+    const legacy: HistoryRecord = {
+      id: "h1",
+      title: "旧记录",
+      original: "原文",
+      enhanced: "增强后",
+      createdAt: "2026-01-01T00:00:00Z",
+      model: "deepseek-chat",
+      target: "豆包",
+    };
+    expect(legacy.deliveryStatus).toBeUndefined();
+    expect(legacy.enhancementLevel).toBeUndefined();
+    expect(legacy.promptVersion).toBeUndefined();
   });
 });

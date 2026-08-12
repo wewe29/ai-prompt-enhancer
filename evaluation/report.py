@@ -144,9 +144,20 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
     ctrl_padded_vs_orig: dict[str, dict[str, list[float]]] = {}
     ctrl_ratios: list[float] = []
 
+    delivery_counts: dict[str, int] = {"complete": 0, "partial": 0, "fallback": 0, "hard_failure": 0}
+    delivery_total = 0
+
     for sample in data.get("samples", []):
         scenario = sample.get("scenario", "未分类")
         persona = sample.get("persona")
+        enhanced = sample.get("enhanced")
+        if isinstance(enhanced, dict) and enhanced:
+            delivery_total += 1
+            if enhanced.get("error"):
+                delivery_counts["hard_failure"] += 1
+            else:
+                status = enhanced.get("delivery_status", "complete")
+                delivery_counts[status if status in delivery_counts else "complete"] += 1
         for target_id, result in (sample.get("results") or {}).items():
             judge = result.get("judge")
             if not judge:
@@ -230,6 +241,10 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
         "binomial_p": round(binomial_one_sided(wins, losses), 4),
         "regression_failure_rate": round((ties + losses) / total, 4) if total else 0.0,
         "regression_worse_rate": round(losses / total, 4) if total else 0.0,
+        "delivery": delivery_counts,
+        "delivery_rate": round(
+            (delivery_total - delivery_counts["hard_failure"]) / delivery_total, 4
+        ) if delivery_total else 0.0,
     }
     if agreement_winners:
         summary["judge_agreement"] = {
@@ -343,6 +358,18 @@ def _render_markdown(data: dict[str, Any]) -> str:
         cell = "-" if st["n"] == 0 else f"{'+' if st['mean'] >= 0 else ''}{st['mean']}"
         lines.append(f"| {DIMENSION_LABELS[dim]} | {cell} |")
     lines.append("")
+
+    delivery = summary.get("delivery") or {}
+    if delivery:
+        lines.append("### 交付状态\n")
+        lines.append("| 交付状态 | 样本数 |")
+        lines.append("|---|---|")
+        lines.append(f"| 完整交付（complete） | {delivery.get('complete', 0)} |")
+        lines.append(f"| 部分交付（partial） | {delivery.get('partial', 0)} |")
+        lines.append(f"| 原文回退（fallback） | {delivery.get('fallback', 0)} |")
+        lines.append(f"| 增强失败（hard_failure） | {delivery.get('hard_failure', 0)} |")
+        lines.append(f"| **有效率**（非 hard_failure 占比） | **{100.0 * summary.get('delivery_rate', 0.0):.1f}%** |")
+        lines.append("")
 
     cost = agg.get("cost") or {}
     if cost:

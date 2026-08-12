@@ -24,7 +24,18 @@ pub async fn enhance(
     on_event: Channel<BackendEvent>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    validate_request(&request)?;
+    if let Err(message) = validate_request(&request) {
+        let _ = state.storage.record_usage(
+            &request.model,
+            estimate_tokens(&request.original_text),
+            0,
+            0.0,
+            0,
+            "error",
+            Some("REQUEST_INVALID"),
+        );
+        return Err(message);
+    }
     let api_key = state.storage.api_key()?;
     let config = state.storage.provider_config()?;
     if request.model.trim().is_empty() {
@@ -39,7 +50,6 @@ pub async fn enhance(
         }
     }
     let started = Instant::now();
-    let body = build_body(&request);
     let endpoint = format!("{}/chat/completions", config.base_url.trim_end_matches('/'));
     on_event
         .send(BackendEvent::Status {
@@ -47,7 +57,7 @@ pub async fn enhance(
         })
         .map_err(|error| error.to_string())?;
 
-    let mut completed = None;
+    let mut outcome: Option<(EnhancementResult, WireUsage, Option<&'static str>)> = None;
     for attempt in 0..2 {
         if attempt == 1 {
             on_event
@@ -56,6 +66,11 @@ pub async fn enhance(
                 })
                 .map_err(|error| error.to_string())?;
         }
+        let body = if attempt == 1 {
+            build_body_with_instruction(&request, Some(STRUCTURE_FIX_INSTRUCTION))
+        } else {
+            build_body(&request)
+        };
         let sent = state
             .client
             .post(&endpoint)
@@ -72,39 +87,126 @@ pub async fn enhance(
                 if status.is_server_error() && attempt == 0 {
                     continue;
                 }
+                record_error_usage(
+                    &state,
+                    &request,
+                    config.input_price,
+                    config.output_price,
+                    started.elapsed().as_millis() as u64,
+                    error_code_for_status(status.as_u16()),
+                );
                 return Err(map_http_error(status.as_u16(), &message));
             }
             Err(error) if attempt == 0 && (error.is_connect() || error.is_timeout()) => continue,
-            Err(error) => return Err(format!("网络请求失败，输入内容仍已保留：{error}")),
+            Err(error) => {
+                record_error_usage(
+                    &state,
+                    &request,
+                    config.input_price,
+                    config.output_price,
+                    started.elapsed().as_millis() as u64,
+                    "NETWORK_FAILED",
+                );
+                return Err(format!("网络请求失败，输入内容仍已保留：{error}"));
+            }
         };
         let (raw, wire_usage) = match consume_stream(response, &on_event, token.clone()).await {
             Ok(consumed) => consumed,
             Err(_) if attempt == 0 && !token.is_cancelled() => continue,
-            Err(error) => return Err(format!("{error}，已自动重试一次")),
+            Err(error) => {
+                record_error_usage(
+                    &state,
+                    &request,
+                    config.input_price,
+                    config.output_price,
+                    started.elapsed().as_millis() as u64,
+                    "STREAM_INTERRUPTED",
+                );
+                return Err(format!("{error}，已自动重试一次"));
+            }
         };
         if token.is_cancelled() {
+            let input_tokens = wire_usage
+                .prompt_tokens
+                .max(estimate_tokens(&request.original_text));
+            let output_tokens = wire_usage.completion_tokens.max(estimate_tokens(&raw));
+            let estimated_cost = calculate_cost(
+                input_tokens,
+                output_tokens,
+                config.input_price,
+                config.output_price,
+            );
+            let _ = state.storage.record_usage(
+                &request.model,
+                input_tokens,
+                output_tokens,
+                estimated_cost,
+                started.elapsed().as_millis() as u64,
+                "cancelled",
+                Some("USER_CANCELLED"),
+            );
             return Ok(());
         }
 
-        let parsed = parse_result(&raw).and_then(|mut result| {
+        let parsed = parse_enhancement(&raw).and_then(|value| {
+            let (value, notices) = normalize_value(value);
+            let mut result = serde_json::from_value::<EnhancementResult>(value)
+                .map_err(|_| "模型返回的结构无法解析，输入内容仍已保留，请重新生成".to_string())?;
+            for notice in notices {
+                if !result.notices.contains(&notice) {
+                    result.notices.push(notice);
+                }
+            }
             if request.clarification_round >= 3 {
                 result.questions.clear();
                 result.status = "ready".into();
             }
-            validate_result(&result)?;
+            validate_core_result(&result)?;
             Ok(result)
         });
         match parsed {
-            Ok(result) => {
-                completed = Some((result, wire_usage));
+            Ok(mut result) => {
+                let error_code = match validate_complete_result(&result, &request.original_text) {
+                    Ok(()) => None,
+                    Err(_) => {
+                        result.delivery_status = "partial".into();
+                        result
+                            .notices
+                            .push("模型返回不完整的增强结构，主提示词仍可使用。".into());
+                        Some("STRUCTURE_PARTIAL")
+                    }
+                };
+                outcome = Some((result, wire_usage, error_code));
                 break;
             }
-            Err(_) if attempt == 0 => continue,
-            Err(error) => return Err(format!("{error}，已自动重试一次")),
+            Err(_) if attempt == 0 => {
+                record_error_usage(
+                    &state,
+                    &request,
+                    config.input_price,
+                    config.output_price,
+                    started.elapsed().as_millis() as u64,
+                    "STRUCTURE_RETRY",
+                );
+                continue;
+            }
+            Err(_) => {
+                let result = match partial_primary_prompt(&raw) {
+                    Some(prompt) => partial_result(prompt),
+                    None => fallback_result(&request.original_text),
+                };
+                let code = if result.delivery_status == "partial" {
+                    "STRUCTURE_PARTIAL"
+                } else {
+                    "STRUCTURE_FALLBACK"
+                };
+                outcome = Some((result, wire_usage, Some(code)));
+                break;
+            }
         }
     }
-    let (result, wire_usage) =
-        completed.ok_or_else(|| "DeepSeek 服务暂时不可用，已自动重试一次".to_string())?;
+    let (result, wire_usage, error_code) =
+        outcome.ok_or_else(|| "DeepSeek 服务暂时不可用，已自动重试一次".to_string())?;
 
     let input_tokens = wire_usage
         .prompt_tokens
@@ -118,15 +220,44 @@ pub async fn enhance(
         config.input_price,
         config.output_price,
     );
-    let month_total = state.storage.record_usage(
-        &request.model,
-        input_tokens,
-        output_tokens,
-        estimated_cost,
-        started.elapsed().as_millis() as u64,
-        "success",
-        None,
-    )?;
+    let duration_ms = started.elapsed().as_millis() as u64;
+    let month_total = match error_code {
+        Some(code) => {
+            let _ = state.storage.record_usage(
+                &request.model,
+                input_tokens,
+                output_tokens,
+                estimated_cost,
+                duration_ms,
+                "error",
+                Some(code),
+            );
+            0.0
+        }
+        None => state
+            .storage
+            .record_usage(
+                &request.model,
+                input_tokens,
+                output_tokens,
+                estimated_cost,
+                duration_ms,
+                "success",
+                None,
+            )
+            .unwrap_or_else(|_| {
+                let _ = state.storage.record_usage(
+                    &request.model,
+                    input_tokens,
+                    output_tokens,
+                    estimated_cost,
+                    duration_ms,
+                    "error",
+                    Some("STORAGE_FAILED"),
+                );
+                0.0
+            }),
+    };
     on_event
         .send(BackendEvent::Result { result })
         .map_err(|error| error.to_string())?;
@@ -202,7 +333,13 @@ async fn consume_stream(
     Ok((raw, usage))
 }
 
+const STRUCTURE_FIX_INSTRUCTION: &str = "上一次输出没有形成可解析的 PromptCraft JSON。请重新生成同一任务的结果。只输出一个完整 JSON 对象，不要解释，不要代码围栏。必须优先保证 status、task_type、primary_prompt、questions 可用；其他数组无法确定时可以返回空数组。";
+
 fn build_body(request: &EnhancementRequest) -> Value {
+    build_body_with_instruction(request, None)
+}
+
+fn build_body_with_instruction(request: &EnhancementRequest, instruction: Option<&str>) -> Value {
     let attachments = request
         .attachments
         .iter()
@@ -239,6 +376,10 @@ fn build_body(request: &EnhancementRequest) -> Value {
         answers,
         attachments,
     );
+    let user_message = match instruction {
+        Some(instruction) => format!("{user_message}\n\n{instruction}"),
+        None => user_message,
+    };
     json!({
         "model": request.model,
         "messages": [
@@ -252,21 +393,195 @@ fn build_body(request: &EnhancementRequest) -> Value {
     })
 }
 
-fn parse_result(raw: &str) -> Result<EnhancementResult, String> {
-    let trimmed = raw
-        .trim()
-        .trim_start_matches("```json")
-        .trim_start_matches("```")
-        .trim_end_matches("```")
+fn parse_enhancement(raw: &str) -> Result<Value, String> {
+    let trimmed = raw.trim();
+    if let Ok(value) = serde_json::from_str::<Value>(trimmed) {
+        if value.is_object() {
+            return Ok(value);
+        }
+    }
+    let unfenced = strip_fences(trimmed);
+    if let Ok(value) = serde_json::from_str::<Value>(unfenced) {
+        if value.is_object() {
+            return Ok(value);
+        }
+    }
+    if let Some(object) = extract_balanced_object(trimmed) {
+        if let Ok(value) = serde_json::from_str::<Value>(object) {
+            if value.is_object() {
+                return Ok(value);
+            }
+        }
+    }
+    Err("模型返回的结构无法解析，输入内容仍已保留，请重新生成".to_string())
+}
+
+fn strip_fences(raw: &str) -> &str {
+    let trimmed = raw.trim();
+    let after_open = trimmed
+        .strip_prefix("```json")
+        .or_else(|| trimmed.strip_prefix("```"))
+        .unwrap_or(trimmed)
         .trim();
-    let start = trimmed
-        .find('{')
-        .ok_or_else(|| "模型没有返回结构化结果，请重新生成".to_string())?;
-    let end = trimmed
-        .rfind('}')
-        .ok_or_else(|| "模型结果未完整结束，请重新生成".to_string())?;
-    serde_json::from_str(&trimmed[start..=end])
-        .map_err(|_| "模型返回的结构无法解析，输入内容仍已保留，请重新生成".to_string())
+    after_open.strip_suffix("```").unwrap_or(after_open).trim()
+}
+
+fn extract_balanced_object(raw: &str) -> Option<&str> {
+    let bytes = raw.as_bytes();
+    let mut depth = 0usize;
+    let mut start = None;
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut index = 0;
+    while index < bytes.len() {
+        let byte = bytes[index];
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == b'"' {
+                in_string = false;
+            }
+            index += 1;
+            continue;
+        }
+        match byte {
+            b'"' => in_string = true,
+            b'{' => {
+                if depth == 0 {
+                    start = Some(index);
+                }
+                depth += 1;
+            }
+            b'}' if depth > 0 => {
+                depth -= 1;
+                if depth == 0 {
+                    if let Some(begin) = start {
+                        let candidate = &raw[begin..=index];
+                        if serde_json::from_str::<Value>(candidate).is_ok() {
+                            return Some(candidate);
+                        }
+                        start = None;
+                    }
+                }
+            }
+            _ => {}
+        }
+        index += 1;
+    }
+    None
+}
+
+fn normalize_value(mut value: Value) -> (Value, Vec<String>) {
+    let mut notices = Vec::new();
+    let Some(object) = value.as_object_mut() else {
+        return (value, notices);
+    };
+    let status_valid = matches!(
+        object.get("status").and_then(Value::as_str),
+        Some("ready" | "needs_clarification")
+    );
+    if !status_valid {
+        let questions_non_empty = object
+            .get("questions")
+            .and_then(Value::as_array)
+            .map(|items| !items.is_empty())
+            .unwrap_or(false);
+        let derived = if questions_non_empty {
+            "needs_clarification"
+        } else {
+            "ready"
+        };
+        object.insert("status".into(), Value::String(derived.into()));
+        notices.push("模型未返回有效状态，已按内容自动判断".into());
+    }
+    const TASK_TYPES: [&str; 7] = [
+        "code",
+        "creative",
+        "writing",
+        "qa",
+        "data",
+        "translation",
+        "other",
+    ];
+    let task_type_valid = object
+        .get("task_type")
+        .and_then(Value::as_str)
+        .map(|kind| TASK_TYPES.contains(&kind))
+        .unwrap_or(false);
+    if !task_type_valid {
+        object.insert("task_type".into(), Value::String("other".into()));
+        notices.push("任务类型无法识别，已归入其他".into());
+    }
+    for field in [
+        "assumptions",
+        "questions",
+        "changes",
+        "suggestions",
+        "risk_flags",
+    ] {
+        match object.get(field) {
+            Some(Value::Array(_)) => {}
+            _ => {
+                object.insert(field.into(), Value::Array(Vec::new()));
+                notices.push(format!("{field} 字段缺失或格式无效，已按空数组处理"));
+            }
+        }
+    }
+    if let Some(suggestions) = object.get_mut("suggestions").and_then(Value::as_array_mut) {
+        if suggestions.len() > 5 {
+            suggestions.truncate(5);
+            notices.push("模型返回的建议超过 5 条，已保留前 5 条".into());
+        }
+        dedupe_ids(suggestions, "s", &mut notices);
+    }
+    if let Some(changes) = object.get_mut("changes").and_then(Value::as_array_mut) {
+        dedupe_ids(changes, "c", &mut notices);
+    }
+    if let Some(questions) = object.get_mut("questions").and_then(Value::as_array_mut) {
+        if questions.len() > 3 {
+            questions.truncate(3);
+            notices.push("模型返回的澄清问题超过 3 个，已保留前 3 个".into());
+        }
+    }
+    if let Some(Value::String(prompt)) = object.get_mut("primary_prompt") {
+        let trimmed = prompt.trim().to_string();
+        if trimmed != *prompt {
+            *prompt = trimmed;
+        }
+    }
+    (value, notices)
+}
+
+fn dedupe_ids(items: &mut Vec<Value>, prefix: &str, notices: &mut Vec<String>) {
+    let mut seen = HashSet::new();
+    let mut next_index = 1;
+    let mut index = 0;
+    while index < items.len() {
+        let mut id = items[index]
+            .get("id")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        if id.is_empty() {
+            while seen.contains(&format!("{prefix}{next_index}")) {
+                next_index += 1;
+            }
+            id = format!("{prefix}{next_index}");
+            next_index += 1;
+            if let Some(item) = items[index].as_object_mut() {
+                item.insert("id".into(), Value::String(id.clone()));
+            }
+        }
+        if seen.contains(&id) {
+            notices.push(format!("{prefix} 前缀条目 {id} 重复，已删除后出现的重复项"));
+            items.remove(index);
+            continue;
+        }
+        seen.insert(id);
+        index += 1;
+    }
 }
 
 fn validate_request(request: &EnhancementRequest) -> Result<(), String> {
@@ -291,26 +606,77 @@ fn validate_request(request: &EnhancementRequest) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_result(result: &EnhancementResult) -> Result<(), String> {
+fn validate_core_result(result: &EnhancementResult) -> Result<(), String> {
     if result.primary_prompt.trim().is_empty() {
         return Err("模型没有生成主提示词".into());
-    }
-    if result.suggestions.len() != 5 {
-        return Err("模型未返回恰好 5 个可选建议，请重新生成".into());
-    }
-    if result.questions.len() > 3 {
-        return Err("模型返回了超过 3 个澄清问题，请重新生成".into());
     }
     if result.primary_prompt.contains("XXX") {
         return Err("模型结果包含未替换占位符，请重新生成".into());
     }
-    let unique = result
-        .suggestions
-        .iter()
-        .map(|item| item.id.as_str())
-        .collect::<HashSet<_>>();
-    if unique.len() != result.suggestions.len() {
-        return Err("模型返回了重复建议，请重新生成".into());
+    if !matches!(result.status.as_str(), "ready" | "needs_clarification") {
+        return Err("模型返回了无效状态，请重新生成".into());
+    }
+    if result.questions.len() > 3 {
+        return Err("模型返回了超过 3 个澄清问题，请重新生成".into());
+    }
+    Ok(())
+}
+
+fn validate_complete_result(result: &EnhancementResult, original: &str) -> Result<(), String> {
+    if result.suggestions.len() != 5 {
+        return Err("模型未返回恰好 5 个可选建议，请重新生成".into());
+    }
+    const SUGGESTION_KINDS: [&str; 5] = [
+        "goal",
+        "context",
+        "format",
+        "constraint",
+        "alternate_intent",
+    ];
+    const OPERATIONS: [&str; 2] = ["insert", "replace"];
+    for suggestion in &result.suggestions {
+        if !SUGGESTION_KINDS.contains(&suggestion.kind.as_str()) {
+            return Err(format!("建议包含无效类型：{}", suggestion.kind));
+        }
+        if !OPERATIONS.contains(&suggestion.operation.as_str()) {
+            return Err(format!("建议包含无效操作：{}", suggestion.operation));
+        }
+    }
+    let mut unique = HashSet::new();
+    for suggestion in &result.suggestions {
+        if suggestion.id.trim().is_empty() || !unique.insert(suggestion.id.as_str()) {
+            return Err("模型返回了重复建议，请重新生成".into());
+        }
+    }
+    const EMPTY_BEFORE_TYPES: [&str; 4] = ["add_context", "add_constraint", "format", "safety"];
+    for change in &result.changes {
+        if change.before.is_empty() {
+            if !EMPTY_BEFORE_TYPES.contains(&change.change_type.as_str()) {
+                return Err(
+                    "空 before 的修改仅允许 add_context/add_constraint/format/safety".into(),
+                );
+            }
+        } else if !original.contains(&change.before) {
+            return Err("模型修改明细引用了原文不存在的片段，请重新生成".into());
+        }
+    }
+    const TASK_TYPES: [&str; 7] = [
+        "code",
+        "creative",
+        "writing",
+        "qa",
+        "data",
+        "translation",
+        "other",
+    ];
+    if !TASK_TYPES.contains(&result.task_type.as_str()) {
+        return Err("模型返回了无效任务类型，请重新生成".into());
+    }
+    if !matches!(
+        result.enhancement_level.as_str(),
+        "none" | "light" | "clarify"
+    ) {
+        return Err("模型返回了无效增强等级，请重新生成".into());
     }
     Ok(())
 }
@@ -369,6 +735,69 @@ fn map_http_error(status: u16, body: &str) -> String {
         429 => format!("DeepSeek 请求限流，请稍后重试：{detail}"),
         400 => format!("DeepSeek 拒绝了请求参数，请检查模型 ID：{detail}"),
         _ => format!("DeepSeek 返回错误 {status}：{detail}"),
+    }
+}
+
+fn error_code_for_status(status: u16) -> &'static str {
+    match status {
+        401 | 403 => "AUTH_FAILED",
+        402 => "BALANCE_INSUFFICIENT",
+        400 | 404 => "MODEL_NOT_FOUND",
+        429 => "RATE_LIMITED",
+        _ => "NETWORK_FAILED",
+    }
+}
+
+fn record_error_usage(
+    state: &State<'_, AppState>,
+    request: &EnhancementRequest,
+    input_price: f64,
+    output_price: f64,
+    duration_ms: u64,
+    code: &'static str,
+) {
+    let input_tokens = estimate_tokens(&request.original_text);
+    let cost = calculate_cost(input_tokens, 0, input_price, output_price);
+    let _ = state.storage.record_usage(
+        &request.model,
+        input_tokens,
+        0,
+        cost,
+        duration_ms,
+        "error",
+        Some(code),
+    );
+}
+
+fn partial_result(prompt: String) -> EnhancementResult {
+    EnhancementResult {
+        status: "ready".into(),
+        task_type: "other".into(),
+        primary_prompt: prompt,
+        assumptions: Vec::new(),
+        questions: Vec::new(),
+        changes: Vec::new(),
+        suggestions: Vec::new(),
+        risk_flags: Vec::new(),
+        delivery_status: "partial".into(),
+        enhancement_level: "none".into(),
+        notices: vec!["模型返回不完整的增强结构，主提示词仍可使用。".into()],
+    }
+}
+
+fn fallback_result(original: &str) -> EnhancementResult {
+    EnhancementResult {
+        status: "ready".into(),
+        task_type: "other".into(),
+        primary_prompt: original.trim().to_string(),
+        assumptions: Vec::new(),
+        questions: Vec::new(),
+        changes: Vec::new(),
+        suggestions: Vec::new(),
+        risk_flags: Vec::new(),
+        delivery_status: "fallback".into(),
+        enhancement_level: "none".into(),
+        notices: vec!["增强服务未返回可用结构，本次已保留原始提示词".into()],
     }
 }
 
@@ -446,14 +875,545 @@ mod tests {
                 })
                 .collect(),
             risk_flags: Vec::new(),
+            delivery_status: "complete".into(),
+            enhancement_level: "light".into(),
+            notices: Vec::new(),
         };
-        assert!(validate_result(&result).is_ok());
+        assert!(validate_core_result(&result).is_ok());
+        assert!(validate_complete_result(&result, "解释这段代码").is_ok());
         result.primary_prompt = "请解释 XXX".into();
-        assert!(validate_result(&result).unwrap_err().contains("占位符"));
+        assert!(
+            validate_core_result(&result)
+                .unwrap_err()
+                .contains("占位符")
+        );
     }
 
     #[test]
     fn calculates_configured_cost() {
         assert!((calculate_cost(1_000, 2_000, 0.001, 0.002) - 0.005).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn parses_direct_json() {
+        let raw = r#"{"status":"ready","task_type":"qa","primary_prompt":"解释这段代码","questions":[],"suggestions":[]}"#;
+        let value = parse_enhancement(raw).unwrap();
+        assert_eq!(value["primary_prompt"], "解释这段代码");
+    }
+
+    #[test]
+    fn parses_fenced_json() {
+        let raw = "```json\n{\"status\":\"ready\",\"task_type\":\"qa\",\"primary_prompt\":\"解释这段代码\"}\n```";
+        let value = parse_enhancement(raw).unwrap();
+        assert_eq!(value["primary_prompt"], "解释这段代码");
+    }
+
+    #[test]
+    fn parses_json_with_leading_and_trailing_prose() {
+        let raw = "好的，以下是增强后的提示词：\n{\"status\":\"ready\",\"task_type\":\"qa\",\"primary_prompt\":\"解释这段代码\"}\n希望对你有帮助。";
+        let value = parse_enhancement(raw).unwrap();
+        assert_eq!(value["primary_prompt"], "解释这段代码");
+    }
+
+    #[test]
+    fn scans_braces_inside_strings() {
+        let raw = r#"前言 {"primary_prompt":"保留 {花括号} 和 }的文本","status":"ready"} 后记"#;
+        let value = parse_enhancement(raw).unwrap();
+        assert_eq!(value["primary_prompt"], "保留 {花括号} 和 }的文本");
+
+        let raw = r#"{"a":"say \"hi\" {x}","b":{"c":1}}"#;
+        let value = parse_enhancement(raw).unwrap();
+        assert_eq!(value["a"], "say \"hi\" {x}");
+        assert_eq!(value["b"]["c"], 1);
+    }
+
+    #[test]
+    fn scanner_rejects_unterminated_json() {
+        let raw = r#"{"primary_prompt":"未闭合的对象"#;
+        assert!(parse_enhancement(raw).is_err());
+        assert!(parse_enhancement("完全没有 JSON 的纯文本").is_err());
+    }
+
+    #[test]
+    fn missing_suggestions_with_valid_primary_yields_partial() {
+        let suggestion = crate::models::Suggestion {
+            id: "s".into(),
+            kind: "goal".into(),
+            title: "目标".into(),
+            purpose: "用途".into(),
+            content: "内容".into(),
+            operation: "insert".into(),
+            anchor: String::new(),
+            applied: false,
+        };
+        let mut result = EnhancementResult {
+            status: "ready".into(),
+            task_type: "other".into(),
+            primary_prompt: "有效提示词".into(),
+            assumptions: Vec::new(),
+            questions: Vec::new(),
+            changes: Vec::new(),
+            suggestions: (0..3)
+                .map(|index| crate::models::Suggestion {
+                    id: format!("s{index}"),
+                    ..suggestion.clone()
+                })
+                .collect(),
+            risk_flags: Vec::new(),
+            delivery_status: "complete".into(),
+            enhancement_level: "light".into(),
+            notices: Vec::new(),
+        };
+        assert!(validate_core_result(&result).is_ok());
+        assert!(validate_complete_result(&result, "解释这段代码").is_err());
+
+        result.suggestions = (0..5)
+            .map(|index| crate::models::Suggestion {
+                id: format!("s{index}"),
+                ..suggestion.clone()
+            })
+            .collect();
+        assert!(validate_complete_result(&result, "解释这段代码").is_ok());
+    }
+
+    #[test]
+    fn truncates_suggestions_over_five() {
+        let suggestions = (0..7)
+            .map(|index| {
+                json!({"id": format!("s{index}"), "kind": "goal", "title": "t", "purpose": "p", "content": "c", "operation": "insert"})
+            })
+            .collect::<Vec<Value>>();
+        let value = json!({
+            "status": "ready",
+            "task_type": "qa",
+            "primary_prompt": "提示词",
+            "suggestions": suggestions,
+        });
+        let (normalized, notices) = normalize_value(value);
+        assert_eq!(normalized["suggestions"].as_array().unwrap().len(), 5);
+        assert!(notices.iter().any(|notice| notice.contains("前 5 条")));
+    }
+
+    #[test]
+    fn dedupes_duplicate_ids() {
+        let value = json!({
+            "status": "ready",
+            "task_type": "qa",
+            "primary_prompt": "提示词",
+            "suggestions": [
+                {"id": "s1", "kind": "goal", "title": "t", "purpose": "p", "content": "c", "operation": "insert"},
+                {"id": "s2", "kind": "context", "title": "t", "purpose": "p", "content": "c", "operation": "insert"},
+                {"id": "s2", "kind": "format", "title": "t", "purpose": "p", "content": "c", "operation": "insert"},
+                {"id": "s3", "kind": "goal", "title": "t", "purpose": "p", "content": "c", "operation": "insert"},
+            ],
+        });
+        let (normalized, notices) = normalize_value(value);
+        let ids = normalized["suggestions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|item| item["id"].as_str().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(ids, vec!["s1", "s2", "s3"]);
+        assert!(notices.iter().any(|notice| notice.contains("重复")));
+    }
+
+    #[test]
+    fn truncates_questions_over_three() {
+        let questions = (0..5)
+            .map(|index| json!({"id": format!("q{index}"), "text": "问题", "why_needed": "原因"}))
+            .collect::<Vec<Value>>();
+        let value = json!({
+            "status": "needs_clarification",
+            "task_type": "qa",
+            "primary_prompt": "提示词",
+            "questions": questions,
+        });
+        let (normalized, notices) = normalize_value(value);
+        assert_eq!(normalized["questions"].as_array().unwrap().len(), 3);
+        assert!(notices.iter().any(|notice| notice.contains("前 3 个")));
+    }
+
+    #[test]
+    fn fallback_keeps_original_text() {
+        let result = fallback_result("  保留原文提示词  ");
+        assert_eq!(result.primary_prompt, "保留原文提示词");
+        assert_eq!(result.delivery_status, "fallback");
+        assert_eq!(result.enhancement_level, "none");
+        assert!(
+            result
+                .notices
+                .iter()
+                .any(|notice| notice.contains("已保留原始提示词"))
+        );
+    }
+
+    #[test]
+    fn fallback_contains_no_fabricated_suggestions() {
+        let result = fallback_result("原始提示词");
+        assert!(result.suggestions.is_empty());
+        assert!(result.changes.is_empty());
+        assert!(result.questions.is_empty());
+        assert!(result.assumptions.is_empty());
+    }
+
+    #[test]
+    fn normalize_derives_status_from_questions() {
+        let value = json!({
+            "primary_prompt": "提示词",
+            "questions": [{"id": "q1", "text": "问题", "why_needed": "原因"}],
+        });
+        let (normalized, _) = normalize_value(value);
+        assert_eq!(normalized["status"], "needs_clarification");
+
+        let value = json!({"primary_prompt": "提示词"});
+        let (normalized, _) = normalize_value(value);
+        assert_eq!(normalized["status"], "ready");
+    }
+
+    #[test]
+    fn error_code_mapping_is_stable() {
+        assert_eq!(error_code_for_status(401), "AUTH_FAILED");
+        assert_eq!(error_code_for_status(403), "AUTH_FAILED");
+        assert_eq!(error_code_for_status(402), "BALANCE_INSUFFICIENT");
+        assert_eq!(error_code_for_status(400), "MODEL_NOT_FOUND");
+        assert_eq!(error_code_for_status(404), "MODEL_NOT_FOUND");
+        assert_eq!(error_code_for_status(429), "RATE_LIMITED");
+        assert_eq!(error_code_for_status(500), "NETWORK_FAILED");
+        assert_eq!(error_code_for_status(999), "NETWORK_FAILED");
+    }
+
+    struct StressCase {
+        raw: String,
+        is_deliverable: bool,
+        expect_complete: bool,
+    }
+
+    fn valid_suggestions() -> Vec<Value> {
+        let kinds = [
+            "goal",
+            "context",
+            "format",
+            "constraint",
+            "alternate_intent",
+        ];
+        kinds
+            .iter()
+            .enumerate()
+            .map(|(index, kind)| {
+                json!({
+                    "id": format!("s{}", index + 1),
+                    "kind": kind,
+                    "title": "标题",
+                    "purpose": "目的",
+                    "content": "内容",
+                    "operation": if *kind == "alternate_intent" { "replace" } else { "insert" },
+                })
+            })
+            .collect()
+    }
+
+    fn complete_body() -> Value {
+        json!({
+            "status": "ready",
+            "task_type": "qa",
+            "primary_prompt": "解释这段代码",
+            "assumptions": [],
+            "questions": [],
+            "changes": [],
+            "suggestions": valid_suggestions(),
+            "risk_flags": [],
+            "delivery_status": "complete",
+            "enhancement_level": "light",
+        })
+    }
+
+    fn case(raw: String, expect_complete: bool) -> StressCase {
+        StressCase {
+            raw,
+            is_deliverable: true,
+            expect_complete,
+        }
+    }
+
+    fn build_stress_cases(original: &str) -> Vec<StressCase> {
+        let mut cases = Vec::with_capacity(100);
+        let task_types = [
+            "code",
+            "creative",
+            "writing",
+            "qa",
+            "data",
+            "translation",
+            "other",
+        ];
+
+        // 15 fully valid complete JSON.
+        for index in 0..15 {
+            let mut body = complete_body();
+            body["primary_prompt"] = json!(format!("解释这段代码——变体 {index}"));
+            body["task_type"] = json!(task_types[index % task_types.len()]);
+            cases.push(case(body.to_string(), true));
+        }
+        // 10 fence-wrapped.
+        for index in 0..10 {
+            let mut body = complete_body();
+            body["primary_prompt"] = json!(format!("围栏提示词 {index}"));
+            cases.push(case(format!("```json\n{body}\n```"), true));
+        }
+        // 10 with leading/trailing prose.
+        for index in 0..10 {
+            let mut body = complete_body();
+            body["primary_prompt"] = json!(format!("带解释的提示词 {index}"));
+            cases.push(case(
+                format!("好的，这是增强后的提示词：\n{body}\n希望对你有帮助。"),
+                true,
+            ));
+        }
+        // 8 with braces inside string values.
+        let brace_prompts = [
+            r#"保留 {花括号} 的文本"#,
+            r#"保留 {"a":1} 的对象"#,
+            r#"包含 } 和 { 的文本"#,
+            r#"嵌套 {{模板}} 结构"#,
+            r#"{"json":"在字符串里"}"#,
+            r#"格式 {{变量}} 与 }} 结束"#,
+            r#"模板 {user.name} 引用"#,
+            r#"正则 [a-z] 与 {} 空对象"#,
+        ];
+        for prompt in brace_prompts {
+            let mut body = complete_body();
+            body["primary_prompt"] = json!(prompt);
+            cases.push(case(body.to_string(), true));
+        }
+        // 8 suggestions > 5 (normalized to 5).
+        for index in 0..8 {
+            let mut body = complete_body();
+            let mut extra = valid_suggestions();
+            extra.push(json!({"id":"s6","kind":"goal","title":"t","purpose":"p","content":"c","operation":"insert"}));
+            extra.push(json!({"id":"s7","kind":"context","title":"t","purpose":"p","content":"c","operation":"insert"}));
+            body["suggestions"] = json!(extra);
+            body["primary_prompt"] = json!(format!("超过 5 条建议 {index}"));
+            cases.push(case(body.to_string(), true));
+        }
+        // 8 duplicate ids.
+        for index in 0..8 {
+            let mut body = complete_body();
+            let mut dup = valid_suggestions();
+            dup.push(json!({"id":"s2","kind":"context","title":"t","purpose":"p","content":"c","operation":"insert"}));
+            body["suggestions"] = json!(dup);
+            body["primary_prompt"] = json!(format!("重复 id {index}"));
+            cases.push(case(body.to_string(), true));
+        }
+        // 8 questions > 4 (truncated to 3).
+        for index in 0..8 {
+            let mut body = complete_body();
+            let questions = (0..5)
+                .map(|q| json!({"id": format!("q{q}"), "text": "问题", "why_needed": "原因"}))
+                .collect::<Vec<_>>();
+            body["questions"] = json!(questions);
+            body["primary_prompt"] = json!(format!("澄清问题超过 3 个 {index}"));
+            cases.push(case(body.to_string(), true));
+        }
+        // Misc recovery cases (all complete).
+        let mut body = complete_body();
+        body["questions"] = Value::Null;
+        body["changes"] = Value::Null;
+        body["assumptions"] = Value::Null;
+        body["risk_flags"] = Value::Null;
+        cases.push(case(body.to_string(), true));
+
+        let mut body = complete_body();
+        body["questions"] = json!("不是数组");
+        cases.push(case(body.to_string(), true));
+
+        let mut body = complete_body();
+        body["changes"] = json!({"oops": 1});
+        cases.push(case(body.to_string(), true));
+
+        let body = complete_body();
+        cases.push(case(format!("\n\n  {body}\t\n"), true));
+
+        let mut body = complete_body();
+        body["primary_prompt"] = json!("  带空格的主提示词  ");
+        cases.push(case(body.to_string(), true));
+
+        let mut body = complete_body();
+        body.as_object_mut().unwrap().remove("task_type");
+        cases.push(case(body.to_string(), true));
+
+        let mut body = complete_body();
+        body.as_object_mut().unwrap().remove("status");
+        cases.push(case(body.to_string(), true));
+
+        let mut body = complete_body();
+        body.as_object_mut().unwrap().remove("enhancement_level");
+        cases.push(case(body.to_string(), true));
+
+        // Extra complete recovery variants.
+        for index in 0..4 {
+            let mut body = complete_body();
+            body["primary_prompt"] = json!(format!("缩进格式 JSON {index}"));
+            cases.push(case(serde_json::to_string_pretty(&body).unwrap(), true));
+        }
+        for index in 0..4 {
+            let mut body = complete_body();
+            body["primary_prompt"] = json!(format!("完整嵌套结构 {index}"));
+            body["assumptions"] = json!([{"id":"a1","text":"假设","confirmed":false}]);
+            body["questions"] = json!([{"id":"q1","text":"问题","why_needed":"原因"}]);
+            body["changes"] = json!([{"id":"c1","type":"format","before":"","after":"输出格式（列表）","reason":"固定结构"}]);
+            body["risk_flags"] =
+                json!([{"category":"安全","message":"注意","required_protection":"x"}]);
+            cases.push(case(body.to_string(), true));
+        }
+        for index in 0..4 {
+            let mut body = complete_body();
+            body["primary_prompt"] = json!(format!("第一行\n第二行\n变体 {index}"));
+            cases.push(case(body.to_string(), true));
+        }
+        for index in 0..4 {
+            let mut body = complete_body();
+            body.as_object_mut().unwrap().remove("delivery_status");
+            body.as_object_mut().unwrap().remove("enhancement_level");
+            body["primary_prompt"] = json!(format!("默认字段提示词 {index}"));
+            cases.push(case(body.to_string(), true));
+        }
+        for index in 0..4 {
+            let mut body = complete_body();
+            body["primary_prompt"] = json!(format!("空白包裹提示词 {index}"));
+            let padding = "  ".repeat(index + 1);
+            cases.push(case(format!("{padding}{body}\n\n{padding}"), true));
+        }
+
+        // Partial: missing suggestions field.
+        let mut body = complete_body();
+        body.as_object_mut().unwrap().remove("suggestions");
+        cases.push(case(body.to_string(), false));
+
+        // Partial: XXX placeholder fails core validation, prompt still recoverable.
+        let mut body = complete_body();
+        body["primary_prompt"] = json!("请替换 XXX 占位符");
+        cases.push(case(body.to_string(), false));
+
+        // Fallback: empty payload.
+        cases.push(case(String::new(), false));
+
+        // Fallback: plain text without extractable primary_prompt.
+        cases.push(case("这完全是纯文本，没有任何 JSON".to_string(), false));
+
+        // Fallback: unterminated object without primary_prompt key.
+        cases.push(case(r#"{"status":"ready""#.to_string(), false));
+
+        assert_eq!(
+            cases.len(),
+            100,
+            "stress suite must contain exactly 100 cases"
+        );
+        let _ = original;
+        cases
+    }
+
+    // Mirrors the real enhance() pipeline (final attempt): parse → normalize →
+    // from_value → core check, then complete check, else partial/fallback delivery.
+    fn deliver_structure(raw: &str, original: &str) -> EnhancementResult {
+        let parsed = parse_enhancement(raw).and_then(|value| {
+            let (value, notices) = normalize_value(value);
+            let mut result = serde_json::from_value::<EnhancementResult>(value)
+                .map_err(|_| "模型返回的结构无法解析".to_string())?;
+            for notice in notices {
+                if !result.notices.contains(&notice) {
+                    result.notices.push(notice);
+                }
+            }
+            validate_core_result(&result)?;
+            Ok(result)
+        });
+        match parsed {
+            Ok(mut result) => {
+                if validate_complete_result(&result, original).is_err() {
+                    result.delivery_status = "partial".into();
+                    result
+                        .notices
+                        .push("模型返回不完整的增强结构，主提示词仍可使用。".into());
+                }
+                result
+            }
+            Err(_) => match partial_primary_prompt(raw) {
+                Some(prompt) => partial_result(prompt),
+                None => fallback_result(original),
+            },
+        }
+    }
+
+    #[test]
+    fn stress_100_structure_cases_deliverable() {
+        const ORIGINAL: &str = "解释这段代码";
+        let cases = build_stress_cases(ORIGINAL);
+
+        let mut complete_count = 0usize;
+        let mut partial_count = 0usize;
+        let mut fallback_count = 0usize;
+        for (index, item) in cases.iter().enumerate() {
+            assert!(item.is_deliverable, "case {index}: 标记为可交付");
+            let result = deliver_structure(&item.raw, ORIGINAL);
+            match result.delivery_status.as_str() {
+                "complete" => {
+                    complete_count += 1;
+                    assert!(
+                        item.expect_complete,
+                        "case {index}: 预期非 complete，实际 complete"
+                    );
+                }
+                "partial" => {
+                    partial_count += 1;
+                    assert!(
+                        !item.expect_complete,
+                        "case {index}: 预期 complete，实际 partial"
+                    );
+                    assert!(
+                        !result.primary_prompt.trim().is_empty(),
+                        "case {index}: partial 必须有主提示词"
+                    );
+                }
+                "fallback" => {
+                    fallback_count += 1;
+                    assert!(
+                        !item.expect_complete,
+                        "case {index}: 预期 complete，实际 fallback"
+                    );
+                    assert_eq!(
+                        result.primary_prompt, ORIGINAL,
+                        "case {index}: fallback 必须保留原文"
+                    );
+                    assert!(
+                        result.suggestions.is_empty(),
+                        "case {index}: fallback 不得虚构建议"
+                    );
+                    assert!(
+                        result.changes.is_empty(),
+                        "case {index}: fallback 不得虚构修改"
+                    );
+                    assert!(
+                        result.questions.is_empty(),
+                        "case {index}: fallback 不得虚构问题"
+                    );
+                }
+                other => panic!("case {index}: 未知交付状态 {other}"),
+            }
+        }
+        assert_eq!(
+            complete_count + partial_count + fallback_count,
+            100,
+            "可交付率必须为 100%"
+        );
+        assert!(
+            complete_count >= 95,
+            "完整结构成功率必须不低于 95%，实际 {complete_count}"
+        );
+        assert!(
+            partial_count + fallback_count <= 5,
+            "非完整交付不得超过 5 条，实际 {}",
+            partial_count + fallback_count
+        );
     }
 }

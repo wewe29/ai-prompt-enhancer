@@ -77,10 +77,22 @@ impl Storage {
               created_at TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS usage_created_at_idx ON usage_records(created_at DESC);
-            PRAGMA user_version = 1;
             ",
             )
             .map_err(|error| format!("无法初始化本地数据库：{error}"))?;
+        let version: i64 = connection
+            .query_row("PRAGMA user_version", [], |row| row.get(0))
+            .unwrap_or(0);
+        if version < 2 {
+            connection
+                .execute_batch(
+                    "ALTER TABLE history ADD COLUMN delivery_status TEXT;
+                     ALTER TABLE history ADD COLUMN enhancement_level TEXT;
+                     ALTER TABLE history ADD COLUMN prompt_version TEXT;
+                     PRAGMA user_version = 2;",
+                )
+                .map_err(|error| format!("无法迁移数据库结构：{error}"))?;
+        }
         let storage = Self {
             connection: Mutex::new(connection),
             database_path,
@@ -156,8 +168,9 @@ impl Storage {
             .lock()
             .map_err(|_| "数据库锁已损坏".to_string())?;
         connection.execute(
-            "INSERT INTO history(id,title,original,enhanced,model,target,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7)",
-            params![record.id, record.title, record.original, record.enhanced, record.model, record.target, record.created_at],
+            "INSERT INTO history(id,title,original,enhanced,model,target,created_at,delivery_status,enhancement_level,prompt_version)
+             VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
+            params![record.id, record.title, record.original, record.enhanced, record.model, record.target, record.created_at, record.delivery_status, record.enhancement_level, record.prompt_version],
         ).map_err(|error| format!("无法保存历史记录：{error}"))?;
         Ok(())
     }
@@ -170,7 +183,7 @@ impl Storage {
         let pattern = format!("%{}%", query.unwrap_or_default());
         let mut statement = connection
             .prepare(
-                "SELECT id,title,original,enhanced,created_at,model,target FROM history
+                "SELECT id,title,original,enhanced,created_at,model,target,delivery_status,enhancement_level,prompt_version FROM history
              WHERE (?1 = '%%' OR title LIKE ?1 OR original LIKE ?1 OR enhanced LIKE ?1)
              ORDER BY created_at DESC LIMIT 500",
             )
@@ -185,6 +198,9 @@ impl Storage {
                     created_at: row.get(4)?,
                     model: row.get(5)?,
                     target: row.get(6)?,
+                    delivery_status: row.get(7)?,
+                    enhancement_level: row.get(8)?,
+                    prompt_version: row.get(9)?,
                 })
             })
             .map_err(|error| error.to_string())?;

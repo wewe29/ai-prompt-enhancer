@@ -112,6 +112,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .status-badge.error i, .status-badge.incomplete i { background: var(--danger); }
 .result-footer { min-height: 48px; display: flex; align-items: center; justify-content: flex-end; gap: 7px; padding-top: 10px; border-top: 1px solid var(--line); }
 .result-footer > div { margin-right: auto; color: var(--muted); font-size: 10px; }
+.notices-strip { display: flex; align-items: flex-start; gap: 8px; margin: 10px 0 6px; padding: 8px 10px; color: #6d4b17; background: var(--warning-soft); border: 1px solid #eed9ac; border-radius: var(--radius); font-size: 12px; line-height: 1.55; }
+.notices-strip > svg { flex: 0 0 auto; margin-top: 2px; }
+.notices-strip ul { display: flex; flex-direction: column; gap: 3px; margin: 0; padding: 0; list-style: none; }
+.notices-strip li::before { content: "·"; margin-right: 6px; color: var(--warning); }
+.notices-strip.fallback { color: #3a5a55; background: var(--accent-soft); border-color: #bdd9d3; }
+.notices-strip.fallback li::before { color: var(--accent); }
 
 .assumption-strip { display: flex; align-items: flex-start; gap: 10px; padding: 12px 22px; color: #6d4b17; background: var(--warning-soft); border-bottom: 1px solid #eed9ac; font-size: 12px; }
 .assumption-strip > svg { flex: 0 0 auto; margin-top: 2px; }
@@ -177,6 +183,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .history-main h3 { margin: 8px 0 5px; font-size: 13px; }
 .history-main p { max-width: 880px; margin: 0 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #4f5c59; font-size: 11px; }
 .history-main small { color: var(--muted); }
+.delivery-badge { display: inline-flex; height: 18px; align-items: center; padding: 0 7px; border-radius: 9px; color: #85312f; background: var(--danger-soft); font-size: 9px; font-weight: 650; }
 .icon-danger { position: absolute; top: 50%; right: 18px; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; transform: translateY(-50%); color: var(--muted); background: transparent; border: 1px solid transparent; border-radius: 4px; }
 .icon-danger:hover { color: var(--danger); background: var(--danger-soft); border-color: #eec9c7; }
 .empty-state { min-height: 440px; display: grid; place-content: center; justify-items: center; color: var(--muted); }

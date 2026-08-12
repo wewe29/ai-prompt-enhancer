@@ -43,6 +43,9 @@ export interface RiskFlag {
 
 export interface EnhancementResult {
   status: "ready" | "needs_clarification";
+  delivery_status?: "complete" | "partial" | "fallback";
+  enhancement_level?: "none" | "light" | "clarify";
+  notices?: string[];
   task_type?: string;
   primary_prompt: string;
   assumptions: Assumption[];
@@ -96,6 +99,9 @@ export interface HistoryRecord {
   createdAt: string;
   model: string;
   target: string;
+  deliveryStatus?: "complete" | "partial" | "fallback";
+  enhancementLevel?: string;
+  promptVersion?: string;
 }
 
 export interface LocalSettings {

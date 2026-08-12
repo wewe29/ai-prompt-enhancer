@@ -58,6 +58,12 @@ export interface EnhanceViewProps {
   showSecurity: boolean;
   setShowSecurity: (v: boolean) => void;
   selectedSuggestionData: Suggestion | null;
+  notices: string[];
+  deliveryStatus?: "complete" | "partial" | "fallback";
+  restoreOriginal: () => void;
+  keepEssentialEdits: () => void;
+  hasActionableChanges: boolean;
+  regenerate: () => void;
 }
 
 export function EnhanceView(props: EnhanceViewProps) {
@@ -68,6 +74,7 @@ export function EnhanceView(props: EnhanceViewProps) {
     output, commitOutput, undo, redo, undoStack, redoStack, result, setResult, usage, handleCopyOpen,
     currentTarget, clarificationRound, answers, setAnswers, submitClarification, changeState, setSelectedSuggestion,
     showSecurity, setShowSecurity, selectedSuggestionData,
+    notices, deliveryStatus, restoreOriginal, keepEssentialEdits, hasActionableChanges, regenerate,
   } = props;
   const [preflightDismissed, setPreflightDismissed] = useState(false);
   const findings = useMemo(() => preflight(original, context.length > 0), [original, context]);
@@ -138,6 +145,7 @@ export function EnhanceView(props: EnhanceViewProps) {
 
       <article className="editor-panel output-panel">
         <div className="panel-heading"><div><span className="step-index">02</span><h2>增强结果</h2></div><div className="panel-actions"><StatusBadge state={state} /><button onClick={undo} disabled={!undoStack.length} title="撤销"><Undo2 size={16} /></button><button onClick={redo} disabled={!redoStack.length} title="重做"><RotateCw size={16} /></button></div></div>
+        {notices.length > 0 && <div className={`notices-strip${deliveryStatus ? ` ${deliveryStatus}` : ""}`}><AlertTriangle size={15} /><ul>{[...new Set(notices)].map((notice) => <li key={notice}>{notice}</li>)}</ul></div>}
         <div className="output-wrap">
           {state === "streaming" && !output && <div className="generating"><LoaderCircle className="spin" size={20} />正在理解意图并检查缺失信息</div>}
           <textarea value={output} onChange={(event) => commitOutput(event.target.value)} placeholder="增强后的提示词会显示在这里" />
@@ -145,6 +153,9 @@ export function EnhanceView(props: EnhanceViewProps) {
         <div className="result-footer">
           {result?.task_type ? <span className={`task-type-badge ${result.task_type}`}>任务类型：{taskTypeLabels[result.task_type] ?? result.task_type}</span> : null}
           <div>{usage ? <span>{usage.inputTokens + usage.outputTokens} tokens · 约 ¥{usage.estimatedCost.toFixed(4)} · 本月 ¥{usage.monthTotal.toFixed(2)}</span> : <span>API 费用由你的供应商账户承担</span>}</div>
+          <button className="secondary" onClick={restoreOriginal} disabled={state === "streaming" || output === original} title="恢复为本次请求开始时的原始提示词"><Undo2 size={16} />恢复原文</button>
+          {hasActionableChanges && <button className="secondary" onClick={keepEssentialEdits} disabled={state === "streaming"} title="拒绝非必要的未确认修改，仅保留安全与已接受的改动"><Check size={16} />仅保留必要修改</button>}
+          <button className="secondary" onClick={regenerate} disabled={state === "streaming"} title="沿用当前输入和配置重新生成"><RefreshCw size={16} />重新生成</button>
           <button className="secondary" onClick={() => copyText(output).catch((cause) => setError(`复制失败：${cause instanceof Error ? cause.message : String(cause)}`))} disabled={!output}><Clipboard size={16} />复制</button>
           <button className="primary" onClick={handleCopyOpen} disabled={!output}><ArrowRight size={16} />复制并打开 {currentTarget.label}</button>
         </div>

@@ -169,10 +169,14 @@ def main() -> int:
             if offline:
                 sample["enhanced"] = enhance_offline(sample["original"], cfg, "")
             else:
-                sample["enhanced"] = run_with_budget(
-                    lambda: api_enhance(sample["original"], cfg, api_key, target_model="评测目标"),
-                    cfg, "增强",
-                )
+                try:
+                    sample["enhanced"] = run_with_budget(
+                        lambda: api_enhance(sample["original"], cfg, api_key, target_model="评测目标"),
+                        cfg, "增强",
+                    )
+                except Exception as exc:  # EnhanceError/JudgeError/网络/解析等任何异常：单条隔离，不终止整批
+                    sample["enhanced"] = {"error": str(exc)}
+                    print(f"[增强] {sample['id']} 失败：{exc}")
             save_cache("enhance", sample["id"], payload=sample["enhanced"], persona=sample.get("persona") or "")
         sample["enhanced_text"] = sample["enhanced"].get("primary_prompt", "")
         if sample["enhanced"].get("error"):
