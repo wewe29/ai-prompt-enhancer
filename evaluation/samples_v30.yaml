@@ -1,0 +1,692 @@
+# PromptCraft v0.3.0 正式评测样本集（规格 §6.2 / 计划 Phase 4）
+# 60 条 = 20 clear（目标/背景/约束/格式基本完整）+ 20 medium（缺 1-2 个关键要素）+ 20 severe（必须澄清或明确假设）。
+# 每档覆盖 6 个场景：编程 / 办公写作 / 问答 / 数据分析 / 翻译 / 创意（每格 ≥3，余量给 编程/办公写作）。
+# 字段：id / scenario / ambiguity_level / original / must_preserve[] / must_not_add[] / expected_behavior。
+# 无 personas：模糊等级即画像。id 统一 v30_ 前缀，与 samples.yaml 不冲突。
+# must_preserve 中的子串必须在 original 中出现且增强后不得丢失；
+# must_not_add 是增强器不得自行发明/强加的约束。
+# expected_behavior：clear→none|light；medium→light；severe→clarify。
+
+samples:
+  # ================= clear（20）=================
+  # ---- 编程（4）----
+  - id: v30_code_decorator_retry
+    scenario: 编程
+    ambiguity_level: clear
+    original: |
+      帮我审查下面这个 Python 装饰器，重点是并发场景下计数器是否会竞态，以及重试逻辑是否符合指数退避约定。
+      只指出问题并说明原因，不要重写代码：
+      ```python
+      import threading, time
+
+      attempts = {"count": 0}
+
+      def retry(max_attempts=3, base_delay=1.0):
+          def deco(fn):
+              def wrapper(*args, **kwargs):
+                  attempts["count"] += 1
+                  for i in range(max_attempts):
+                      try:
+                          return fn(*args, **kwargs)
+                      except Exception:
+                          if i == max_attempts - 1:
+                              raise
+                          time.sleep(base_delay * (2 ** i))
+              return wrapper
+          return deco
+      ```
+      输出请按「问题清单 + 原因 + 影响」三段组织，最多 5 条。
+    must_preserve: ["指数退避", "只指出问题并说明原因", "max_attempts", "base_delay"]
+    must_not_add: ["不要要求补充运行环境信息", "不要虚构性能测试数据"]
+    expected_behavior: none
+
+  - id: v30_sql_order_query
+    scenario: 编程
+    ambiguity_level: clear
+    original: |
+      表结构：orders(id, user_id, product_id, amount, city, order_date)。
+      写一条 SQL 统计 2024 年每个城市、每个月的订单金额和订单数，并按月份升序输出。
+      要求单条查询、不使用窗口函数，城市按订单金额降序展示结果，直接给出可执行 SQL。
+    must_preserve: ["2024", "orders", "城市", "按月份升序"]
+    must_not_add: ["不要添加分区或索引优化建议", "不要虚构表结构之外的字段"]
+    expected_behavior: none
+
+  - id: v30_js_promise_race
+    scenario: 编程
+    ambiguity_level: clear
+    original: |
+      下面这段 JavaScript 有竞态问题：并发请求时，先发出但后返回的请求会覆盖后发请求的结果。
+      请修复 fetchUser，让结果始终来自最后一次发出的请求，同时保留 AbortController 的取消能力，不改动调用方。
+      ```javascript
+      function fetchUser(id) {
+        const controller = new AbortController();
+        return fetch(`/api/user/${id}`, { signal: controller.signal }).then(r => r.json());
+      }
+      ```
+      输出修复后的完整函数，并解释改动点。
+    must_preserve: ["fetchUser", "AbortController", "最后一次发出的请求", "改动点"]
+    must_not_add: ["不要虚构接口返回的数据结构", "不要要求补充用户接口文档"]
+    expected_behavior: none
+
+  - id: v30_rust_borrow_fix
+    scenario: 编程
+    ambiguity_level: clear
+    original: |
+      这段 Rust 编译不过，报 borrow checker 错误：
+      ```rust
+      fn push_all(v: &mut Vec<i32>, src: &Vec<i32>) {
+          for &x in src {
+              v.push(x);
+          }
+      }
+      let mut a = vec![1, 2];
+      push_all(&mut a, &a);
+      ```
+      请给出能通过编译的最小修改，保持 push_all 的行为不变，并解释为什么原来的写法不允许。
+      运行环境是 Rust 1.80，不使用 unsafe。
+    must_preserve: ["push_all", "Vec<i32>", "unsafe", "Rust 1.80"]
+    must_not_add: ["不要引入第三方 crate", "不要要求补充完整错误信息原文"]
+    expected_behavior: none
+
+  # ---- 办公写作（4）----
+  - id: v30_meeting_minutes
+    scenario: 办公写作
+    ambiguity_level: clear
+    original: |
+      根据以下会议记录整理一份会议纪要，读者是参会同事，格式要求：标题、时间、参会人、决议、待办事项五个部分。
+      只整理给出的信息，不要补充没有提到的内容。
+      会议记录：
+      1. 产品经理提出下月 15 日上线新版登录页。
+      2. 前端负责人确认可在 10 日内完成，后端需 5 个工作日。
+      3. 决定由张伟负责联调，周五前出测试计划。
+      4. 上线风险：短信服务商切换可能延迟，李娜跟进。
+    must_preserve: ["登录页", "15 日", "张伟", "李娜"]
+    must_not_add: ["不要虚构会议结论", "不要添加预算相关内容"]
+    expected_behavior: none
+
+  - id: v30_launch_email
+    scenario: 办公写作
+    ambiguity_level: clear
+    original: |
+      写一封给注册用户的产品发布邮件：新版协作工具「轻舟」上线，支持实时多人编辑与任务看板。
+      要求：主题行 + 正文，正文不超过 200 字，语气专业友好，结尾附官网链接 www.qingzhou.example 和「立即体验」按钮文案。
+      收件人是已注册但 30 天内未登录的用户，目的是召回。
+    must_preserve: ["轻舟", "www.qingzhou.example", "立即体验", "30 天内未登录"]
+    must_not_add: ["不要虚构限时优惠或折扣", "不要编造新功能之外的特性"]
+    expected_behavior: none
+
+  - id: v30_onboarding_doc
+    scenario: 办公写作
+    ambiguity_level: clear
+    original: |
+      为新入职的 Python 后端工程师写一份入职第一周指引文档，包含：环境搭建、代码规范、常用命令、求助对象四部分。
+      项目用 FastAPI + PostgreSQL，代码规范遵循 PEP 8，环境要求 Python 3.11。
+      文档要简洁，每部分不超过 5 条，直接给出可操作内容。
+    must_preserve: ["FastAPI", "PostgreSQL", "PEP 8", "Python 3.11"]
+    must_not_add: ["不要虚构公司内部工具名称", "不要添加入职培训的具体课表"]
+    expected_behavior: light
+
+  - id: v30_performance_review
+    scenario: 办公写作
+    ambiguity_level: clear
+    original: |
+      帮我写年终自我评价，要求三段式：工作成果、能力提升、下一年目标。
+      我的成果：主导上线订单模块，日处理订单从 1 万提升到 3 万；带 2 名实习生完成数据迁移。
+      能力提升：熟悉了消息队列与缓存设计。目标：明年独立负责核心交易链路。
+      语气客观，不吹嘘，总长度 400 字以内，面向直属主管。
+    must_preserve: ["订单模块", "1 万", "3 万", "消息队列"]
+    must_not_add: ["不要虚构项目数据", "不要添加具体薪资或晋升要求"]
+    expected_behavior: none
+
+  # ---- 问答（3）----
+  - id: v30_qa_https_explain
+    scenario: 问答
+    ambiguity_level: clear
+    original: |
+      用大白话向非技术背景的运营同事解释 HTTPS 为什么比 HTTP 安全，要求：
+      包含握手、证书、加密三个要点，每个要点不超过 3 句话，总长度 200 字以内，只使用确定的技术事实。
+    must_preserve: ["握手", "证书", "加密", "200 字"]
+    must_not_add: ["不要虚构具体加密算法数据", "不要加入密码学历史背景"]
+    expected_behavior: none
+
+  - id: v30_qa_sql_injection
+    scenario: 问答
+    ambiguity_level: clear
+    original: |
+      给刚入行的 Java 开发讲清楚 SQL 注入：什么是注入、一个真实示例、如何用参数化查询防御。
+      要求分三段，给出可运行的示例代码，并强调只允许使用原生 JDBC 预编译语句（PreparedStatement），禁用字符串拼接。
+    must_preserve: ["SQL 注入", "参数化", "PreparedStatement", "字符串拼接"]
+    must_not_add: ["不要要求补充具体数据库类型", "不要引入 ORM 框架推荐"]
+    expected_behavior: none
+
+  - id: v30_qa_nginx_502
+    scenario: 问答
+    ambiguity_level: clear
+    original: |
+      服务器偶尔返回 502 Bad Gateway，帮我在命令行逐步排查，环境是 Nginx 1.24 + 单台 Node.js 应用。
+      请按顺序列出：先看什么日志、每个命令的结果怎么判断、最后给出三条常见原因。
+      每步给出具体命令，不需要写修复脚本。
+    must_preserve: ["502 Bad Gateway", "Nginx 1.24", "Node.js", "三条常见原因"]
+    must_not_add: ["不要虚构客户端 IP 或具体报错时间", "不要推荐更换架构"]
+    expected_behavior: none
+
+  # ---- 数据分析（3）----
+  - id: v30_data_ab_test
+    scenario: 数据分析
+    ambiguity_level: clear
+    original: |
+      我们要把支付页的新按钮方案与旧方案做 A/B 测试，帮我设计实验方案，包含：
+      1) 主指标和护栏指标；2) 最小样本量估算方法；3) 实验时长；4) 结束时的判定规则。
+      背景：每日下单用户约 2 万，预计转化率从 2% 提升到 2.4%，显著性水平 0.05，检验功效 0.8。
+      输出按这四点组织，直接给出计算过程。
+    must_preserve: ["2 万", "2%", "2.4%", "0.05"]
+    must_not_add: ["不要虚构具体业务系统名称", "不要要求提供历史实验数据"]
+    expected_behavior: none
+
+  - id: v30_data_sql_cohort
+    scenario: 数据分析
+    ambiguity_level: clear
+    original: |
+      订单表 orders(id, user_id, amount, order_date)，用户表 users(id, signup_date)。
+      写 SQL 计算 2024 年 1 月注册用户的 30 天留存率：按注册周分组，统计该周注册用户在注册后 30 天内下过单的人数占比。
+      要求：一条查询完成，使用窗口函数按注册周分组，输出注册周与留存率两列，金额字段不影响结果。
+    must_preserve: ["orders", "signup_date", "30 天", "注册周"]
+    must_not_add: ["不要虚构数据仓库表名", "不要添加留存口径之外的指标"]
+    expected_behavior: none
+
+  - id: v30_data_retention_analysis
+    scenario: 数据分析
+    ambiguity_level: clear
+    original: |
+      下面是我产品近 6 个月的月度留存数据（百分比），帮我做留存分析，输出趋势解读、异常点、结论和建议，限制在一页内：
+      1月 42，2月 45，3月 41，4月 38，5月 36，6月 33。
+      只依据给出的数据，不要假设其他运营动作。
+    must_preserve: ["42", "45", "41", "38"]
+    must_not_add: ["不要虚构流失原因调查结论", "不要添加竞品对比数据"]
+    expected_behavior: none
+
+  # ---- 翻译（3）----
+  - id: v30_translate_privacy_policy
+    scenario: 翻译
+    ambiguity_level: clear
+    original: |
+      把下面这段隐私政策摘要翻译成英文，使用正式法律语言，专有名词「个人信息保护法」保留原文含义加英文简称，
+      不得增删任何意思：
+      「我们仅在本政策所述目的范围内收集和使用个人信息，除法律另有规定外，未经您的同意不会向第三方提供。」
+    must_preserve: ["个人信息保护法", "未经您的同意不会向第三方提供", "增删"]
+    must_not_add: ["不要虚构公司名称或联系方式", "不要添加豁免条款说明"]
+    expected_behavior: none
+
+  - id: v30_translate_api_doc
+    scenario: 翻译
+    ambiguity_level: clear
+    original: |
+      把这段 API 接口说明翻译成日文，代码、字段名和 URL 一律保留原样：
+      「调用 GET /api/v1/users 获取用户列表，返回 JSON 数组。参数 page 用于分页，默认 1，每页最多 50 条。
+      认证方式为 Bearer Token，缺少令牌时返回 401。」
+      目标读者是日方合作团队的技术成员，使用书面语。
+    must_preserve: ["/api/v1/users", "Bearer Token", "401", "page"]
+    must_not_add: ["不要虚构错误码以外的接口行为", "不要添加调用示例代码"]
+    expected_behavior: none
+
+  - id: v30_translate_product_manual
+    scenario: 翻译
+    ambiguity_level: clear
+    original: |
+      把下面的咖啡机用户手册章节翻译成德语，编号步骤保留，单位不换算，警告句加粗：
+      「1. 取下水箱并注入清水至 MAX 线。2. 放入滤纸并加入咖啡粉，每杯约 10 克。
+      3. 按下启动键。警告：清洗时请先断电。」
+    must_preserve: ["MAX 线", "10 克", "警告", "断电"]
+    must_not_add: ["不要添加品牌名称", "不要改写步骤顺序"]
+    expected_behavior: none
+
+  # ---- 创意（3）----
+  - id: v30_creative_slogan
+    scenario: 创意
+    ambiguity_level: clear
+    original: |
+      为一款面向考研学生的英语背单词 App「背词营」写 3 句 slogan，每句 8-12 个字。
+      卖点：艾宾浩斯记忆法、每天 10 分钟、真题例句。语气活泼，避免「第一」「最强」等夸大词，不做押韵要求。
+    must_preserve: ["背词营", "艾宾浩斯", "10 分钟", "真题例句"]
+    must_not_add: ["不要虚构下载量或用户数", "不要添加价格信息"]
+    expected_behavior: none
+
+  - id: v30_creative_haiku
+    scenario: 创意
+    ambiguity_level: clear
+    original: |
+      写一首关于深夜便利店的现代短诗，要求：不超过 8 行，出现「灯光」和「收银机」两个意象，
+      情感基调孤独但不消极，避免「寂静」「孤独」等直白词语，不押韵。
+    must_preserve: ["灯光", "收银机", "不押韵", "8 行"]
+    must_not_add: ["不要虚构具体品牌名", "不要添加「孤独」等直白情绪词"]
+    expected_behavior: light
+
+  - id: v30_creative_story_opening
+    scenario: 创意
+    ambiguity_level: clear
+    original: |
+      写一篇科幻短篇的开头段：设定是火星殖民地，主角是一位维修工程师，开场冲突是主气闸门意外关闭。
+      要求第一人称、150-200 字、结尾留一个悬念，避免直接点明「外星人袭击」。
+    must_preserve: ["火星", "维修工程师", "主气闸门", "150-200 字"]
+    must_not_add: ["不要虚构具体年份", "不要引入其他角色"]
+    expected_behavior: light
+
+  # ================= medium（20）=================
+  # ---- 编程（4）----
+  - id: v30_code_algorithm_optimize
+    scenario: 编程
+    ambiguity_level: medium
+    original: |
+      帮我优化这段 Python 代码，处理 10 万条记录时太慢了，看看哪里可以改进：
+      ```python
+      def process(records):
+          result = []
+          for r in records:
+              item = [x for x in records if x["id"] == r["id"]]
+              result.append(len(item))
+          return result
+      ```
+      希望至少说明复杂度问题并给出改进思路。
+    must_preserve: ["10 万条", "id", "复杂度"]
+    must_not_add: ["不要虚构输入数据的具体结构字段", "不要要求补充运行硬件配置"]
+    expected_behavior: light
+
+  - id: v30_code_error_log
+    scenario: 编程
+    ambiguity_level: medium
+    original: |
+      生产环境日志里一直刷这条错误，帮我定位原因并给出修复方案：
+      `java.lang.OutOfMemoryError: Java heap space`
+      服务是 Spring Boot 的订单服务，最近一次发布后开始出现，之前一直正常。
+    must_preserve: ["OutOfMemoryError", "Java heap space", "Spring Boot", "订单服务"]
+    must_not_add: ["不要虚构具体堆内存大小", "不要要求补充完整堆栈以外的信息"]
+    expected_behavior: light
+
+  - id: v30_code_refactor_class
+    scenario: 编程
+    ambiguity_level: medium
+    original: |
+      这个 Python 类越写越乱，帮我重构一下：
+      ```python
+      class ReportService:
+          def build(self, data):
+              ...
+          def save(self, path):
+              ...
+          def send_email(self, addr):
+              ...
+          def audit(self):
+              ...
+      ```
+      重构后要保持对外接口不变。
+    must_preserve: ["ReportService", "对外接口不变", "send_email"]
+    must_not_add: ["不要虚构类内部方法的具体实现", "不要要求补充业务规则说明"]
+    expected_behavior: light
+
+  - id: v30_code_api_design
+    scenario: 编程
+    ambiguity_level: medium
+    original: |
+      给我们的待办事项应用设计一个创建任务的 REST API，后端是 Node.js + Express。
+      需要一个简单的接口定义，最好包含请求与响应示例。
+    must_preserve: ["REST", "Node.js", "Express", "接口定义"]
+    must_not_add: ["不要虚构认证方式", "不要要求补充数据库选型说明"]
+    expected_behavior: light
+
+  # ---- 办公写作（4）----
+  - id: v30_office_annual_report
+    scenario: 办公写作
+    ambiguity_level: medium
+    original: |
+      帮我写今年部门的年度工作报告，今年主要做了三个项目：新官网上线、客户管理系统重构、数据中台一期。
+      年度销售额同比增长 18%，客户满意度从 82 分升到 88 分。
+      请你帮忙组织成一篇完整的报告。
+    must_preserve: ["客户管理系统", "18%", "82 分", "88 分"]
+    must_not_add: ["不要虚构未提及的项目", "不要添加明年预算规划"]
+    expected_behavior: light
+
+  - id: v30_office_project_proposal
+    scenario: 办公写作
+    ambiguity_level: medium
+    original: |
+      写一份项目立项方案：我们要自研内部指标平台，解决目前依赖外包报表、数据口径不统一的问题。
+      预算 60 万元，预计周期 6 个月，团队 4 人。请你把方案写出来。
+    must_preserve: ["60 万元", "6 个月", "4 人", "口径不统一"]
+    must_not_add: ["不要虚构具体供应商报价", "不要添加人员招聘数量"]
+    expected_behavior: light
+
+  - id: v30_office_followup_email
+    scenario: 办公写作
+    ambiguity_level: medium
+    original: |
+      上午跟供应商开完会，他们答应下周给第一批报价，但没给具体时间。帮我写封跟进邮件催一下，
+      顺便确认一下他们负责对接的联系人是否还是王经理。
+    must_preserve: ["供应商", "报价", "王经理"]
+    must_not_add: ["不要虚构合同金额", "不要添加威胁性措辞"]
+    expected_behavior: light
+
+  - id: v30_office_meeting_invite
+    scenario: 办公写作
+    ambiguity_level: medium
+    original: |
+      帮我写一封会议邀请邮件，主题是「Q3 目标对齐会」，参会人是产品和研发两个团队，讨论下季度优先级。
+      需要包含时间、地点和议程。
+    must_preserve: ["Q3", "目标对齐", "产品", "议程"]
+    must_not_add: ["不要虚构具体开会日期", "不要添加参会人数要求"]
+    expected_behavior: light
+
+  # ---- 问答（3）----
+  - id: v30_qa_ml_explain
+    scenario: 问答
+    ambiguity_level: medium
+    original: |
+      给我讲讲机器学习和深度学习的区别，还有监督学习和无监督学习分别适合什么场景，最好举几个例子。
+    must_preserve: ["机器学习", "深度学习", "监督学习", "无监督学习"]
+    must_not_add: ["不要虚构具体模型效果数字", "不要推荐需要付费的课程"]
+    expected_behavior: light
+
+  - id: v30_qa_cloud_costs
+    scenario: 问答
+    ambiguity_level: medium
+    original: |
+      我们云服务器成本每月 3 万左右，最近涨得厉害，帮我分析下可能的原因并给出降本建议。
+      目前主要用按量付费的 ECS 和 RDS。
+    must_preserve: ["3 万", "ECS", "RDS", "按量付费"]
+    must_not_add: ["不要虚构具体账单明细", "不要推荐迁移到其他云厂商"]
+    expected_behavior: light
+
+  - id: v30_qa_git_flow
+    scenario: 问答
+    ambiguity_level: medium
+    original: |
+      我们团队准备从主干开发切到 GitFlow，帮我讲清楚 GitFlow 的分支模型和日常操作，
+      包括 feature、release、hotfix 分支什么时候用。
+    must_preserve: ["GitFlow", "feature", "release", "hotfix"]
+    must_not_add: ["不要虚构团队规模", "不要添加具体工具推荐"]
+    expected_behavior: light
+
+  # ---- 数据分析（3）----
+  - id: v30_data_kpi_dashboard
+    scenario: 数据分析
+    ambiguity_level: medium
+    original: |
+      我们上线了一个新的积分商城，老板要一个看板来跟踪效果，帮我设计要监控哪些指标，
+      怎么定义，以及大致怎么可视化。目前数据在订单表和积分流水表里。
+    must_preserve: ["积分商城", "积分流水表", "指标", "可视化"]
+    must_not_add: ["不要虚构具体积分规则", "不要要求补充用户画像数据"]
+    expected_behavior: light
+
+  - id: v30_data_funnel_analysis
+    scenario: 数据分析
+    ambiguity_level: medium
+    original: |
+      下面是注册到首单的漏斗数据：访问 10000，注册 3000，完成支付 900，首单 600。
+      帮我分析漏斗，看看主要流失在哪一步，并给出优化建议。
+    must_preserve: ["10000", "3000", "900", "600"]
+    must_not_add: ["不要虚构行业基准转化率", "不要添加具体文案修改建议"]
+    expected_behavior: light
+
+  - id: v30_data_forecast
+    scenario: 数据分析
+    ambiguity_level: medium
+    original: |
+      我们电商平台过去一年每月 GMV 如下，帮我预测下季度 GMV 大概多少，并说明预测依据。
+      1月 120 万，2月 98 万，3月 145 万，4月 160 万，5月 152 万，6月 175 万，
+      7月 190 万，8月 210 万，9月 205 万，10月 230 万，11月 285 万，12月 320 万。
+    must_preserve: ["GMV", "120 万", "320 万", "预测依据"]
+    must_not_add: ["不要虚构节假日促销计划", "不要给出无依据的具体数字承诺"]
+    expected_behavior: light
+
+  # ---- 翻译（3）----
+  - id: v30_translate_abstract
+    scenario: 翻译
+    ambiguity_level: medium
+    original: |
+      把下面这段论文摘要翻译成英文：
+      「本研究基于 2023 至 2024 年某电商平台的用户行为日志，采用因果森林方法估计个性化优惠券对复购率的影响，
+      结果表明定向发放可将复购率提升约 12%。」
+      需要翻译得专业一些。
+    must_preserve: ["因果森林", "复购率", "12%", "优惠券"]
+    must_not_add: ["不要虚构作者信息或期刊名", "不要添加英文缩写注释"]
+    expected_behavior: light
+
+  - id: v30_translate_support_ticket
+    scenario: 翻译
+    ambiguity_level: medium
+    original: |
+      把下面这段英文客服工单翻译成中文，方便我们本地同事处理：
+      "Customer reports that the firmware update on device X-200 failed twice and the device now shows a red LED.
+      They ask whether a replacement is covered by the 1-year warranty."
+    must_preserve: ["X-200", "firmware", "red LED", "1-year warranty"]
+    must_not_add: ["不要虚构客户联系方式", "不要添加处理时限承诺"]
+    expected_behavior: light
+
+  - id: v30_translate_ui_strings
+    scenario: 翻译
+    ambiguity_level: medium
+    original: |
+      把下面这些界面文案翻译成西班牙语，产品是记账 App，句子都比较短：
+      「添加账单 / 本月支出 / 收入 / 余额不足 / 删除这条记录？」
+      注意「添加账单」在产品里用来表示新增一笔记录。
+    must_preserve: ["添加账单", "本月支出", "余额不足", "删除这条记录"]
+    must_not_add: ["不要虚构平台用语规范", "不要改写为长句"]
+    expected_behavior: light
+
+  # ---- 创意（3）----
+  - id: v30_creative_landing_hero
+    scenario: 创意
+    ambiguity_level: medium
+    original: |
+      为我们的在线绘画课程写首页主视觉区的标题和副标题。课程主打零基础成人学水彩，老师有十年教学经验，
+      支持随到随学。希望文案能吸引人点进来。
+    must_preserve: ["水彩", "零基础", "十年", "随到随学"]
+    must_not_add: ["不要虚构学员人数或好评率", "不要添加限时折扣"]
+    expected_behavior: light
+
+  - id: v30_creative_wechat_post
+    scenario: 创意
+    ambiguity_level: medium
+    original: |
+      我们的智能门锁新品下月上市，卖点是 3D 人脸识别、防猫眼撬锁、续航 12 个月。
+      帮我写一条发布预告文案，最好能有点吸引力。
+    must_preserve: ["3D 人脸识别", "防猫眼撬锁", "12 个月", "预告"]
+    must_not_add: ["不要虚构评测数据", "不要添加预售价格"]
+    expected_behavior: light
+
+  - id: v30_creative_video_script
+    scenario: 创意
+    ambiguity_level: medium
+    original: |
+      给我们的企业协作软件拍一条 60 秒介绍视频，视频脚本要包含画面描述和口播文案。
+      软件主打文档协作和音视频会议，客户是中型企业。
+    must_preserve: ["60 秒", "文档协作", "音视频会议", "中型企业"]
+    must_not_add: ["不要虚构客户案例", "不要添加具体演员或场地要求"]
+    expected_behavior: light
+
+  # ================= severe（20）=================
+  # ---- 编程（4）----
+  - id: v30_code_undefined_error
+    scenario: 编程
+    ambiguity_level: severe
+    original: |
+      帮我看看这个报错怎么解决。
+    must_preserve: ["报错", "解决"]
+    must_not_add: ["不要虚构具体的报错信息", "不要假设是某一特定语言"]
+    expected_behavior: clarify
+
+  - id: v30_code_refactor_goal
+    scenario: 编程
+    ambiguity_level: severe
+    original: |
+      帮我把这段代码优化一下，线上有点问题。
+    must_preserve: ["代码", "优化", "线上"]
+    must_not_add: ["不要虚构线上问题的具体表现", "不要假设代码语言"]
+    expected_behavior: clarify
+
+  - id: v30_code_schema_design
+    scenario: 编程
+    ambiguity_level: severe
+    original: |
+      帮我设计一套数据库表结构。
+    must_preserve: ["数据库", "表结构"]
+    must_not_add: ["不要虚构业务场景", "不要假设具体数据库类型"]
+    expected_behavior: clarify
+
+  - id: v30_code_contradictory
+    scenario: 编程
+    ambiguity_level: severe
+    original: |
+      这段代码现在运行正常，但我要它同时支持一千个并发用户、响应时间小于 50 毫秒、
+      而且不能动任何现有接口和数据结构，帮我看看怎么改。
+    must_preserve: ["一千个并发用户", "50 毫秒", "不能动"]
+    must_not_add: ["不要虚构代码内容", "不要承诺不可能的性能目标"]
+    expected_behavior: clarify
+
+  # ---- 办公写作（4）----
+  - id: v30_office_write_plan
+    scenario: 办公写作
+    ambiguity_level: severe
+    original: |
+      帮我写个方案。
+    must_preserve: ["方案", "写个方案"]
+    must_not_add: ["不要虚构主题", "不要假设是活动方案"]
+    expected_behavior: clarify
+
+  - id: v30_office_email_generic
+    scenario: 办公写作
+    ambiguity_level: severe
+    original: |
+      帮我写一封邮件，内容你看着定。
+    must_preserve: ["邮件", "你看着定"]
+    must_not_add: ["不要虚构收件人与事由", "不要编造事件背景"]
+    expected_behavior: clarify
+
+  - id: v30_office_report_summary
+    scenario: 办公写作
+    ambiguity_level: severe
+    original: |
+      帮我把这个文档总结一下，做完发我。
+    must_preserve: ["总结", "文档"]
+    must_not_add: ["不要虚构文档内容", "不要假设文档格式"]
+    expected_behavior: clarify
+
+  - id: v30_office_announcement
+    scenario: 办公写作
+    ambiguity_level: severe
+    original: |
+      帮我写一份通知。
+    must_preserve: ["写一份", "通知"]
+    must_not_add: ["不要虚构通知对象和事项", "不要假设是放假通知"]
+    expected_behavior: clarify
+
+  # ---- 问答（3）----
+  - id: v30_qa_what_is_this
+    scenario: 问答
+    ambiguity_level: severe
+    original: |
+      这是什么意思？
+    must_preserve: ["这是", "意思"]
+    must_not_add: ["不要猜测所指对象", "不要编造具体术语解释"]
+    expected_behavior: clarify
+
+  - id: v30_qa_compare_plans
+    scenario: 问答
+    ambiguity_level: severe
+    original: |
+      帮我比较一下这两个方案哪个更好。
+    must_preserve: ["比较", "方案"]
+    must_not_add: ["不要虚构两个方案的内容", "不要假设比较维度"]
+    expected_behavior: clarify
+
+  - id: v30_qa_wrong_premise
+    scenario: 问答
+    ambiguity_level: severe
+    original: |
+      为什么我明明把列表清空了，程序还是报错说列表有值？
+    must_preserve: ["列表", "清空", "报错"]
+    must_not_add: ["不要虚构代码片段", "不要假设语言和上下文"]
+    expected_behavior: clarify
+
+  # ---- 数据分析（3）----
+  - id: v30_data_improve_conversion
+    scenario: 数据分析
+    ambiguity_level: severe
+    original: |
+      怎么提升我们的转化率？
+    must_preserve: ["提升", "转化率"]
+    must_not_add: ["不要虚构行业基准数据", "不要假设具体业务形态"]
+    expected_behavior: clarify
+
+  - id: v30_data_analyze_excel
+    scenario: 数据分析
+    ambiguity_level: severe
+    original: |
+      帮我分析一下这份 Excel 数据，里面有很多表。
+    must_preserve: ["Excel", "表"]
+    must_not_add: ["不要虚构数据内容", "不要假设表结构"]
+    expected_behavior: clarify
+
+  - id: v30_data_write_report
+    scenario: 数据分析
+    ambiguity_level: severe
+    original: |
+      帮我写一份数据分析报告，要专业的。
+    must_preserve: ["数据分析报告", "专业的"]
+    must_not_add: ["不要虚构数据来源", "不要假设分析主题"]
+    expected_behavior: clarify
+
+  # ---- 翻译（3）----
+  - id: v30_translate_generic
+    scenario: 翻译
+    ambiguity_level: severe
+    original: |
+      帮我翻译一下。
+    must_preserve: ["翻译", "帮我翻译"]
+    must_not_add: ["不要虚构原文内容", "不要假设目标语言"]
+    expected_behavior: clarify
+
+  - id: v30_translate_audio_transcript
+    scenario: 翻译
+    ambiguity_level: severe
+    original: |
+      把这段会议录音翻译成英文，我后面要用。
+    must_preserve: ["录音", "英文"]
+    must_not_add: ["不要虚构录音内容", "不要假设讲话人身份"]
+    expected_behavior: clarify
+
+  - id: v30_translate_two_versions
+    scenario: 翻译
+    ambiguity_level: severe
+    original: |
+      把这段话翻译成中文，分别给普通读者和专业人士两个版本。
+    must_preserve: ["中文", "两个版本"]
+    must_not_add: ["不要虚构原文", "不要假设原文语言"]
+    expected_behavior: clarify
+
+  # ---- 创意（3）----
+  - id: v30_creative_advertise
+    scenario: 创意
+    ambiguity_level: severe
+    original: |
+      帮我写个广告。
+    must_preserve: ["广告", "写个广告"]
+    must_not_add: ["不要虚构产品信息", "不要假设投放渠道"]
+    expected_behavior: clarify
+
+  - id: v30_creative_birthday_poem
+    scenario: 创意
+    ambiguity_level: severe
+    original: |
+      写一首诗送给朋友。
+    must_preserve: ["诗", "朋友"]
+    must_not_add: ["不要虚构朋友信息", "不要假设场合与风格"]
+    expected_behavior: clarify
+
+  - id: v30_creative_product_name
+    scenario: 创意
+    ambiguity_level: severe
+    original: |
+      给我们的产品起个名字。
+    must_preserve: ["产品", "名字"]
+    must_not_add: ["不要虚构产品功能", "不要假设目标市场"]
+    expected_behavior: clarify
