@@ -525,6 +525,7 @@ def main() -> int:
         "control_group": control_group,
         "repeats": repeats,
         "regression_mode": regression_mode,
+        "human_review_count": int(getattr(args, "human_review_count", 0) or 0),
     }
     payload = {"meta": meta, "samples": samples}
     out_dir = report_mod.timestamp_dir(RESULTS_ROOT)
@@ -841,6 +842,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--samples", default=None, help="样本 YAML 路径")
     parser.add_argument("--regression", action="store_true",
                         help="回归测试模式：使用 samples_regression.yaml，统计回归失败率/变差率")
+    parser.add_argument("--human-review-count", type=int, default=0,
+                        help="人工校准样本数（review_export 导出的有效比较数），用于结论门槛判定")
     parser.add_argument("--target", action="extend", nargs="+", help="只评测指定 target，可写多个：--target doubao qwen")
     parser.add_argument("--personas", action="extend", nargs="+", help="按用户画像展开样本：--personas novice student office")
     parser.add_argument("--login", action="store_true", help="打开浏览器手动登录各网页站点后退出")
