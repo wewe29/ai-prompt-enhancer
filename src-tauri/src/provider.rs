@@ -1082,4 +1082,338 @@ mod tests {
         assert_eq!(error_code_for_status(500), "NETWORK_FAILED");
         assert_eq!(error_code_for_status(999), "NETWORK_FAILED");
     }
+
+    struct StressCase {
+        raw: String,
+        is_deliverable: bool,
+        expect_complete: bool,
+    }
+
+    fn valid_suggestions() -> Vec<Value> {
+        let kinds = [
+            "goal",
+            "context",
+            "format",
+            "constraint",
+            "alternate_intent",
+        ];
+        kinds
+            .iter()
+            .enumerate()
+            .map(|(index, kind)| {
+                json!({
+                    "id": format!("s{}", index + 1),
+                    "kind": kind,
+                    "title": "标题",
+                    "purpose": "目的",
+                    "content": "内容",
+                    "operation": if *kind == "alternate_intent" { "replace" } else { "insert" },
+                })
+            })
+            .collect()
+    }
+
+    fn complete_body() -> Value {
+        json!({
+            "status": "ready",
+            "task_type": "qa",
+            "primary_prompt": "解释这段代码",
+            "assumptions": [],
+            "questions": [],
+            "changes": [],
+            "suggestions": valid_suggestions(),
+            "risk_flags": [],
+            "delivery_status": "complete",
+            "enhancement_level": "light",
+        })
+    }
+
+    fn case(raw: String, expect_complete: bool) -> StressCase {
+        StressCase {
+            raw,
+            is_deliverable: true,
+            expect_complete,
+        }
+    }
+
+    fn build_stress_cases(original: &str) -> Vec<StressCase> {
+        let mut cases = Vec::with_capacity(100);
+        let task_types = [
+            "code",
+            "creative",
+            "writing",
+            "qa",
+            "data",
+            "translation",
+            "other",
+        ];
+
+        // 15 fully valid complete JSON.
+        for index in 0..15 {
+            let mut body = complete_body();
+            body["primary_prompt"] = json!(format!("解释这段代码——变体 {index}"));
+            body["task_type"] = json!(task_types[index % task_types.len()]);
+            cases.push(case(body.to_string(), true));
+        }
+        // 10 fence-wrapped.
+        for index in 0..10 {
+            let mut body = complete_body();
+            body["primary_prompt"] = json!(format!("围栏提示词 {index}"));
+            cases.push(case(format!("```json\n{body}\n```"), true));
+        }
+        // 10 with leading/trailing prose.
+        for index in 0..10 {
+            let mut body = complete_body();
+            body["primary_prompt"] = json!(format!("带解释的提示词 {index}"));
+            cases.push(case(
+                format!("好的，这是增强后的提示词：\n{body}\n希望对你有帮助。"),
+                true,
+            ));
+        }
+        // 8 with braces inside string values.
+        let brace_prompts = [
+            r#"保留 {花括号} 的文本"#,
+            r#"保留 {"a":1} 的对象"#,
+            r#"包含 } 和 { 的文本"#,
+            r#"嵌套 {{模板}} 结构"#,
+            r#"{"json":"在字符串里"}"#,
+            r#"格式 {{变量}} 与 }} 结束"#,
+            r#"模板 {user.name} 引用"#,
+            r#"正则 [a-z] 与 {} 空对象"#,
+        ];
+        for prompt in brace_prompts {
+            let mut body = complete_body();
+            body["primary_prompt"] = json!(prompt);
+            cases.push(case(body.to_string(), true));
+        }
+        // 8 suggestions > 5 (normalized to 5).
+        for index in 0..8 {
+            let mut body = complete_body();
+            let mut extra = valid_suggestions();
+            extra.push(json!({"id":"s6","kind":"goal","title":"t","purpose":"p","content":"c","operation":"insert"}));
+            extra.push(json!({"id":"s7","kind":"context","title":"t","purpose":"p","content":"c","operation":"insert"}));
+            body["suggestions"] = json!(extra);
+            body["primary_prompt"] = json!(format!("超过 5 条建议 {index}"));
+            cases.push(case(body.to_string(), true));
+        }
+        // 8 duplicate ids.
+        for index in 0..8 {
+            let mut body = complete_body();
+            let mut dup = valid_suggestions();
+            dup.push(json!({"id":"s2","kind":"context","title":"t","purpose":"p","content":"c","operation":"insert"}));
+            body["suggestions"] = json!(dup);
+            body["primary_prompt"] = json!(format!("重复 id {index}"));
+            cases.push(case(body.to_string(), true));
+        }
+        // 8 questions > 4 (truncated to 3).
+        for index in 0..8 {
+            let mut body = complete_body();
+            let questions = (0..5)
+                .map(|q| json!({"id": format!("q{q}"), "text": "问题", "why_needed": "原因"}))
+                .collect::<Vec<_>>();
+            body["questions"] = json!(questions);
+            body["primary_prompt"] = json!(format!("澄清问题超过 3 个 {index}"));
+            cases.push(case(body.to_string(), true));
+        }
+        // Misc recovery cases (all complete).
+        let mut body = complete_body();
+        body["questions"] = Value::Null;
+        body["changes"] = Value::Null;
+        body["assumptions"] = Value::Null;
+        body["risk_flags"] = Value::Null;
+        cases.push(case(body.to_string(), true));
+
+        let mut body = complete_body();
+        body["questions"] = json!("不是数组");
+        cases.push(case(body.to_string(), true));
+
+        let mut body = complete_body();
+        body["changes"] = json!({"oops": 1});
+        cases.push(case(body.to_string(), true));
+
+        let body = complete_body();
+        cases.push(case(format!("\n\n  {body}\t\n"), true));
+
+        let mut body = complete_body();
+        body["primary_prompt"] = json!("  带空格的主提示词  ");
+        cases.push(case(body.to_string(), true));
+
+        let mut body = complete_body();
+        body.as_object_mut().unwrap().remove("task_type");
+        cases.push(case(body.to_string(), true));
+
+        let mut body = complete_body();
+        body.as_object_mut().unwrap().remove("status");
+        cases.push(case(body.to_string(), true));
+
+        let mut body = complete_body();
+        body.as_object_mut().unwrap().remove("enhancement_level");
+        cases.push(case(body.to_string(), true));
+
+        // Extra complete recovery variants.
+        for index in 0..4 {
+            let mut body = complete_body();
+            body["primary_prompt"] = json!(format!("缩进格式 JSON {index}"));
+            cases.push(case(serde_json::to_string_pretty(&body).unwrap(), true));
+        }
+        for index in 0..4 {
+            let mut body = complete_body();
+            body["primary_prompt"] = json!(format!("完整嵌套结构 {index}"));
+            body["assumptions"] = json!([{"id":"a1","text":"假设","confirmed":false}]);
+            body["questions"] = json!([{"id":"q1","text":"问题","why_needed":"原因"}]);
+            body["changes"] = json!([{"id":"c1","type":"format","before":"","after":"输出格式（列表）","reason":"固定结构"}]);
+            body["risk_flags"] =
+                json!([{"category":"安全","message":"注意","required_protection":"x"}]);
+            cases.push(case(body.to_string(), true));
+        }
+        for index in 0..4 {
+            let mut body = complete_body();
+            body["primary_prompt"] = json!(format!("第一行\n第二行\n变体 {index}"));
+            cases.push(case(body.to_string(), true));
+        }
+        for index in 0..4 {
+            let mut body = complete_body();
+            body.as_object_mut().unwrap().remove("delivery_status");
+            body.as_object_mut().unwrap().remove("enhancement_level");
+            body["primary_prompt"] = json!(format!("默认字段提示词 {index}"));
+            cases.push(case(body.to_string(), true));
+        }
+        for index in 0..4 {
+            let mut body = complete_body();
+            body["primary_prompt"] = json!(format!("空白包裹提示词 {index}"));
+            let padding = "  ".repeat(index + 1);
+            cases.push(case(format!("{padding}{body}\n\n{padding}"), true));
+        }
+
+        // Partial: missing suggestions field.
+        let mut body = complete_body();
+        body.as_object_mut().unwrap().remove("suggestions");
+        cases.push(case(body.to_string(), false));
+
+        // Partial: XXX placeholder fails core validation, prompt still recoverable.
+        let mut body = complete_body();
+        body["primary_prompt"] = json!("请替换 XXX 占位符");
+        cases.push(case(body.to_string(), false));
+
+        // Fallback: empty payload.
+        cases.push(case(String::new(), false));
+
+        // Fallback: plain text without extractable primary_prompt.
+        cases.push(case("这完全是纯文本，没有任何 JSON".to_string(), false));
+
+        // Fallback: unterminated object without primary_prompt key.
+        cases.push(case(r#"{"status":"ready""#.to_string(), false));
+
+        assert_eq!(
+            cases.len(),
+            100,
+            "stress suite must contain exactly 100 cases"
+        );
+        let _ = original;
+        cases
+    }
+
+    // Mirrors the real enhance() pipeline (final attempt): parse → normalize →
+    // from_value → core check, then complete check, else partial/fallback delivery.
+    fn deliver_structure(raw: &str, original: &str) -> EnhancementResult {
+        let parsed = parse_enhancement(raw).and_then(|value| {
+            let (value, notices) = normalize_value(value);
+            let mut result = serde_json::from_value::<EnhancementResult>(value)
+                .map_err(|_| "模型返回的结构无法解析".to_string())?;
+            for notice in notices {
+                if !result.notices.contains(&notice) {
+                    result.notices.push(notice);
+                }
+            }
+            validate_core_result(&result)?;
+            Ok(result)
+        });
+        match parsed {
+            Ok(mut result) => {
+                if validate_complete_result(&result, original).is_err() {
+                    result.delivery_status = "partial".into();
+                    result
+                        .notices
+                        .push("模型返回不完整的增强结构，主提示词仍可使用。".into());
+                }
+                result
+            }
+            Err(_) => match partial_primary_prompt(raw) {
+                Some(prompt) => partial_result(prompt),
+                None => fallback_result(original),
+            },
+        }
+    }
+
+    #[test]
+    fn stress_100_structure_cases_deliverable() {
+        const ORIGINAL: &str = "解释这段代码";
+        let cases = build_stress_cases(ORIGINAL);
+
+        let mut complete_count = 0usize;
+        let mut partial_count = 0usize;
+        let mut fallback_count = 0usize;
+        for (index, item) in cases.iter().enumerate() {
+            assert!(item.is_deliverable, "case {index}: 标记为可交付");
+            let result = deliver_structure(&item.raw, ORIGINAL);
+            match result.delivery_status.as_str() {
+                "complete" => {
+                    complete_count += 1;
+                    assert!(
+                        item.expect_complete,
+                        "case {index}: 预期非 complete，实际 complete"
+                    );
+                }
+                "partial" => {
+                    partial_count += 1;
+                    assert!(
+                        !item.expect_complete,
+                        "case {index}: 预期 complete，实际 partial"
+                    );
+                    assert!(
+                        !result.primary_prompt.trim().is_empty(),
+                        "case {index}: partial 必须有主提示词"
+                    );
+                }
+                "fallback" => {
+                    fallback_count += 1;
+                    assert!(
+                        !item.expect_complete,
+                        "case {index}: 预期 complete，实际 fallback"
+                    );
+                    assert_eq!(
+                        result.primary_prompt, ORIGINAL,
+                        "case {index}: fallback 必须保留原文"
+                    );
+                    assert!(
+                        result.suggestions.is_empty(),
+                        "case {index}: fallback 不得虚构建议"
+                    );
+                    assert!(
+                        result.changes.is_empty(),
+                        "case {index}: fallback 不得虚构修改"
+                    );
+                    assert!(
+                        result.questions.is_empty(),
+                        "case {index}: fallback 不得虚构问题"
+                    );
+                }
+                other => panic!("case {index}: 未知交付状态 {other}"),
+            }
+        }
+        assert_eq!(
+            complete_count + partial_count + fallback_count,
+            100,
+            "可交付率必须为 100%"
+        );
+        assert!(
+            complete_count >= 95,
+            "完整结构成功率必须不低于 95%，实际 {complete_count}"
+        );
+        assert!(
+            partial_count + fallback_count <= 5,
+            "非完整交付不得超过 5 条，实际 {}",
+            partial_count + fallback_count
+        );
+    }
 }

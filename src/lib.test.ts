@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyChangeDecision, applySuggestionToText, normalizeResult, pushUndoSnapshot, rebuildAfterKeepEssential, safeParseResult } from "./lib";
-import type { EnhancementResult, PromptChange, Suggestion } from "./types";
+import type { EnhancementResult, HistoryRecord, PromptChange, Suggestion } from "./types";
 
 const suggestion: Suggestion = {
   id: "s1",
@@ -140,5 +140,20 @@ describe("prompt result helpers", () => {
       { id: "c2", type: "format", before: "也不存在", after: "新内容2", reason: "r2", state: "rejected" },
     ];
     expect(rebuildAfterKeepEssential(changes, "原文")).toBe("原文");
+  });
+
+  it("accepts legacy HistoryRecord literals without the optional delivery fields", () => {
+    const legacy: HistoryRecord = {
+      id: "h1",
+      title: "旧记录",
+      original: "原文",
+      enhanced: "增强后",
+      createdAt: "2026-01-01T00:00:00Z",
+      model: "deepseek-chat",
+      target: "豆包",
+    };
+    expect(legacy.deliveryStatus).toBeUndefined();
+    expect(legacy.enhancementLevel).toBeUndefined();
+    expect(legacy.promptVersion).toBeUndefined();
   });
 });
