@@ -2,7 +2,7 @@ import { AlertTriangle, ArrowRight, Check, ChevronDown, Clipboard, FileCode2, Fi
 import { useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { copyText, targetModels } from "../lib";
-import { preflight } from "../preflight";
+import { classifyTask, preflight } from "../preflight";
 import type { Attachment, EnhancementResult, EnhancementState, ProviderConfig, Suggestion, UsageRecord, Verbosity } from "../types";
 import { StatusBadge } from "../components/StatusBadge";
 
@@ -77,7 +77,26 @@ export function EnhanceView(props: EnhanceViewProps) {
     notices, deliveryStatus, restoreOriginal, keepEssentialEdits, hasActionableChanges, regenerate,
   } = props;
   const [preflightDismissed, setPreflightDismissed] = useState(false);
-  const findings = useMemo(() => preflight(original, context.length > 0), [original, context]);
+  const findings = useMemo(() => preflight(original, context.length > 0, classifyTask(original)), [original, context]);
+  const changeSummaryLabels: Record<string, string> = {
+    add_context: "补充背景",
+    add_constraint: "补充约束",
+    format: "明确输出形式",
+    safety: "添加风险保护",
+    clarify: "澄清表达",
+    remove_redundancy: "精简重复内容",
+  };
+  const enhancementLevelLabels: Record<string, string> = { none: "无需明显修改", light: "轻度增强", clarify: "需要澄清" };
+  const resultSummary = useMemo(() => {
+    if (!result) return null;
+    const level = enhancementLevelLabels[result.enhancement_level ?? "light"] ?? "轻度增强";
+    const outputLength = result.primary_prompt.length;
+    const ratio = original.length > 0 ? `（${(outputLength / original.length).toFixed(2)} 倍）` : "";
+    const lengthChange = `原文 ${original.length} 字 -> 结果 ${outputLength} 字${ratio}`;
+    const changesText = [...new Set(result.changes.map((change) => changeSummaryLabels[change.type]).filter(Boolean))].join("、") || "无实质修改";
+    const source = result.assumptions.length > 0 ? "包含明确假设" : "仅使用用户提供内容";
+    return { level, lengthChange, changesText, source };
+  }, [result, original]);
   useEffect(() => {
     const isTyping = () => {
       const el = document.activeElement;
@@ -161,6 +180,13 @@ export function EnhanceView(props: EnhanceViewProps) {
         </div>
       </article>
     </section>
+
+    {resultSummary && <section className="result-summary">
+      <div className="summary-row"><span>增强等级</span><strong>{resultSummary.level}</strong></div>
+      <div className="summary-row"><span>长度变化</span><strong>{resultSummary.lengthChange}</strong></div>
+      <div className="summary-row"><span>修改摘要</span><strong>{resultSummary.changesText}</strong></div>
+      <div className="summary-row"><span>事实来源</span><strong>{resultSummary.source}</strong></div>
+    </section>}
 
     {result?.assumptions.length ? <section className="assumption-strip"><AlertTriangle size={17} /><div><strong>当前假设</strong>{result.assumptions.map((item) => <span key={item.id}>{item.text}</span>)}</div></section> : null}
 

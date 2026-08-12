@@ -297,3 +297,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .preflight-card ul { margin: 0; padding-left: 18px; font-size: 12.5px; display: flex; flex-direction: column; gap: 4px; }
 .preflight-card li.level-warning { color: var(--warning, #e8b34b); }
 .preflight-card li.level-info { color: var(--muted); }
+
+.result-summary { margin: 14px 22px 0; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.summary-row { display: flex; align-items: baseline; gap: 14px; padding: 9px 14px; border-bottom: 1px solid var(--line); font-size: 12px; }
+.summary-row:last-child { border-bottom: 0; }
+.summary-row span { flex: 0 0 76px; color: var(--muted); font-size: 11px; }
+.summary-row strong { min-width: 0; overflow-wrap: anywhere; font-weight: 650; }
