@@ -86,12 +86,20 @@ pub async fn enhance(
             return Ok(());
         }
 
-        let parsed = parse_result(&raw).and_then(|mut result| {
+        let parsed = parse_enhancement(&raw).and_then(|value| {
+            let (value, notices) = normalize_value(value);
+            let mut result = serde_json::from_value::<EnhancementResult>(value)
+                .map_err(|_| "模型返回的结构无法解析，输入内容仍已保留，请重新生成".to_string())?;
+            for notice in notices {
+                if !result.notices.contains(&notice) {
+                    result.notices.push(notice);
+                }
+            }
             if request.clarification_round >= 3 {
                 result.questions.clear();
                 result.status = "ready".into();
             }
-            validate_result(&result)?;
+            validate_core_result(&result)?;
             Ok(result)
         });
         match parsed {
@@ -252,21 +260,195 @@ fn build_body(request: &EnhancementRequest) -> Value {
     })
 }
 
-fn parse_result(raw: &str) -> Result<EnhancementResult, String> {
-    let trimmed = raw
-        .trim()
-        .trim_start_matches("```json")
-        .trim_start_matches("```")
-        .trim_end_matches("```")
+fn parse_enhancement(raw: &str) -> Result<Value, String> {
+    let trimmed = raw.trim();
+    if let Ok(value) = serde_json::from_str::<Value>(trimmed) {
+        if value.is_object() {
+            return Ok(value);
+        }
+    }
+    let unfenced = strip_fences(trimmed);
+    if let Ok(value) = serde_json::from_str::<Value>(unfenced) {
+        if value.is_object() {
+            return Ok(value);
+        }
+    }
+    if let Some(object) = extract_balanced_object(trimmed) {
+        if let Ok(value) = serde_json::from_str::<Value>(object) {
+            if value.is_object() {
+                return Ok(value);
+            }
+        }
+    }
+    Err("模型返回的结构无法解析，输入内容仍已保留，请重新生成".to_string())
+}
+
+fn strip_fences(raw: &str) -> &str {
+    let trimmed = raw.trim();
+    let after_open = trimmed
+        .strip_prefix("```json")
+        .or_else(|| trimmed.strip_prefix("```"))
+        .unwrap_or(trimmed)
         .trim();
-    let start = trimmed
-        .find('{')
-        .ok_or_else(|| "模型没有返回结构化结果，请重新生成".to_string())?;
-    let end = trimmed
-        .rfind('}')
-        .ok_or_else(|| "模型结果未完整结束，请重新生成".to_string())?;
-    serde_json::from_str(&trimmed[start..=end])
-        .map_err(|_| "模型返回的结构无法解析，输入内容仍已保留，请重新生成".to_string())
+    after_open.strip_suffix("```").unwrap_or(after_open).trim()
+}
+
+fn extract_balanced_object(raw: &str) -> Option<&str> {
+    let bytes = raw.as_bytes();
+    let mut depth = 0usize;
+    let mut start = None;
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut index = 0;
+    while index < bytes.len() {
+        let byte = bytes[index];
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if byte == b'\\' {
+                escaped = true;
+            } else if byte == b'"' {
+                in_string = false;
+            }
+            index += 1;
+            continue;
+        }
+        match byte {
+            b'"' => in_string = true,
+            b'{' => {
+                if depth == 0 {
+                    start = Some(index);
+                }
+                depth += 1;
+            }
+            b'}' if depth > 0 => {
+                depth -= 1;
+                if depth == 0 {
+                    if let Some(begin) = start {
+                        let candidate = &raw[begin..=index];
+                        if serde_json::from_str::<Value>(candidate).is_ok() {
+                            return Some(candidate);
+                        }
+                        start = None;
+                    }
+                }
+            }
+            _ => {}
+        }
+        index += 1;
+    }
+    None
+}
+
+fn normalize_value(mut value: Value) -> (Value, Vec<String>) {
+    let mut notices = Vec::new();
+    let Some(object) = value.as_object_mut() else {
+        return (value, notices);
+    };
+    let status_valid = matches!(
+        object.get("status").and_then(Value::as_str),
+        Some("ready" | "needs_clarification")
+    );
+    if !status_valid {
+        let questions_non_empty = object
+            .get("questions")
+            .and_then(Value::as_array)
+            .map(|items| !items.is_empty())
+            .unwrap_or(false);
+        let derived = if questions_non_empty {
+            "needs_clarification"
+        } else {
+            "ready"
+        };
+        object.insert("status".into(), Value::String(derived.into()));
+        notices.push("模型未返回有效状态，已按内容自动判断".into());
+    }
+    const TASK_TYPES: [&str; 7] = [
+        "code",
+        "creative",
+        "writing",
+        "qa",
+        "data",
+        "translation",
+        "other",
+    ];
+    let task_type_valid = object
+        .get("task_type")
+        .and_then(Value::as_str)
+        .map(|kind| TASK_TYPES.contains(&kind))
+        .unwrap_or(false);
+    if !task_type_valid {
+        object.insert("task_type".into(), Value::String("other".into()));
+        notices.push("任务类型无法识别，已归入其他".into());
+    }
+    for field in [
+        "assumptions",
+        "questions",
+        "changes",
+        "suggestions",
+        "risk_flags",
+    ] {
+        match object.get(field) {
+            Some(Value::Array(_)) => {}
+            _ => {
+                object.insert(field.into(), Value::Array(Vec::new()));
+                notices.push(format!("{field} 字段缺失或格式无效，已按空数组处理"));
+            }
+        }
+    }
+    if let Some(suggestions) = object.get_mut("suggestions").and_then(Value::as_array_mut) {
+        if suggestions.len() > 5 {
+            suggestions.truncate(5);
+            notices.push("模型返回的建议超过 5 条，已保留前 5 条".into());
+        }
+        dedupe_ids(suggestions, "s", &mut notices);
+    }
+    if let Some(changes) = object.get_mut("changes").and_then(Value::as_array_mut) {
+        dedupe_ids(changes, "c", &mut notices);
+    }
+    if let Some(questions) = object.get_mut("questions").and_then(Value::as_array_mut) {
+        if questions.len() > 3 {
+            questions.truncate(3);
+            notices.push("模型返回的澄清问题超过 3 个，已保留前 3 个".into());
+        }
+    }
+    if let Some(Value::String(prompt)) = object.get_mut("primary_prompt") {
+        let trimmed = prompt.trim().to_string();
+        if trimmed != *prompt {
+            *prompt = trimmed;
+        }
+    }
+    (value, notices)
+}
+
+fn dedupe_ids(items: &mut Vec<Value>, prefix: &str, notices: &mut Vec<String>) {
+    let mut seen = HashSet::new();
+    let mut next_index = 1;
+    let mut index = 0;
+    while index < items.len() {
+        let mut id = items[index]
+            .get("id")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        if id.is_empty() {
+            while seen.contains(&format!("{prefix}{next_index}")) {
+                next_index += 1;
+            }
+            id = format!("{prefix}{next_index}");
+            next_index += 1;
+            if let Some(item) = items[index].as_object_mut() {
+                item.insert("id".into(), Value::String(id.clone()));
+            }
+        }
+        if seen.contains(&id) {
+            notices.push(format!("{prefix} 前缀条目 {id} 重复，已删除后出现的重复项"));
+            items.remove(index);
+            continue;
+        }
+        seen.insert(id);
+        index += 1;
+    }
 }
 
 fn validate_request(request: &EnhancementRequest) -> Result<(), String> {
@@ -291,26 +473,77 @@ fn validate_request(request: &EnhancementRequest) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_result(result: &EnhancementResult) -> Result<(), String> {
+fn validate_core_result(result: &EnhancementResult) -> Result<(), String> {
     if result.primary_prompt.trim().is_empty() {
         return Err("模型没有生成主提示词".into());
-    }
-    if result.suggestions.len() != 5 {
-        return Err("模型未返回恰好 5 个可选建议，请重新生成".into());
-    }
-    if result.questions.len() > 3 {
-        return Err("模型返回了超过 3 个澄清问题，请重新生成".into());
     }
     if result.primary_prompt.contains("XXX") {
         return Err("模型结果包含未替换占位符，请重新生成".into());
     }
-    let unique = result
-        .suggestions
-        .iter()
-        .map(|item| item.id.as_str())
-        .collect::<HashSet<_>>();
-    if unique.len() != result.suggestions.len() {
-        return Err("模型返回了重复建议，请重新生成".into());
+    if !matches!(result.status.as_str(), "ready" | "needs_clarification") {
+        return Err("模型返回了无效状态，请重新生成".into());
+    }
+    if result.questions.len() > 3 {
+        return Err("模型返回了超过 3 个澄清问题，请重新生成".into());
+    }
+    Ok(())
+}
+
+fn validate_complete_result(result: &EnhancementResult, original: &str) -> Result<(), String> {
+    if result.suggestions.len() != 5 {
+        return Err("模型未返回恰好 5 个可选建议，请重新生成".into());
+    }
+    const SUGGESTION_KINDS: [&str; 5] = [
+        "goal",
+        "context",
+        "format",
+        "constraint",
+        "alternate_intent",
+    ];
+    const OPERATIONS: [&str; 2] = ["insert", "replace"];
+    for suggestion in &result.suggestions {
+        if !SUGGESTION_KINDS.contains(&suggestion.kind.as_str()) {
+            return Err(format!("建议包含无效类型：{}", suggestion.kind));
+        }
+        if !OPERATIONS.contains(&suggestion.operation.as_str()) {
+            return Err(format!("建议包含无效操作：{}", suggestion.operation));
+        }
+    }
+    let mut unique = HashSet::new();
+    for suggestion in &result.suggestions {
+        if suggestion.id.trim().is_empty() || !unique.insert(suggestion.id.as_str()) {
+            return Err("模型返回了重复建议，请重新生成".into());
+        }
+    }
+    const EMPTY_BEFORE_TYPES: [&str; 4] = ["add_context", "add_constraint", "format", "safety"];
+    for change in &result.changes {
+        if change.before.is_empty() {
+            if !EMPTY_BEFORE_TYPES.contains(&change.change_type.as_str()) {
+                return Err(
+                    "空 before 的修改仅允许 add_context/add_constraint/format/safety".into(),
+                );
+            }
+        } else if !original.contains(&change.before) {
+            return Err("模型修改明细引用了原文不存在的片段，请重新生成".into());
+        }
+    }
+    const TASK_TYPES: [&str; 7] = [
+        "code",
+        "creative",
+        "writing",
+        "qa",
+        "data",
+        "translation",
+        "other",
+    ];
+    if !TASK_TYPES.contains(&result.task_type.as_str()) {
+        return Err("模型返回了无效任务类型，请重新生成".into());
+    }
+    if !matches!(
+        result.enhancement_level.as_str(),
+        "none" | "light" | "clarify"
+    ) {
+        return Err("模型返回了无效增强等级，请重新生成".into());
     }
     Ok(())
 }
@@ -450,9 +683,14 @@ mod tests {
             enhancement_level: "light".into(),
             notices: Vec::new(),
         };
-        assert!(validate_result(&result).is_ok());
+        assert!(validate_core_result(&result).is_ok());
+        assert!(validate_complete_result(&result, "解释这段代码").is_ok());
         result.primary_prompt = "请解释 XXX".into();
-        assert!(validate_result(&result).unwrap_err().contains("占位符"));
+        assert!(
+            validate_core_result(&result)
+                .unwrap_err()
+                .contains("占位符")
+        );
     }
 
     #[test]
