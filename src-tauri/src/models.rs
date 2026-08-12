@@ -183,6 +183,12 @@ pub struct HistoryRecord {
     pub created_at: String,
     pub model: String,
     pub target: String,
+    #[serde(default, rename = "deliveryStatus")]
+    pub delivery_status: Option<String>,
+    #[serde(default, rename = "enhancementLevel")]
+    pub enhancement_level: Option<String>,
+    #[serde(default, rename = "promptVersion")]
+    pub prompt_version: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
