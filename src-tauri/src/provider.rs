@@ -446,6 +446,9 @@ mod tests {
                 })
                 .collect(),
             risk_flags: Vec::new(),
+            delivery_status: "complete".into(),
+            enhancement_level: "light".into(),
+            notices: Vec::new(),
         };
         assert!(validate_result(&result).is_ok());
         result.primary_prompt = "请解释 XXX".into();

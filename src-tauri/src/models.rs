@@ -44,6 +44,12 @@ pub struct EnhancementResult {
     pub suggestions: Vec<Suggestion>,
     #[serde(default)]
     pub risk_flags: Vec<RiskFlag>,
+    #[serde(default = "default_delivery_status")]
+    pub delivery_status: String,
+    #[serde(default = "default_enhancement_level")]
+    pub enhancement_level: String,
+    #[serde(default)]
+    pub notices: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -76,6 +82,14 @@ pub struct PromptChange {
 
 fn pending_state() -> String {
     "pending".to_string()
+}
+
+fn default_delivery_status() -> String {
+    "complete".into()
+}
+
+fn default_enhancement_level() -> String {
+    "light".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
