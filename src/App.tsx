@@ -18,6 +18,8 @@ import { HistoryView } from "./views/HistoryView";
 import { ProfileView } from "./views/ProfileView";
 import { SettingsView } from "./views/SettingsView";
 
+const SYSTEM_PROMPT_VERSION = "promptcraft-v2.1.0";
+
 const defaultProvider: ProviderConfig = {
   baseUrl: "https://api.deepseek.com",
   hasApiKey: false,
@@ -187,7 +189,7 @@ export default function App() {
           setNotices(nextNotices);
           setOutput(normalized.primary_prompt);
           setState(normalized.status === "needs_clarification" ? "needs_clarification" : "ready");
-          persistHistory(normalized.primary_prompt, { deliveryStatus: normalized.delivery_status, enhancementLevel: normalized.enhancement_level });
+          persistHistory(normalized.primary_prompt, { deliveryStatus: normalized.delivery_status, enhancementLevel: normalized.enhancement_level, promptVersion: SYSTEM_PROMPT_VERSION });
         }
         if (event.type === "status" && event.data === "retrying_structure") setOutput("");
         if (event.type === "usage" && event.usage) setUsage(event.usage);
