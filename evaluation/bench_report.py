@@ -217,7 +217,11 @@ def aggregate(
             entry["winner"] = False
         details.append(entry)
 
-    return {"models": models, "details": details}
+    result: dict[str, Any] = {"models": models, "details": details}
+    enhance_failures = payload.get("enhance_failures")
+    if enhance_failures:
+        result["enhance_failures"] = enhance_failures
+    return result
 
 
 def generate(out_dir: Path, payload: dict[str, Any]) -> Path:
@@ -313,12 +317,18 @@ def _render_markdown(payload: dict[str, Any]) -> str:
         lines.append("")
 
     failures = [item for item in details if item.get("error")]
+    enhance_failures = payload.get("enhance_failures") or []
     lines.append("## 四、失败清单\n")
-    if not failures:
+    if not failures and not enhance_failures:
         lines.append("> 无失败条目。\n")
     for item in failures:
         lines.append(
             f"- [{item.get('prompt_id', '')} × {item.get('model_id', '')}] {item.get('error', '未知错误')}"
+        )
+    for item in enhance_failures:
+        lines.append(
+            f"- [{item.get('prompt_id', '')}] {item.get('error', '未知错误')}"
+            f"（影响 {item.get('model_count', 0)} 个模型）"
         )
     lines.append("")
     lines.append("---\n")

@@ -251,12 +251,27 @@ def main(argv: list[str] | None = None) -> int:
             _pace(delay_between_s)
 
     # 阶段二/三：推理 + 裁判
+    # 增强失败按 prompt 级计一次，不再逐模型复制 error（规格 §4.6.3）。
+    enhanced_by_pid = {p["id"]: (p.get("enhanced") or {}) for p in prompts}
+    enhance_failed_prompts: set[str] = {
+        pid for pid, e in enhanced_by_pid.items() if e.get("error")
+    }
+    enhance_failures: list[dict[str, Any]] = [
+        {
+            "prompt_id": pid,
+            "error": f"增强失败：{enhanced_by_pid[pid].get('error', '')}",
+            "model_count": len(models),
+        }
+        for pid in sorted(enhance_failed_prompts)
+    ]
+
     details: list[dict[str, Any]] = []
     for model in models:
         mid, label = model["id"], model.get("label", model["id"])
         for prompt in prompts:
             pid = prompt["id"]
-            enhanced = prompt.get("enhanced") or {}
+            if pid in enhance_failed_prompts:
+                continue  # 该 prompt 增强失败，跳过全部模型评测
             detail = {
                 "prompt_id": pid,
                 "model_id": mid,
@@ -269,39 +284,36 @@ def main(argv: list[str] | None = None) -> int:
                 "usage": {},
                 "error": None,
             }
-            if enhanced.get("error"):
-                detail["error"] = f"增强失败：{enhanced['error']}"
+            temp = prompt.get("temperature")
+            if temp is None:
+                temp = cfg.get("scenario_temperatures", {}).get(prompt.get("scenario", ""))
+            if temp is None:
+                temp = float(params.get("temperature", INFER_TEMPERATURE))
+            infer = _infer_one(mid, pid, enhanced_by_pid[pid].get("enhanced", ""), cfg, api_cfg, api_key,
+                               params, retries, backoff_s, timeout_s, args.skip_infer, temperature=temp)
+            detail["latency_s"] = infer.get("latency_s")
+            detail["output_len"] = len(infer.get("text") or "")
+            detail["usage"] = infer.get("usage", {})
+            if infer.get("error"):
+                detail["error"] = f"推理失败：{infer['error']}"
+            elif not (infer.get("text") or "").strip():
+                detail["error"] = "推理输出为空，跳过裁判"
             else:
-                temp = prompt.get("temperature")
-                if temp is None:
-                    temp = cfg.get("scenario_temperatures", {}).get(prompt.get("scenario", ""))
-                if temp is None:
-                    temp = float(params.get("temperature", INFER_TEMPERATURE))
-                infer = _infer_one(mid, pid, enhanced.get("enhanced", ""), cfg, api_cfg, api_key,
-                                   params, retries, backoff_s, timeout_s, args.skip_infer, temperature=temp)
-                detail["latency_s"] = infer.get("latency_s")
-                detail["output_len"] = len(infer.get("text") or "")
-                detail["usage"] = infer.get("usage", {})
-                if infer.get("error"):
-                    detail["error"] = f"推理失败：{infer['error']}"
-                elif not (infer.get("text") or "").strip():
-                    detail["error"] = "推理输出为空，跳过裁判"
+                cached = load_cache("judge", pid, mid)
+                if cached is not None:
+                    verdict = cached
+                elif args.skip_judge:
+                    verdict = {"error": "无裁判缓存（--skip-judge）"}
                 else:
-                    cached = load_cache("judge", pid, mid)
-                    if cached is not None:
-                        verdict = cached
-                    elif args.skip_judge:
-                        verdict = {"error": "无裁判缓存（--skip-judge）"}
-                    else:
-                        verdict = _judge_one(prompt, enhanced.get("enhanced", ""), infer.get("text", ""),
-                                             cfg, api_cfg, api_key, params, retries, backoff_s, timeout_s)
-                        save_cache("judge", pid, mid, verdict)
-                        _pace(delay_between_s)
-                if verdict.get("error"):
-                    detail["error"] = f"裁判失败：{verdict['error']}"
-                else:
-                    detail["scores"] = {d: verdict.get(d, verdict.get("relevance", 0)) for d in bench_judge.DIMENSIONS}
-                    detail["reason"] = verdict.get("reason", "")
+                    verdict = _judge_one(prompt, enhanced_by_pid[pid].get("enhanced", ""), infer.get("text", ""),
+                                         cfg, api_cfg, api_key, params, retries, backoff_s, timeout_s)
+                    save_cache("judge", pid, mid, verdict)
+                    _pace(delay_between_s)
+            if verdict.get("error"):
+                detail["error"] = f"裁判失败：{verdict['error']}"
+            else:
+                detail["scores"] = {d: verdict.get(d, verdict.get("relevance", 0)) for d in bench_judge.DIMENSIONS}
+                detail["reason"] = verdict.get("reason", "")
             if detail["error"]:
                 print(f"  [{mid} × {pid}] {detail['error']}")
             else:
@@ -333,7 +345,7 @@ def main(argv: list[str] | None = None) -> int:
             "skip_judge": args.skip_judge,
         },
     }
-    payload = {"meta": meta, "details": details}
+    payload = {"meta": meta, "details": details, "enhance_failures": enhance_failures}
     agg = bench_report.aggregate(payload, cfg.get("judge", {}).get("weights"))
     summary = {"meta": meta, **agg}
 
