@@ -39,7 +39,6 @@ pub async fn enhance(
         }
     }
     let started = Instant::now();
-    let body = build_body(&request);
     let endpoint = format!("{}/chat/completions", config.base_url.trim_end_matches('/'));
     on_event
         .send(BackendEvent::Status {
@@ -47,7 +46,7 @@ pub async fn enhance(
         })
         .map_err(|error| error.to_string())?;
 
-    let mut completed = None;
+    let mut outcome: Option<(EnhancementResult, WireUsage, Option<&'static str>)> = None;
     for attempt in 0..2 {
         if attempt == 1 {
             on_event
@@ -56,6 +55,11 @@ pub async fn enhance(
                 })
                 .map_err(|error| error.to_string())?;
         }
+        let body = if attempt == 1 {
+            build_body_with_instruction(&request, Some(STRUCTURE_FIX_INSTRUCTION))
+        } else {
+            build_body(&request)
+        };
         let sent = state
             .client
             .post(&endpoint)
@@ -72,17 +76,64 @@ pub async fn enhance(
                 if status.is_server_error() && attempt == 0 {
                     continue;
                 }
+                record_error_usage(
+                    &state,
+                    &request,
+                    config.input_price,
+                    config.output_price,
+                    started.elapsed().as_millis() as u64,
+                    error_code_for_status(status.as_u16()),
+                );
                 return Err(map_http_error(status.as_u16(), &message));
             }
             Err(error) if attempt == 0 && (error.is_connect() || error.is_timeout()) => continue,
-            Err(error) => return Err(format!("网络请求失败，输入内容仍已保留：{error}")),
+            Err(error) => {
+                record_error_usage(
+                    &state,
+                    &request,
+                    config.input_price,
+                    config.output_price,
+                    started.elapsed().as_millis() as u64,
+                    "NETWORK_FAILED",
+                );
+                return Err(format!("网络请求失败，输入内容仍已保留：{error}"));
+            }
         };
         let (raw, wire_usage) = match consume_stream(response, &on_event, token.clone()).await {
             Ok(consumed) => consumed,
             Err(_) if attempt == 0 && !token.is_cancelled() => continue,
-            Err(error) => return Err(format!("{error}，已自动重试一次")),
+            Err(error) => {
+                record_error_usage(
+                    &state,
+                    &request,
+                    config.input_price,
+                    config.output_price,
+                    started.elapsed().as_millis() as u64,
+                    "STREAM_INTERRUPTED",
+                );
+                return Err(format!("{error}，已自动重试一次"));
+            }
         };
         if token.is_cancelled() {
+            let input_tokens = wire_usage
+                .prompt_tokens
+                .max(estimate_tokens(&request.original_text));
+            let output_tokens = wire_usage.completion_tokens.max(estimate_tokens(&raw));
+            let estimated_cost = calculate_cost(
+                input_tokens,
+                output_tokens,
+                config.input_price,
+                config.output_price,
+            );
+            let _ = state.storage.record_usage(
+                &request.model,
+                input_tokens,
+                output_tokens,
+                estimated_cost,
+                started.elapsed().as_millis() as u64,
+                "cancelled",
+                Some("USER_CANCELLED"),
+            );
             return Ok(());
         }
 
@@ -103,16 +154,38 @@ pub async fn enhance(
             Ok(result)
         });
         match parsed {
-            Ok(result) => {
-                completed = Some((result, wire_usage));
+            Ok(mut result) => {
+                let error_code = match validate_complete_result(&result, &request.original_text) {
+                    Ok(()) => None,
+                    Err(_) => {
+                        result.delivery_status = "partial".into();
+                        result
+                            .notices
+                            .push("模型返回不完整的增强结构，主提示词仍可使用。".into());
+                        Some("STRUCTURE_PARTIAL")
+                    }
+                };
+                outcome = Some((result, wire_usage, error_code));
                 break;
             }
             Err(_) if attempt == 0 => continue,
-            Err(error) => return Err(format!("{error}，已自动重试一次")),
+            Err(_) => {
+                let result = match partial_primary_prompt(&raw) {
+                    Some(prompt) => partial_result(prompt),
+                    None => fallback_result(&request.original_text),
+                };
+                let code = if result.delivery_status == "partial" {
+                    "STRUCTURE_PARTIAL"
+                } else {
+                    "STRUCTURE_FALLBACK"
+                };
+                outcome = Some((result, wire_usage, Some(code)));
+                break;
+            }
         }
     }
-    let (result, wire_usage) =
-        completed.ok_or_else(|| "DeepSeek 服务暂时不可用，已自动重试一次".to_string())?;
+    let (result, wire_usage, error_code) =
+        outcome.ok_or_else(|| "DeepSeek 服务暂时不可用，已自动重试一次".to_string())?;
 
     let input_tokens = wire_usage
         .prompt_tokens
@@ -126,15 +199,30 @@ pub async fn enhance(
         config.input_price,
         config.output_price,
     );
-    let month_total = state.storage.record_usage(
-        &request.model,
-        input_tokens,
-        output_tokens,
-        estimated_cost,
-        started.elapsed().as_millis() as u64,
-        "success",
-        None,
-    )?;
+    let duration_ms = started.elapsed().as_millis() as u64;
+    let month_total = match error_code {
+        Some(code) => {
+            let _ = state.storage.record_usage(
+                &request.model,
+                input_tokens,
+                output_tokens,
+                estimated_cost,
+                duration_ms,
+                "error",
+                Some(code),
+            );
+            0.0
+        }
+        None => state.storage.record_usage(
+            &request.model,
+            input_tokens,
+            output_tokens,
+            estimated_cost,
+            duration_ms,
+            "success",
+            None,
+        )?,
+    };
     on_event
         .send(BackendEvent::Result { result })
         .map_err(|error| error.to_string())?;
@@ -210,7 +298,13 @@ async fn consume_stream(
     Ok((raw, usage))
 }
 
+const STRUCTURE_FIX_INSTRUCTION: &str = "上一次输出没有形成可解析的 PromptCraft JSON。请重新生成同一任务的结果。只输出一个完整 JSON 对象，不要解释，不要代码围栏。必须优先保证 status、task_type、primary_prompt、questions 可用；其他数组无法确定时可以返回空数组。";
+
 fn build_body(request: &EnhancementRequest) -> Value {
+    build_body_with_instruction(request, None)
+}
+
+fn build_body_with_instruction(request: &EnhancementRequest, instruction: Option<&str>) -> Value {
     let attachments = request
         .attachments
         .iter()
@@ -247,6 +341,10 @@ fn build_body(request: &EnhancementRequest) -> Value {
         answers,
         attachments,
     );
+    let user_message = match instruction {
+        Some(instruction) => format!("{user_message}\n\n{instruction}"),
+        None => user_message,
+    };
     json!({
         "model": request.model,
         "messages": [
@@ -605,6 +703,69 @@ fn map_http_error(status: u16, body: &str) -> String {
     }
 }
 
+fn error_code_for_status(status: u16) -> &'static str {
+    match status {
+        401 | 403 => "AUTH_FAILED",
+        402 => "BALANCE_INSUFFICIENT",
+        400 | 404 => "MODEL_NOT_FOUND",
+        429 => "RATE_LIMITED",
+        _ => "NETWORK_FAILED",
+    }
+}
+
+fn record_error_usage(
+    state: &State<'_, AppState>,
+    request: &EnhancementRequest,
+    input_price: f64,
+    output_price: f64,
+    duration_ms: u64,
+    code: &'static str,
+) {
+    let input_tokens = estimate_tokens(&request.original_text);
+    let cost = calculate_cost(input_tokens, 0, input_price, output_price);
+    let _ = state.storage.record_usage(
+        &request.model,
+        input_tokens,
+        0,
+        cost,
+        duration_ms,
+        "error",
+        Some(code),
+    );
+}
+
+fn partial_result(prompt: String) -> EnhancementResult {
+    EnhancementResult {
+        status: "ready".into(),
+        task_type: "other".into(),
+        primary_prompt: prompt,
+        assumptions: Vec::new(),
+        questions: Vec::new(),
+        changes: Vec::new(),
+        suggestions: Vec::new(),
+        risk_flags: Vec::new(),
+        delivery_status: "partial".into(),
+        enhancement_level: "none".into(),
+        notices: vec!["模型返回不完整的增强结构，主提示词仍可使用。".into()],
+    }
+}
+
+fn fallback_result(original: &str) -> EnhancementResult {
+    EnhancementResult {
+        status: "ready".into(),
+        task_type: "other".into(),
+        primary_prompt: original.trim().to_string(),
+        assumptions: Vec::new(),
+        questions: Vec::new(),
+        changes: Vec::new(),
+        suggestions: Vec::new(),
+        risk_flags: Vec::new(),
+        delivery_status: "fallback".into(),
+        enhancement_level: "none".into(),
+        notices: vec!["增强服务未返回可用结构，本次已保留原始提示词".into()],
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -696,5 +857,194 @@ mod tests {
     #[test]
     fn calculates_configured_cost() {
         assert!((calculate_cost(1_000, 2_000, 0.001, 0.002) - 0.005).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn parses_direct_json() {
+        let raw = r#"{"status":"ready","task_type":"qa","primary_prompt":"解释这段代码","questions":[],"suggestions":[]}"#;
+        let value = parse_enhancement(raw).unwrap();
+        assert_eq!(value["primary_prompt"], "解释这段代码");
+    }
+
+    #[test]
+    fn parses_fenced_json() {
+        let raw = "```json\n{\"status\":\"ready\",\"task_type\":\"qa\",\"primary_prompt\":\"解释这段代码\"}\n```";
+        let value = parse_enhancement(raw).unwrap();
+        assert_eq!(value["primary_prompt"], "解释这段代码");
+    }
+
+    #[test]
+    fn parses_json_with_leading_and_trailing_prose() {
+        let raw = "好的，以下是增强后的提示词：\n{\"status\":\"ready\",\"task_type\":\"qa\",\"primary_prompt\":\"解释这段代码\"}\n希望对你有帮助。";
+        let value = parse_enhancement(raw).unwrap();
+        assert_eq!(value["primary_prompt"], "解释这段代码");
+    }
+
+    #[test]
+    fn scans_braces_inside_strings() {
+        let raw = r#"前言 {"primary_prompt":"保留 {花括号} 和 }的文本","status":"ready"} 后记"#;
+        let value = parse_enhancement(raw).unwrap();
+        assert_eq!(value["primary_prompt"], "保留 {花括号} 和 }的文本");
+
+        let raw = r#"{"a":"say \"hi\" {x}","b":{"c":1}}"#;
+        let value = parse_enhancement(raw).unwrap();
+        assert_eq!(value["a"], "say \"hi\" {x}");
+        assert_eq!(value["b"]["c"], 1);
+    }
+
+    #[test]
+    fn scanner_rejects_unterminated_json() {
+        let raw = r#"{"primary_prompt":"未闭合的对象"#;
+        assert!(parse_enhancement(raw).is_err());
+        assert!(parse_enhancement("完全没有 JSON 的纯文本").is_err());
+    }
+
+    #[test]
+    fn missing_suggestions_with_valid_primary_yields_partial() {
+        let suggestion = crate::models::Suggestion {
+            id: "s".into(),
+            kind: "goal".into(),
+            title: "目标".into(),
+            purpose: "用途".into(),
+            content: "内容".into(),
+            operation: "insert".into(),
+            anchor: String::new(),
+            applied: false,
+        };
+        let mut result = EnhancementResult {
+            status: "ready".into(),
+            task_type: "other".into(),
+            primary_prompt: "有效提示词".into(),
+            assumptions: Vec::new(),
+            questions: Vec::new(),
+            changes: Vec::new(),
+            suggestions: (0..3)
+                .map(|index| crate::models::Suggestion {
+                    id: format!("s{index}"),
+                    ..suggestion.clone()
+                })
+                .collect(),
+            risk_flags: Vec::new(),
+            delivery_status: "complete".into(),
+            enhancement_level: "light".into(),
+            notices: Vec::new(),
+        };
+        assert!(validate_core_result(&result).is_ok());
+        assert!(validate_complete_result(&result, "解释这段代码").is_err());
+
+        result.suggestions = (0..5)
+            .map(|index| crate::models::Suggestion {
+                id: format!("s{index}"),
+                ..suggestion.clone()
+            })
+            .collect();
+        assert!(validate_complete_result(&result, "解释这段代码").is_ok());
+    }
+
+    #[test]
+    fn truncates_suggestions_over_five() {
+        let suggestions = (0..7)
+            .map(|index| {
+                json!({"id": format!("s{index}"), "kind": "goal", "title": "t", "purpose": "p", "content": "c", "operation": "insert"})
+            })
+            .collect::<Vec<Value>>();
+        let value = json!({
+            "status": "ready",
+            "task_type": "qa",
+            "primary_prompt": "提示词",
+            "suggestions": suggestions,
+        });
+        let (normalized, notices) = normalize_value(value);
+        assert_eq!(normalized["suggestions"].as_array().unwrap().len(), 5);
+        assert!(notices.iter().any(|notice| notice.contains("前 5 条")));
+    }
+
+    #[test]
+    fn dedupes_duplicate_ids() {
+        let value = json!({
+            "status": "ready",
+            "task_type": "qa",
+            "primary_prompt": "提示词",
+            "suggestions": [
+                {"id": "s1", "kind": "goal", "title": "t", "purpose": "p", "content": "c", "operation": "insert"},
+                {"id": "s2", "kind": "context", "title": "t", "purpose": "p", "content": "c", "operation": "insert"},
+                {"id": "s2", "kind": "format", "title": "t", "purpose": "p", "content": "c", "operation": "insert"},
+                {"id": "s3", "kind": "goal", "title": "t", "purpose": "p", "content": "c", "operation": "insert"},
+            ],
+        });
+        let (normalized, notices) = normalize_value(value);
+        let ids = normalized["suggestions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|item| item["id"].as_str().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(ids, vec!["s1", "s2", "s3"]);
+        assert!(notices.iter().any(|notice| notice.contains("重复")));
+    }
+
+    #[test]
+    fn truncates_questions_over_three() {
+        let questions = (0..5)
+            .map(|index| json!({"id": format!("q{index}"), "text": "问题", "why_needed": "原因"}))
+            .collect::<Vec<Value>>();
+        let value = json!({
+            "status": "needs_clarification",
+            "task_type": "qa",
+            "primary_prompt": "提示词",
+            "questions": questions,
+        });
+        let (normalized, notices) = normalize_value(value);
+        assert_eq!(normalized["questions"].as_array().unwrap().len(), 3);
+        assert!(notices.iter().any(|notice| notice.contains("前 3 个")));
+    }
+
+    #[test]
+    fn fallback_keeps_original_text() {
+        let result = fallback_result("  保留原文提示词  ");
+        assert_eq!(result.primary_prompt, "保留原文提示词");
+        assert_eq!(result.delivery_status, "fallback");
+        assert_eq!(result.enhancement_level, "none");
+        assert!(
+            result
+                .notices
+                .iter()
+                .any(|notice| notice.contains("已保留原始提示词"))
+        );
+    }
+
+    #[test]
+    fn fallback_contains_no_fabricated_suggestions() {
+        let result = fallback_result("原始提示词");
+        assert!(result.suggestions.is_empty());
+        assert!(result.changes.is_empty());
+        assert!(result.questions.is_empty());
+        assert!(result.assumptions.is_empty());
+    }
+
+    #[test]
+    fn normalize_derives_status_from_questions() {
+        let value = json!({
+            "primary_prompt": "提示词",
+            "questions": [{"id": "q1", "text": "问题", "why_needed": "原因"}],
+        });
+        let (normalized, _) = normalize_value(value);
+        assert_eq!(normalized["status"], "needs_clarification");
+
+        let value = json!({"primary_prompt": "提示词"});
+        let (normalized, _) = normalize_value(value);
+        assert_eq!(normalized["status"], "ready");
+    }
+
+    #[test]
+    fn error_code_mapping_is_stable() {
+        assert_eq!(error_code_for_status(401), "AUTH_FAILED");
+        assert_eq!(error_code_for_status(403), "AUTH_FAILED");
+        assert_eq!(error_code_for_status(402), "BALANCE_INSUFFICIENT");
+        assert_eq!(error_code_for_status(400), "MODEL_NOT_FOUND");
+        assert_eq!(error_code_for_status(404), "MODEL_NOT_FOUND");
+        assert_eq!(error_code_for_status(429), "RATE_LIMITED");
+        assert_eq!(error_code_for_status(500), "NETWORK_FAILED");
+        assert_eq!(error_code_for_status(999), "NETWORK_FAILED");
     }
 }
