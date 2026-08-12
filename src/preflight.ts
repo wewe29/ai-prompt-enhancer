@@ -7,7 +7,7 @@ const CREATIVE_KEYWORDS = ["写一首", "诗", "文案", "广告", "创意", "�
 const DATA_KEYWORDS = ["数据", "报表", "销售额", "统计", "指标", "环比", "sql"];
 const CODE_KEYWORDS = ["```", "代码", "函数", "报错", "error", "bug", "debug", "python", "js", "sql", "编译", "运行", "内存", "git"];
 const WRITING_KEYWORDS = ["邮件", "周报", "公告", "文档", "汇报", "总结", "文章", "说明书", "改写", "报告"];
-const QA_KEYWORDS = ["是什么意思", "什么区别", "怎么", "为什么", "介绍", "解释", "查", "了解", "对比", "?"];
+const QA_KEYWORDS = ["是什么意思", "什么区别", "怎么", "为什么", "介绍", "解释", "查", "了解", "对比", "症状", "?"];
 
 // Precedence: translation -> creative -> data -> code -> writing -> qa -> other.
 // Data is checked before code so "用 python 统计销售额" is data while "python 报错" is code;
