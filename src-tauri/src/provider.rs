@@ -623,8 +623,8 @@ fn validate_core_result(result: &EnhancementResult) -> Result<(), String> {
 }
 
 fn validate_complete_result(result: &EnhancementResult, original: &str) -> Result<(), String> {
-    if result.suggestions.len() != 5 {
-        return Err("模型未返回恰好 5 个可选建议，请重新生成".into());
+    if result.suggestions.len() > 5 {
+        return Err("模型返回了超过 5 条可选建议，请重新生成".into());
     }
     const SUGGESTION_KINDS: [&str; 5] = [
         "goal",
@@ -935,7 +935,7 @@ mod tests {
     }
 
     #[test]
-    fn missing_suggestions_with_valid_primary_yields_partial() {
+    fn suggestions_0_to_5_are_complete() {
         let suggestion = crate::models::Suggestion {
             id: "s".into(),
             kind: "goal".into(),
@@ -965,15 +965,18 @@ mod tests {
             notices: Vec::new(),
         };
         assert!(validate_core_result(&result).is_ok());
-        assert!(validate_complete_result(&result, "解释这段代码").is_err());
+        assert!(validate_complete_result(&result, "解释这段代码").is_ok());
 
-        result.suggestions = (0..5)
+        result.suggestions.clear();
+        assert!(validate_complete_result(&result, "解释这段代码").is_ok());
+
+        result.suggestions = (0..6)
             .map(|index| crate::models::Suggestion {
                 id: format!("s{index}"),
                 ..suggestion.clone()
             })
             .collect();
-        assert!(validate_complete_result(&result, "解释这段代码").is_ok());
+        assert!(validate_complete_result(&result, "解释这段代码").is_err());
     }
 
     #[test]
@@ -1285,10 +1288,10 @@ mod tests {
             cases.push(case(format!("{padding}{body}\n\n{padding}"), true));
         }
 
-        // Partial: missing suggestions field.
+        // Suggestions omitted → normalized to empty array, still complete (0-5 rule).
         let mut body = complete_body();
         body.as_object_mut().unwrap().remove("suggestions");
-        cases.push(case(body.to_string(), false));
+        cases.push(case(body.to_string(), true));
 
         // Partial: XXX placeholder fails core validation, prompt still recoverable.
         let mut body = complete_body();
