@@ -27,10 +27,12 @@ judge:
 scenario_weights:
   编程: { accuracy: 0.4, completeness: 0.3, relevance: 0.2, clarity: 0.1 }
   创意: { accuracy: 0.15, completeness: 0.15, relevance: 0.25, clarity: 0.2, novelty: 0.25 }
+# 目标模型 = probe_targets.py 探测可用集合剔除 deepseek-v4-flash（裁判/增强器同模型，§6.5 解耦）
 models:
   - { id: doubao-seed-2.0-mini, label: 豆包 2.0 mini }
   - { id: glm-5.2, label: GLM-5.2 }
-  - { id: deepseek-v4-flash, label: DeepSeek V4 Flash }
+  - { id: doubao-seed-2-0-pro-260215, label: 豆包 2.0 pro }
+  - { id: glm-5-2-260617, label: GLM-5.2 GA }
 prompts: []
 samples_file: samples/samples.yaml
 params:
@@ -40,5 +42,6 @@ params:
   retry_backoff_s: [2, 5]
   delay_between_s: 1.0
   temperature: 0.7
+  repeats: 1
 run:
   out_dir: results/benchmark
