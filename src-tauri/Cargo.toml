@@ -1,4 +1,4 @@
-﻿[package]
+[package]
 name = "prompt-craft"
 version = "0.2.1"
 description = "Local AI prompt enhancer for Windows"
