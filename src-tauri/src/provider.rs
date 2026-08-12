@@ -24,7 +24,18 @@ pub async fn enhance(
     on_event: Channel<BackendEvent>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    validate_request(&request)?;
+    if let Err(message) = validate_request(&request) {
+        let _ = state.storage.record_usage(
+            &request.model,
+            estimate_tokens(&request.original_text),
+            0,
+            0.0,
+            0,
+            "error",
+            Some("REQUEST_INVALID"),
+        );
+        return Err(message);
+    }
     let api_key = state.storage.api_key()?;
     let config = state.storage.provider_config()?;
     if request.model.trim().is_empty() {
@@ -168,7 +179,17 @@ pub async fn enhance(
                 outcome = Some((result, wire_usage, error_code));
                 break;
             }
-            Err(_) if attempt == 0 => continue,
+            Err(_) if attempt == 0 => {
+                record_error_usage(
+                    &state,
+                    &request,
+                    config.input_price,
+                    config.output_price,
+                    started.elapsed().as_millis() as u64,
+                    "STRUCTURE_RETRY",
+                );
+                continue;
+            }
             Err(_) => {
                 let result = match partial_primary_prompt(&raw) {
                     Some(prompt) => partial_result(prompt),
@@ -213,15 +234,29 @@ pub async fn enhance(
             );
             0.0
         }
-        None => state.storage.record_usage(
-            &request.model,
-            input_tokens,
-            output_tokens,
-            estimated_cost,
-            duration_ms,
-            "success",
-            None,
-        )?,
+        None => state
+            .storage
+            .record_usage(
+                &request.model,
+                input_tokens,
+                output_tokens,
+                estimated_cost,
+                duration_ms,
+                "success",
+                None,
+            )
+            .unwrap_or_else(|_| {
+                let _ = state.storage.record_usage(
+                    &request.model,
+                    input_tokens,
+                    output_tokens,
+                    estimated_cost,
+                    duration_ms,
+                    "error",
+                    Some("STORAGE_FAILED"),
+                );
+                0.0
+            }),
     };
     on_event
         .send(BackendEvent::Result { result })
