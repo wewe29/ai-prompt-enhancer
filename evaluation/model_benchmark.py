@@ -73,11 +73,17 @@ DEFAULTS: dict[str, Any] = {
         "retry_backoff_s": [2, 5],
         "delay_between_s": 1.0,
         "temperature": 0.7,  # 推理默认温度（样本 temperature / scenario_temperatures 未命中时使用）
+        "repeats": 1,        # 每个(模型×提示词)重复次数（正式运行用 3）
     },
     "run": {"out_dir": "results/benchmark"},
 }
 
 INFER_TEMPERATURE = 0.7
+
+
+def _rep_key(repeats: int, rep: int) -> str:
+    """重复实验缓存键后缀：N=1 无后缀（与旧缓存向后兼容），N>1 为 _rep<i>。"""
+    return "" if int(repeats) <= 1 else f"_rep{rep}"
 
 
 # ---- 配置 ----
@@ -223,6 +229,10 @@ def main(argv: list[str] | None = None) -> int:
     delay_between_s = float(params.get("delay_between_s", 1.0))
     max_tokens = int(params.get("max_tokens", 4096))
     timeout_s = float(params.get("timeout_s", 120))
+    repeats = args.repeats if args.repeats is not None else int(params.get("repeats", 1))
+    if repeats < 1:
+        print("[错误] --repeats 必须 ≥ 1")
+        return 1
 
     out_dir = Path(args.out_dir) if args.out_dir else Path(cfg["run"]["out_dir"])
     if not out_dir.is_absolute():
@@ -272,58 +282,64 @@ def main(argv: list[str] | None = None) -> int:
             pid = prompt["id"]
             if pid in enhance_failed_prompts:
                 continue  # 该 prompt 增强失败，跳过全部模型评测
-            detail = {
-                "prompt_id": pid,
-                "model_id": mid,
-                "model_label": label,
-                "scenario": prompt.get("scenario") or "未分类",
-                "scores": None,
-                "reason": "",
-                "latency_s": None,
-                "output_len": None,
-                "usage": {},
-                "error": None,
-            }
             temp = prompt.get("temperature")
             if temp is None:
                 temp = cfg.get("scenario_temperatures", {}).get(prompt.get("scenario", ""))
             if temp is None:
                 temp = float(params.get("temperature", INFER_TEMPERATURE))
-            infer = _infer_one(mid, pid, enhanced_by_pid[pid].get("enhanced", ""), cfg, api_cfg, api_key,
-                               params, retries, backoff_s, timeout_s, args.skip_infer, temperature=temp)
-            detail["latency_s"] = infer.get("latency_s")
-            detail["output_len"] = len(infer.get("text") or "")
-            detail["usage"] = infer.get("usage", {})
-            if infer.get("error"):
-                detail["error"] = f"推理失败：{infer['error']}"
-            elif not (infer.get("text") or "").strip():
-                detail["error"] = "推理输出为空，跳过裁判"
-            else:
-                cached = load_cache("judge", pid, mid)
-                if cached is not None:
-                    verdict = cached
-                elif args.skip_judge:
-                    verdict = {"error": "无裁判缓存（--skip-judge）"}
+            for rep in range(repeats):
+                suffix = _rep_key(repeats, rep)
+                detail = {
+                    "prompt_id": pid,
+                    "model_id": mid,
+                    "model_label": label,
+                    "scenario": prompt.get("scenario") or "未分类",
+                    "rep": rep,
+                    "scores": None,
+                    "reason": "",
+                    "latency_s": None,
+                    "output_len": None,
+                    "usage": {},
+                    "error": None,
+                }
+                infer = _infer_one(mid, pid, enhanced_by_pid[pid].get("enhanced", ""), cfg, api_cfg, api_key,
+                                   params, retries, backoff_s, timeout_s, args.skip_infer,
+                                   temperature=temp, suffix=suffix)
+                detail["latency_s"] = infer.get("latency_s")
+                detail["output_len"] = len(infer.get("text") or "")
+                detail["usage"] = infer.get("usage", {})
+                if infer.get("error"):
+                    detail["error"] = f"推理失败：{infer['error']}"
+                    verdict = {"error": detail["error"]}
+                elif not (infer.get("text") or "").strip():
+                    detail["error"] = "推理输出为空，跳过裁判"
+                    verdict = {"error": detail["error"]}
                 else:
-                    verdict = _judge_one(prompt, enhanced_by_pid[pid].get("enhanced", ""), infer.get("text", ""),
-                                         cfg, api_cfg, api_key, params, retries, backoff_s, timeout_s)
-                    save_cache("judge", pid, mid, verdict)
-                    _pace(delay_between_s)
-            if verdict.get("error"):
-                detail["error"] = f"裁判失败：{verdict['error']}"
-            else:
-                detail["scores"] = {d: verdict.get(d, verdict.get("relevance", 0)) for d in bench_judge.DIMENSIONS}
-                detail["reason"] = verdict.get("reason", "")
-            if detail["error"]:
-                print(f"  [{mid} × {pid}] {detail['error']}")
-            else:
-                q_dims = ("accuracy", "completeness", "clarity")
-                quality_mean = sum(detail["scores"][d] for d in q_dims) / len(q_dims)
-                novelty = detail["scores"].get("novelty")
-                novelty_suffix = f"，新颖度 {novelty:.0f}" if novelty is not None else ""
-                print(f"  [{mid} × {pid}] 完成（{detail['output_len']} 字符，"
-                      f"{detail['latency_s']:.1f}s，质量均分 {quality_mean:.1f}{novelty_suffix}）")
-            details.append(detail)
+                    cached = load_cache("judge", pid, mid + suffix)
+                    if cached is not None:
+                        verdict = cached
+                    elif args.skip_judge:
+                        verdict = {"error": "无裁判缓存（--skip-judge）"}
+                    else:
+                        verdict = _judge_one(prompt, enhanced_by_pid[pid].get("enhanced", ""), infer.get("text", ""),
+                                             cfg, api_cfg, api_key, params, retries, backoff_s, timeout_s)
+                        save_cache("judge", pid, mid + suffix, verdict)
+                        _pace(delay_between_s)
+                if verdict.get("error"):
+                    detail["error"] = f"裁判失败：{verdict['error']}"
+                else:
+                    detail["scores"] = {d: verdict.get(d, verdict.get("relevance", 0)) for d in bench_judge.DIMENSIONS}
+                    detail["reason"] = verdict.get("reason", "")
+                if detail["error"]:
+                    print(f"  [{mid} × {pid}{suffix}] {detail['error']}")
+                else:
+                    q_dims = ("accuracy", "completeness", "clarity")
+                    quality_mean = sum(detail["scores"][d] for d in q_dims) / len(q_dims)
+                    novelty = detail["scores"].get("novelty")
+                    novelty_suffix = f"，新颖度 {novelty:.0f}" if novelty is not None else ""
+                    print(f"  [{mid} × {pid}{suffix}] 完成（{detail['output_len']} 字符，"
+                          f"{detail['latency_s']:.1f}s，质量均分 {quality_mean:.1f}{novelty_suffix}）")
+                details.append(detail)
 
     # 阶段四：聚合 + 报告
     meta = {
@@ -339,6 +355,7 @@ def main(argv: list[str] | None = None) -> int:
         "prompt_count": len(prompts),
         "model_count": len(models),
         "params": params,
+        "repeats": repeats,
         "flags": {
             "skip_enhance": args.skip_enhance,
             "skip_infer": args.skip_infer,
@@ -406,8 +423,8 @@ def _enhance_prompt(original: str, cfg: dict, enh_cfg: dict, enh_key: str,
 
 def _infer_one(mid: str, pid: str, enhanced: str, cfg: dict, api_cfg: dict, api_key: str,
                params: dict, retries: int, backoff_s: list[float], timeout_s: float,
-               skip: bool, temperature: float = INFER_TEMPERATURE) -> dict:
-    cached = load_cache("infer", pid, mid)
+               skip: bool, temperature: float = INFER_TEMPERATURE, suffix: str = "") -> dict:
+    cached = load_cache("infer", pid, mid + suffix)
     if cached is not None:
         return cached
     if skip:
@@ -429,7 +446,7 @@ def _infer_one(mid: str, pid: str, enhanced: str, cfg: dict, api_cfg: dict, api_
     if result.error:
         return {"error": result.error}
     payload = {"text": result.text, "latency_s": result.latency_s, "usage": result.usage}
-    save_cache("infer", pid, mid, payload)
+    save_cache("infer", pid, mid + suffix, payload)
     return payload
 
 
@@ -474,6 +491,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--skip-enhance", action="store_true", help="复用缓存的增强结果")
     parser.add_argument("--skip-infer", action="store_true", help="复用缓存的推理结果")
     parser.add_argument("--skip-judge", action="store_true", help="复用缓存的裁判结果")
+    parser.add_argument("--repeats", type=int, default=None,
+                        help="每个(模型×提示词)重复 N 次（默认取配置 params.repeats，缺省 1）")
     parser.add_argument("--max-prompts", type=int, default=None, help="最多评测的提示词数")
     parser.add_argument("--max-models", type=int, default=None, help="最多评测的模型数")
     parser.add_argument("--out-dir", default=None, help="报告输出目录（默认配置 run.out_dir）")

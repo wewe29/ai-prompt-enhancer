@@ -66,6 +66,8 @@ DEFAULTS: dict[str, Any] = {
         "delay_between": 2.0,  # 秒，请求间延迟
         "max_cost_usd": 2.0,   # 预算保护
         "retry_seconds": 60,   # RateLimited 后等待重试
+        "control_group": True,  # A/B/C 三组对照默认开启
+        "repeats": 1,           # 每个(样本×目标×变体)重复次数
     },
     "samples": "samples/samples.yaml",
 }

@@ -106,7 +106,32 @@ def _write_raw_files(raw_dir: Path, data: dict[str, Any]) -> None:
             json.dumps(enhanced, ensure_ascii=False, indent=2), encoding="utf-8"
         )
         for target_id, result in (sample.get("results") or {}).items():
-            for variant in ("original", "enhanced"):
+            variants = ("original", "enhanced", "padded")
+            reps = result.get("reps")
+            if reps:
+                for rep in reps:
+                    rep_no = rep.get("rep", 0)
+                    for variant in variants:
+                        if f"{variant}_output" not in rep and f"{variant}_error" not in rep:
+                            continue
+                        payload = {
+                            "sample_id": sample_id,
+                            "target": target_id,
+                            "variant": variant,
+                            "rep": rep_no,
+                            "prompt": sample.get("original" if variant == "original" else "enhanced_text", ""),
+                            "output": rep.get(f"{variant}_output", ""),
+                            "error": rep.get(f"{variant}_error"),
+                            "latency_s": rep.get(f"{variant}_latency_s"),
+                            "est_tokens": rep.get(f"{variant}_est_tokens"),
+                            "model": rep.get(f"{variant}_model") or target_id,
+                        }
+                        (raw_dir / f"{sample_id}{persona_seg}_{target_id}_{variant}_rep{rep_no}.json").write_text(
+                            json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+                        )
+            for variant in variants:
+                if f"{variant}_output" not in result and f"{variant}_error" not in result:
+                    continue
                 payload = {
                     "sample_id": sample_id,
                     "target": target_id,
@@ -114,6 +139,9 @@ def _write_raw_files(raw_dir: Path, data: dict[str, Any]) -> None:
                     "prompt": sample.get("original" if variant == "original" else "enhanced_text", ""),
                     "output": result.get(f"{variant}_output", ""),
                     "error": result.get(f"{variant}_error"),
+                    "latency_s": result.get(f"{variant}_latency_s"),
+                    "est_tokens": result.get(f"{variant}_est_tokens"),
+                    "model": result.get(f"{variant}_model") or target_id,
                 }
                 (raw_dir / f"{sample_id}{persona_seg}_{target_id}_{variant}.json").write_text(
                     json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"

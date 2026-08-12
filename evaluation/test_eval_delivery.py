@@ -57,7 +57,8 @@ def test_enhance_failure_does_not_abort_batch(monkeypatch, tmp_path):
     args = argparse.Namespace(
         config=None, samples="samples.yaml", regression=False, target=None,
         personas=None, login=False, skip_enhance=False, skip_infer=False,
-        skip_prompt_judge=False, max_cost=None, offline=False, control_group=False,
+        skip_judge=False, skip_prompt_judge=False, max_cost=None, offline=False,
+        no_control_group=True, repeats=None,
         manual=True, manual_answers=None,
     )
     monkeypatch.setattr(run_eval_mod, "parse_args", lambda *_a, **_k: args)
