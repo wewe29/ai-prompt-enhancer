@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  applyChangeDecision, applySuggestionToText, cancelEnhancement, clearAllData, copyAndOpen, deleteHistoryRecord, extractAttachment,
+  applyChangeDecisionSafe, applySuggestionToText, cancelEnhancement, clearAllData, copyAndOpen, deleteHistoryRecord, extractAttachment,
   getLocalSettings, getProviderConfig, listHistoryRecords, normalizeResult, pickAttachments,
   pushUndoSnapshot, rebuildAfterKeepEssential, saveHistoryRecord, saveLocalSettings, saveProviderConfig, startEnhancement,
   targetModels, validateProvider,
@@ -227,8 +227,10 @@ export default function App() {
   const changeState = (id: string, nextState: "accepted" | "rejected") => {
     const change = result?.changes.find((item) => item.id === id);
     if (!change) return;
-    const next = applyChangeDecision(output, change, nextState);
-    if (next !== output) commitOutput(next);
+    if (change.state === nextState) return;
+    const { text, applied } = applyChangeDecisionSafe(output, change, nextState);
+    if (applied && text !== output) commitOutput(text);
+    if (!applied) setNotices((current) => [...new Set([...current, `原文已被编辑，无法自动应用该项：${change.reason}`])]);
     setResult((current) => current ? { ...current, changes: current.changes.map((item) => item.id === id ? { ...item, state: nextState } : item) } : current);
   };
 
