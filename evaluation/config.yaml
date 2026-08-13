@@ -216,8 +216,8 @@ judge:
   model: deepseek-v4-flash
   temperature: 0
   randomize_order: true               # 随机互换 A/B 消除位置偏差
-  cross_check: false                  # 每条独立再评一次交叉验证（增加成本）
-  # second_model: doubao-seed-2-1-pro  # 交叉验证的第二裁判模型（cross_check: true 时生效）
+  cross_check: true                   # v0.3.0 正式评测：第二裁判默认开启
+  second_model: glm-5.2               # 第二裁判（与主裁判/增强器部署不同）
 
 samples: samples/samples.yaml
 
