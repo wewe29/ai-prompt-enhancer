@@ -361,7 +361,7 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
         gate_reasons.append(f"有效样本率 {eff_rate:.0%} 低于 90%")
     major_scenarios = ("编程", "办公写作", "问答", "数据分析", "翻译", "创意")
     scenario_ns = {
-        sc: (next(iter(dims.values()), {}).get("n", 0) if dims else 0)
+        sc: (len(next(iter(dims.values()), [])) if dims else 0)
         for sc, dims in by_scenario.items()
     }
     present_min = min((n for sc, n in scenario_ns.items() if sc in major_scenarios), default=None)
