@@ -18,7 +18,18 @@ def _quality(mean_map: dict[str, Any]) -> float:
     return sum(dims) / len(dims) if dims else 0.0
 
 
-def compute_gates(summary: dict[str, Any]) -> list[dict[str, Any]]:
+def _nested(summary: dict[str, Any]) -> dict[str, Any]:
+    """summary.json 顶层可能为完整聚合(含 summary 子对象);归一化到数据视图。"""
+    if "delivery_rate" in summary or "judge_agreement" in summary:
+        return summary
+    sub = summary.get("summary") or {}
+    merged = dict(summary)
+    merged.update(sub)
+    return merged
+
+
+def compute_gates(summary_in: dict[str, Any]) -> list[dict[str, Any]]:
+    summary = _nested(summary_in)
     gates: list[dict[str, Any]] = []
 
     effective = float(summary.get("delivery_rate", 0.0))
