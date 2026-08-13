@@ -111,6 +111,9 @@ targets:
 
   # 火山方舟 Agent Plan 目标（Anthropic Messages 协议，/api/plan 端点）
   # 密钥从环境变量 ARK_PLAN_API_KEY 读取（api_key_env），不会写入本文件
+  # 目标模型列表 = probe_targets.py 探测可用集合剔除 deepseek-v4-flash（裁判/增强器同模型，§6.5 解耦）
+  # 探测日期 2026-08-12：doubao-seed-2.0-mini / glm-5.2 / deepseek-v4-flash /
+  #   doubao-seed-2-0-pro-260215 / glm-5-2-260617 可用；其余候选 404
   plan_doubao:
     enabled: true
     mode: anthropic
@@ -129,8 +132,26 @@ targets:
     temperature: 0.7
     max_tokens: 4096
 
-  plan_deepseek:
+  plan_doubao_pro:
     enabled: true
+    mode: anthropic
+    base_url: https://ark.cn-beijing.volces.com/api/plan
+    model: doubao-seed-2-0-pro-260215
+    api_key_env: ARK_PLAN_API_KEY
+    temperature: 0.7
+    max_tokens: 4096
+
+  plan_glm_5_2:
+    enabled: true
+    mode: anthropic
+    base_url: https://ark.cn-beijing.volces.com/api/plan
+    model: glm-5-2-260617
+    api_key_env: ARK_PLAN_API_KEY
+    temperature: 0.7
+    max_tokens: 4096
+
+  plan_deepseek:
+    enabled: false                # 与裁判/增强器同模型部署，§6.5 解耦要求剔除，不作为评测目标
     mode: anthropic
     base_url: https://ark.cn-beijing.volces.com/api/plan
     model: deepseek-v4-flash
@@ -195,8 +216,8 @@ judge:
   model: deepseek-v4-flash
   temperature: 0
   randomize_order: true               # 随机互换 A/B 消除位置偏差
-  cross_check: false                  # 每条独立再评一次交叉验证（增加成本）
-  # second_model: doubao-seed-2-1-pro  # 交叉验证的第二裁判模型（cross_check: true 时生效）
+  cross_check: true                   # v0.3.0 正式评测：第二裁判默认开启
+  second_model: glm-5.2               # 第二裁判（与主裁判/增强器部署不同）
 
 samples: samples/samples.yaml
 
@@ -204,3 +225,5 @@ run:
   delay_between: 2.0                  # 秒，网页请求间隔（避免限流）
   max_cost_usd: 2.0                   # 增强+裁判的 API 预算保护
   retry_seconds: 60                   # 限流后等待重试的秒数
+  control_group: true                 # A/B/C 三组对照默认开启（--no-control-group 关闭）
+  repeats: 1                          # 每个(样本×目标×变体)的重复次数（正式运行用 3）

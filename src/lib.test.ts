@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyChangeDecision, applySuggestionToText, normalizeResult, pushUndoSnapshot, rebuildAfterKeepEssential, safeParseResult } from "./lib";
+import { applyChangeDecision, applyChangeDecisionSafe, applySuggestionToText, normalizeResult, pushUndoSnapshot, rebuildAfterKeepEssential, safeParseResult } from "./lib";
 import type { EnhancementResult, HistoryRecord, PromptChange, Suggestion } from "./types";
 
 const suggestion: Suggestion = {
@@ -34,11 +34,22 @@ describe("prompt result helpers", () => {
       .toBe("面向大三学生解释");
   });
 
+  it("keeps the original text when a replacement anchor is missing", () => {
+    expect(applySuggestionToText("原提示词", { ...suggestion, operation: "replace", anchor: "不存在", content: "新内容" }))
+      .toBe("原提示词");
+  });
+
   it("accepts and rejects an atomic change without duplicating text", () => {
     const change: PromptChange = { id: "c1", type: "clarify", before: "解释代码", after: "解释这段代码的用途", reason: "明确范围", state: "pending" };
     expect(applyChangeDecision("请解释代码", change, "accepted")).toBe("请解释这段代码的用途");
     expect(applyChangeDecision("请解释这段代码的用途", change, "rejected")).toBe("请解释代码");
     expect(applyChangeDecision("请解释这段代码的用途", change, "accepted")).toBe("请解释这段代码的用途");
+  });
+
+  it("reports when a change cannot be applied because its anchor is missing", () => {
+    const change: PromptChange = { id: "c1", type: "clarify", before: "不存在的片段", after: "新内容", reason: "r", state: "pending" };
+    expect(applyChangeDecisionSafe("原文内容", change, "accepted")).toEqual({ text: "原文内容", applied: false });
+    expect(applyChangeDecisionSafe("原文内容", { ...change, before: "原文", after: "不存在的内容" }, "rejected")).toEqual({ text: "原文内容", applied: false });
   });
 
   it("caps undo history at 100 snapshots", () => {

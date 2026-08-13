@@ -257,11 +257,20 @@ def _spearman(x: list[float], y: list[float]) -> float:
 
 
 def _assign_labels(sample, original_output, enhanced_output, swapped):
+    """为 A/B 标签分配提示词与回答；标签必须中立（不含“原始/增强”字样）。
+
+    增强提示词优先取 sample["enhanced_text"]（文本），兼容旧结构
+    sample["enhanced"] 为结果 dict 时取其 primary_prompt，绝不把内部结构注入裁判消息。
+    """
+    enhanced_prompt = str(sample.get("enhanced_text") or "")
+    if not enhanced_prompt:
+        enh = sample.get("enhanced") or ""
+        enhanced_prompt = str(enh.get("primary_prompt", "")) if isinstance(enh, dict) else str(enh)
     if swapped:
-        return (sample.get("enhanced", ""), enhanced_output,
-                sample.get("original", ""), original_output)
-    return (sample.get("original", ""), original_output,
-            sample.get("enhanced", ""), enhanced_output)
+        return (enhanced_prompt, enhanced_output,
+                str(sample.get("original", "")), original_output)
+    return (str(sample.get("original", "")), original_output,
+            enhanced_prompt, enhanced_output)
 
 
 def _build_judge_message(sample, prompt_a, answer_a, prompt_b, answer_b) -> str:

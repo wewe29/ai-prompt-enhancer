@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  applyChangeDecision, applySuggestionToText, cancelEnhancement, clearAllData, copyAndOpen, deleteHistoryRecord, extractAttachment,
+  applyChangeDecisionSafe, applySuggestionToText, cancelEnhancement, clearAllData, copyAndOpen, deleteHistoryRecord, extractAttachment,
   getLocalSettings, getProviderConfig, listHistoryRecords, normalizeResult, pickAttachments,
   pushUndoSnapshot, rebuildAfterKeepEssential, saveHistoryRecord, saveLocalSettings, saveProviderConfig, startEnhancement,
   targetModels, validateProvider,
@@ -17,6 +17,8 @@ import { EnhanceView } from "./views/EnhanceView";
 import { HistoryView } from "./views/HistoryView";
 import { ProfileView } from "./views/ProfileView";
 import { SettingsView } from "./views/SettingsView";
+
+const SYSTEM_PROMPT_VERSION = "promptcraft-v2.1.0";
 
 const defaultProvider: ProviderConfig = {
   baseUrl: "https://api.deepseek.com",
@@ -187,7 +189,7 @@ export default function App() {
           setNotices(nextNotices);
           setOutput(normalized.primary_prompt);
           setState(normalized.status === "needs_clarification" ? "needs_clarification" : "ready");
-          persistHistory(normalized.primary_prompt, { deliveryStatus: normalized.delivery_status, enhancementLevel: normalized.enhancement_level });
+          persistHistory(normalized.primary_prompt, { deliveryStatus: normalized.delivery_status, enhancementLevel: normalized.enhancement_level, promptVersion: SYSTEM_PROMPT_VERSION });
         }
         if (event.type === "status" && event.data === "retrying_structure") setOutput("");
         if (event.type === "usage" && event.usage) setUsage(event.usage);
@@ -225,8 +227,10 @@ export default function App() {
   const changeState = (id: string, nextState: "accepted" | "rejected") => {
     const change = result?.changes.find((item) => item.id === id);
     if (!change) return;
-    const next = applyChangeDecision(output, change, nextState);
-    if (next !== output) commitOutput(next);
+    if (change.state === nextState) return;
+    const { text, applied } = applyChangeDecisionSafe(output, change, nextState);
+    if (applied && text !== output) commitOutput(text);
+    if (!applied) setNotices((current) => [...new Set([...current, `原文已被编辑，无法自动应用该项：${change.reason}`])]);
     setResult((current) => current ? { ...current, changes: current.changes.map((item) => item.id === id ? { ...item, state: nextState } : item) } : current);
   };
 

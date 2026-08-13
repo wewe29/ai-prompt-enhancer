@@ -228,20 +228,26 @@ export function rebuildAfterKeepEssential(changes: PromptChange[], original: str
 }
 
 export function applySuggestionToText(text: string, suggestion: Suggestion): string {
-  if (suggestion.operation === "replace" && suggestion.anchor && text.includes(suggestion.anchor)) {
-    return text.replace(suggestion.anchor, suggestion.content);
+  if (suggestion.operation === "replace" && suggestion.anchor) {
+    return text.includes(suggestion.anchor) ? text.replace(suggestion.anchor, suggestion.content) : text;
   }
   return [text.trim(), suggestion.content.trim()].filter(Boolean).join("\n\n");
 }
 
+export function applyChangeDecisionSafe(text: string, change: PromptChange, state: "accepted" | "rejected"): { text: string; applied: boolean } {
+  if (state === "rejected" && change.after) {
+    if (text.includes(change.after)) return { text: text.replace(change.after, change.before), applied: true };
+    return { text, applied: false };
+  }
+  if (state === "accepted" && change.before) {
+    if (!text.includes(change.after) && text.includes(change.before)) return { text: text.replace(change.before, change.after), applied: true };
+    return { text, applied: false };
+  }
+  return { text, applied: false };
+}
+
 export function applyChangeDecision(text: string, change: PromptChange, state: "accepted" | "rejected"): string {
-  if (state === "rejected" && change.after && text.includes(change.after)) {
-    return text.replace(change.after, change.before);
-  }
-  if (state === "accepted" && change.before && !text.includes(change.after) && text.includes(change.before)) {
-    return text.replace(change.before, change.after);
-  }
-  return text;
+  return applyChangeDecisionSafe(text, change, state).text;
 }
 
 export function pushUndoSnapshot(stack: string[], value: string, limit = 100): string[] {

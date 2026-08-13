@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 import time
 from pathlib import Path
@@ -32,14 +33,158 @@ _FILLER = "请确保回答完整、准确、结构清晰，先给结论再展开
 
 
 def pad_to_length(text: str, target_len: int) -> str:
-    """在原文后追加中性说明句,直至长度接近 target_len(±5%)。"""
-    if len(text) >= target_len:
-        return text
-    parts = [text]
-    while len("".join(parts)) < target_len * 0.95:
-        parts.append(_FILLER)
-    joined = "".join(parts)
-    return joined[:target_len] if len(joined) > target_len else joined
+    """在原文后追加中性说明句，使长度落在 target_len 的 ±5% 区间内。
+
+    仅用于 A/B/C 对照组的填充变体 B：B 与 C（增强版）的字符数差需 ≤5%（规格 §6.3）。
+    - 原文已接近目标长度（±5%）→ 原样返回；
+    - 原文过短 → 追加固定中性句直到 ≥95%，再截到 target_len；
+    - 原文过长（>105%）→ 截断到 target_len（保持长度一致，不注入领域知识）。
+    """
+    if len(text) <= target_len * 1.05:
+        if len(text) >= target_len:
+            return text
+        parts = [text]
+        while len("".join(parts)) < target_len * 0.95:
+            parts.append(_FILLER)
+        joined = "".join(parts)
+        return joined[:target_len] if len(joined) > target_len else joined
+    return text[:target_len]
+
+
+def _rep_key(repeats: int, rep: int) -> str:
+    """重复实验缓存键后缀：N=1 无后缀（与旧缓存向后兼容），N>1 为 _rep<i>。"""
+    return "" if int(repeats) <= 1 else f"_rep{rep}"
+
+
+def resolve_control_group(cfg: dict[str, Any], no_control_group: bool) -> bool:
+    """控制组开关：默认开启（config run.control_group，缺省 true），--no-control-group 覆盖为关闭。"""
+    if no_control_group:
+        return False
+    return bool(cfg.get("run", {}).get("control_group", True))
+
+
+def aggregate_judges(rep_judges: list[dict[str, Any] | None] | None) -> dict[str, Any] | None:
+    """把多个重复的 judge 结果聚合为一个：deltas/得分取均值，winner 取多数（未过半则 tie）。
+
+    judge 结构沿用 judge_pair 返回：{"original","enhanced","deltas","winner","reason",...}。
+    """
+    valid = [j for j in (rep_judges or []) if isinstance(j, dict) and isinstance(j.get("deltas"), dict)]
+    if not valid:
+        return None
+    dims = sorted({d for j in valid for d in j["deltas"]})
+    mean = lambda vals: sum(vals) / len(vals) if vals else 0.0
+    scores = {
+        side: {
+            dim: mean([float(j[side].get(dim, 0.0)) for j in valid if isinstance(j.get(side), dict)])
+            for dim in dims
+        }
+        for side in ("original", "enhanced")
+    }
+    deltas = {dim: mean([float(j["deltas"].get(dim, 0.0)) for j in valid]) for dim in dims}
+    winners: dict[str, int] = {}
+    for j in valid:
+        winners[j.get("winner", "tie")] = winners.get(j.get("winner", "tie"), 0) + 1
+    best, count = max(winners.items(), key=lambda kv: kv[1])
+    winner = best if count * 2 > len(valid) else "tie"
+    usage = {
+        key: sum(int(j.get("usage", {}).get(key, 0) or 0) for j in valid)
+        for key in ("input_tokens", "output_tokens")
+    }
+    reasons = [str(j.get("reason", "")).strip() for j in valid if j.get("reason")]
+    return {
+        "original": scores["original"],
+        "enhanced": scores["enhanced"],
+        "deltas": deltas,
+        "winner": winner,
+        "reason": "；".join(reasons)[:500],
+        "swapped": False,
+        "heuristics": valid[0].get("heuristics", {}),
+        "usage": usage,
+    }
+
+
+def _aggregate_rep_outputs(rep_store: list[dict[str, Any]], variants: list[str], tid: str) -> dict[str, Any]:
+    """把多 rep 的变体输出聚合为顶层字段：output 取首个成功；error 仅全失败时保留；延迟/估 token 取均值。"""
+    out: dict[str, Any] = {}
+    for variant in variants:
+        successes = [r[f"{variant}_output"] for r in rep_store if r.get(f"{variant}_output")]
+        errors = [r.get(f"{variant}_error") for r in rep_store if r.get(f"{variant}_error")]
+        out[f"{variant}_output"] = successes[0] if successes else ""
+        out[f"{variant}_error"] = None if successes else (errors[0] if errors else None)
+        lat = [r[f"{variant}_latency_s"] for r in rep_store if r.get(f"{variant}_latency_s") is not None]
+        out[f"{variant}_latency_s"] = round(sum(lat) / len(lat), 3) if lat else None
+        toks = [r[f"{variant}_est_tokens"] for r in rep_store if r.get(f"{variant}_est_tokens") is not None]
+        out[f"{variant}_est_tokens"] = sum(toks) if toks else None
+        out[f"{variant}_model"] = tid
+    return out
+
+
+def _judge_variants(
+    sample: dict[str, Any],
+    tid: str,
+    result: dict[str, Any],
+    cfg: dict[str, Any],
+    judge_key: str,
+    offline: bool,
+    cross_check: bool,
+    second_model: str,
+    control_group: bool,
+) -> int:
+    """对单个 result（单次运行或单个 rep）执行全部裁判，返回主对比是否完成（0/1）。
+
+    主对比 = 原始 A vs 增强 C；控制组 = C-B（增强 vs 填充）与 B-A（填充 vs 原始）。
+    """
+    if result.get("judge") is not None:
+        return 1
+    if result.get("original_error") or result.get("enhanced_error") \
+       or not result.get("original_output") or not result.get("enhanced_output"):
+        return 0
+    try:
+        if offline:
+            result["judge"] = judge_offline(sample, result["original_output"], result["enhanced_output"], cfg, "")
+        else:
+            result["judge"] = run_with_budget(
+                lambda s=sample, r=result: judge_pair(s, r["original_output"], r["enhanced_output"], cfg, judge_key),
+                cfg, "裁判",
+            )
+        if cross_check:
+            try:
+                if offline:
+                    result["judge2"] = judge_offline(sample, result["original_output"], result["enhanced_output"], cfg, "")
+                else:
+                    result["judge2"] = run_with_budget(
+                        lambda s=sample, r=result: judge_pair(
+                            s, r["original_output"], r["enhanced_output"], cfg, judge_key, judge_model=second_model
+                        ),
+                        cfg, "第二裁判",
+                    )
+            except JudgeError as exc:
+                result["judge2"] = None
+                print(f"  [第二裁判] {sample['id']} × {tid} 失败：{exc}")
+            if result.get("judge2") is not None:
+                result["agreement"] = judge_agreement(result["judge"], result["judge2"])
+    except JudgeError as exc:
+        result["judge"] = None
+        print(f"  [裁判] {sample['id']} × {tid} 失败：{exc}")
+    if control_group:
+        for ckey, a_out, b_out in (
+            ("judge_control", result.get("padded_output"), result.get("enhanced_output")),
+            ("judge_padded_vs_orig", result.get("padded_output"), result.get("original_output")),
+        ):
+            if not a_out or not b_out:
+                continue
+            try:
+                if offline:
+                    result[ckey] = judge_offline(sample, a_out, b_out, cfg, "")
+                else:
+                    result[ckey] = run_with_budget(
+                        lambda s=sample, a=a_out, b=b_out: judge_pair(s, a, b, cfg, judge_key),
+                        cfg, "控制组裁判",
+                    )
+            except JudgeError as exc:
+                result[ckey] = None
+                print(f"  [控制组裁判] {sample['id']} × {tid} 失败：{exc}")
+    return 1 if result.get("judge") is not None else 0
 
 
 # ---- 离线确定性实现（--offline，用于无网络自测）----
@@ -108,9 +253,17 @@ def main() -> int:
         print("[模式] 离线自测模式：全部目标使用 mock，增强与裁判使用确定性实现")
         for tcfg in cfg.setdefault("targets", {}).values():
             tcfg["mode"] = "mock"
-    control_group = args.control_group
+    control_group = resolve_control_group(cfg, args.no_control_group)
     if control_group:
-        print("[模式] 长度控制组：启用（额外推理 padded 变体，与增强对照裁判）")
+        print("[模式] A/B/C 三组对照：启用（原始 A / 填充 B / 增强 C，主比较 C-B，辅助 B-A）")
+    else:
+        print("[模式] 长度控制组：已禁用（--no-control-group）")
+    repeats = args.repeats if args.repeats is not None else int(cfg.get("run", {}).get("repeats", 1))
+    if repeats < 1:
+        print("[错误] --repeats 必须 ≥ 1")
+        return 1
+    if repeats > 1:
+        print(f"[模式] 重复实验：每个(样本×目标×变体)重复 {repeats} 次")
 
     regression_mode = args.regression
     samples_path = args.samples or cfg.get("samples")
@@ -242,51 +395,82 @@ def main() -> int:
                 variants = ["original", "enhanced"]
                 if control_group and sample["enhanced_text"]:
                     variants.append("padded")
-                for variant in variants:
-                    key = f"infer_{sample['id']}_{tid}_{variant}"
-                    cached = load_cache("infer", sample["id"], tid, variant, persona=sample.get("persona") or "") if args.skip_infer else None
-                    if cached is not None:
-                        result[f"{variant}_output"] = cached["output"]
-                        result[f"{variant}_error"] = cached.get("error")
-                        continue
-                    if variant == "original":
-                        prompt = sample["original"]
-                    elif variant == "enhanced":
-                        prompt = sample["enhanced_text"]
-                    else:
-                        prompt = pad_to_length(sample["original"], len(sample["enhanced_text"]))
-                    if not prompt:
-                        result[f"{variant}_error"] = "无提示词（增强失败）"
-                        continue
-                    if login_failed:
-                        result[f"{variant}_error"] = "目标站点登录失败，已跳过"
-                        continue
-                    temp = sample.get("temperature")
-                    if temp is None:
-                        temp = cfg.get("scenario_temperatures", {}).get(sample.get("scenario", ""))
-                    try:
-                        output = adapter.infer(prompt, temperature=temp)
-                        result[f"{variant}_output"] = output
-                        save_cache("infer", sample["id"], tid, variant, {"output": output}, persona=sample.get("persona") or "")
-                        print(f"  [{sample['id']}][{variant}] 完成（{len(output)} 字符）")
-                    except targets.LoginRequired as exc:
-                        login_failed = True
-                        result[f"{variant}_error"] = f"登录失败：{exc}"
-                        print(f"  [{sample['id']}][{variant}] {exc}")
-                    except targets.RateLimited as exc:
-                        wait = float(cfg["run"].get("retry_seconds", 60))
-                        print(f"  [{sample['id']}][{variant}] 限流，等待 {wait:.0f}s 后重试一次")
-                        time.sleep(wait)
+                rep_store: list[dict[str, Any]] = []
+                for rep in range(repeats):
+                    suffix = _rep_key(repeats, rep)
+                    rep_out: dict[str, Any] = result if repeats <= 1 else {"rep": rep}
+                    for variant in variants:
+                        cache_variant = variant + suffix
+                        cached = load_cache("infer", sample["id"], tid, cache_variant,
+                                            persona=sample.get("persona") or "") if args.skip_infer else None
+                        if cached is not None:
+                            rep_out[f"{variant}_output"] = cached.get("output", "")
+                            rep_out[f"{variant}_error"] = cached.get("error")
+                            rep_out[f"{variant}_latency_s"] = cached.get("latency_s")
+                            rep_out[f"{variant}_est_tokens"] = cached.get("est_tokens")
+                            rep_out[f"{variant}_model"] = cached.get("model") or tid
+                            continue
+                        if variant == "original":
+                            prompt = sample["original"]
+                        elif variant == "enhanced":
+                            prompt = sample["enhanced_text"]
+                        else:
+                            prompt = pad_to_length(sample["original"], len(sample["enhanced_text"]))
+                        if not prompt:
+                            rep_out[f"{variant}_error"] = "无提示词（增强失败）"
+                            continue
+                        if login_failed:
+                            rep_out[f"{variant}_error"] = "目标站点登录失败，已跳过"
+                            continue
+                        temp = sample.get("temperature")
+                        if temp is None:
+                            temp = cfg.get("scenario_temperatures", {}).get(sample.get("scenario", ""))
                         try:
+                            start = time.perf_counter()
                             output = adapter.infer(prompt, temperature=temp)
-                            result[f"{variant}_output"] = output
-                            save_cache("infer", sample["id"], tid, variant, {"output": output}, persona=sample.get("persona") or "")
-                        except targets.TargetError as retry_exc:
-                            result[f"{variant}_error"] = f"重试仍失败：{retry_exc}"
-                    except targets.TargetError as exc:
-                        result[f"{variant}_error"] = str(exc)
-                        print(f"  [{sample['id']}][{variant}] 失败：{exc}")
-                    time.sleep(float(cfg["run"].get("delay_between", 2)))
+                            latency_s = time.perf_counter() - start
+                            est_tokens = math.ceil(len(output) / 1.8)
+                            rep_out[f"{variant}_output"] = output
+                            rep_out[f"{variant}_latency_s"] = latency_s
+                            rep_out[f"{variant}_est_tokens"] = est_tokens
+                            rep_out[f"{variant}_model"] = tid
+                            save_cache("infer", sample["id"], tid, cache_variant,
+                                       {"output": output, "latency_s": latency_s,
+                                        "est_tokens": est_tokens, "model": tid, "error": None},
+                                       persona=sample.get("persona") or "")
+                            print(f"  [{sample['id']}][{variant}{suffix}] 完成（{len(output)} 字符）")
+                        except targets.LoginRequired as exc:
+                            login_failed = True
+                            rep_out[f"{variant}_error"] = f"登录失败：{exc}"
+                            print(f"  [{sample['id']}][{variant}] {exc}")
+                        except targets.RateLimited as exc:
+                            wait = float(cfg["run"].get("retry_seconds", 60))
+                            print(f"  [{sample['id']}][{variant}] 限流，等待 {wait:.0f}s 后重试一次")
+                            time.sleep(wait)
+                            try:
+                                start = time.perf_counter()
+                                output = adapter.infer(prompt, temperature=temp)
+                                latency_s = time.perf_counter() - start
+                                est_tokens = math.ceil(len(output) / 1.8)
+                                rep_out[f"{variant}_output"] = output
+                                rep_out[f"{variant}_latency_s"] = latency_s
+                                rep_out[f"{variant}_est_tokens"] = est_tokens
+                                rep_out[f"{variant}_model"] = tid
+                                save_cache("infer", sample["id"], tid, cache_variant,
+                                           {"output": output, "latency_s": latency_s,
+                                            "est_tokens": est_tokens, "model": tid, "error": None},
+                                           persona=sample.get("persona") or "")
+                            except targets.TargetError as retry_exc:
+                                rep_out[f"{variant}_error"] = f"重试仍失败：{retry_exc}"
+                        except targets.TargetError as exc:
+                            rep_out[f"{variant}_error"] = str(exc)
+                            print(f"  [{sample['id']}][{variant}] 失败：{exc}")
+                        time.sleep(float(cfg["run"].get("delay_between", 2)))
+                    if repeats > 1:
+                        rep_store.append(rep_out)
+                if repeats > 1:
+                    result["reps"] = rep_store
+                    result.update(_aggregate_rep_outputs(rep_store, variants, tid))
                 if result.get("original_error") and result.get("enhanced_error"):
                     result["judge"] = None
             adapter.close()
@@ -301,58 +485,34 @@ def main() -> int:
     second_model = jcfg.get("second_model", "")
     for sample in samples:
         for tid, result in (sample.get("results") or {}).items():
-            if result.get("judge") is not None:
-                judged += 1
-                continue
-            if result.get("original_error") or result.get("enhanced_error") \
-               or not result.get("original_output") or not result.get("enhanced_output"):
-                continue
-            try:
-                if offline:
-                    result["judge"] = judge_offline(sample, result["original_output"], result["enhanced_output"], cfg, "")
-                else:
-                    result["judge"] = run_with_budget(
-                        lambda s=sample, r=result: judge_pair(s, r["original_output"], r["enhanced_output"], cfg, judge_key),
-                        cfg, "裁判",
-                    )
-                judged += 1
-                if cross_check:
-                    try:
-                        if offline:
-                            result["judge2"] = judge_offline(sample, result["original_output"], result["enhanced_output"], cfg, "")
-                        else:
-                            result["judge2"] = run_with_budget(
-                                lambda s=sample, r=result: judge_pair(
-                                    s, r["original_output"], r["enhanced_output"], cfg, judge_key, judge_model=second_model
-                                ),
-                                cfg, "第二裁判",
-                            )
-                    except JudgeError as exc:
-                        result["judge2"] = None
-                        print(f"  [第二裁判] {sample['id']} × {tid} 失败：{exc}")
-                    if result.get("judge2") is not None:
-                        result["agreement"] = judge_agreement(result["judge"], result["judge2"])
-            except JudgeError as exc:
-                result["judge"] = None
-                print(f"  [裁判] {sample['id']} × {tid} 失败：{exc}")
-            if control_group:
-                for ckey, a_out, b_out in (
-                    ("judge_control", result.get("padded_output"), result.get("enhanced_output")),
-                    ("judge_padded_vs_orig", result.get("padded_output"), result.get("original_output")),
-                ):
-                    if not a_out or not b_out:
+            reps = result.get("reps")
+            if reps is not None:
+                # 多 rep：逐 rep 裁判（可缓存）→ 均值/多数聚合到 result 顶层
+                for rep in reps:
+                    suffix = _rep_key(repeats, rep.get("rep", 0))
+                    cached = load_cache("judge", sample["id"], tid, suffix,
+                                        persona=sample.get("persona") or "") if args.skip_judge else None
+                    if cached is not None:
+                        for key in ("judge", "judge2", "judge_control", "judge_padded_vs_orig"):
+                            rep[key] = cached.get(key)
                         continue
-                    try:
-                        if offline:
-                            result[ckey] = judge_offline(sample, a_out, b_out, cfg, "")
-                        else:
-                            result[ckey] = run_with_budget(
-                                lambda s=sample, a=a_out, b=b_out: judge_pair(s, a, b, cfg, judge_key),
-                                cfg, "控制组裁判",
-                            )
-                    except JudgeError as exc:
-                        result[ckey] = None
-                        print(f"  [控制组裁判] {sample['id']} × {tid} 失败：{exc}")
+                    _judge_variants(sample, tid, rep, cfg, judge_key, offline,
+                                    cross_check, second_model, control_group)
+                    save_cache("judge", sample["id"], tid, suffix,
+                               {key: rep.get(key) for key in
+                                ("judge", "judge2", "judge_control", "judge_padded_vs_orig")},
+                               persona=sample.get("persona") or "")
+                result["judge"] = aggregate_judges([r.get("judge") for r in reps])
+                result["judge_control"] = aggregate_judges([r.get("judge_control") for r in reps])
+                result["judge_padded_vs_orig"] = aggregate_judges([r.get("judge_padded_vs_orig") for r in reps])
+                if result["judge"] is not None:
+                    judged += 1
+                agg2 = aggregate_judges([r.get("judge2") for r in reps])
+                if agg2 is not None and result.get("judge") is not None:
+                    result["agreement"] = judge_agreement(result["judge"], agg2)
+            else:
+                judged += _judge_variants(sample, tid, result, cfg, judge_key, offline,
+                                          cross_check, second_model, control_group)
 
     # 阶段四：报告
     meta = {
@@ -363,7 +523,9 @@ def main() -> int:
         "estimated_cost": round(_total_cost(samples), 4),
         "offline": offline,
         "control_group": control_group,
+        "repeats": repeats,
         "regression_mode": regression_mode,
+        "human_review_count": int(getattr(args, "human_review_count", 0) or 0),
     }
     payload = {"meta": meta, "samples": samples}
     out_dir = report_mod.timestamp_dir(RESULTS_ROOT)
@@ -680,16 +842,21 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--samples", default=None, help="样本 YAML 路径")
     parser.add_argument("--regression", action="store_true",
                         help="回归测试模式：使用 samples_regression.yaml，统计回归失败率/变差率")
+    parser.add_argument("--human-review-count", type=int, default=0,
+                        help="人工校准样本数（review_export 导出的有效比较数），用于结论门槛判定")
     parser.add_argument("--target", action="extend", nargs="+", help="只评测指定 target，可写多个：--target doubao qwen")
     parser.add_argument("--personas", action="extend", nargs="+", help="按用户画像展开样本：--personas novice student office")
     parser.add_argument("--login", action="store_true", help="打开浏览器手动登录各网页站点后退出")
     parser.add_argument("--skip-enhance", action="store_true", help="复用缓存的增强结果")
     parser.add_argument("--skip-infer", action="store_true", help="复用缓存的目标回答")
+    parser.add_argument("--skip-judge", action="store_true", help="复用缓存的裁判结果")
     parser.add_argument("--skip-prompt-judge", action="store_true", help="跳过增强质量(prompt 级)裁判")
     parser.add_argument("--max-cost", type=float, default=None, help="覆盖 max_cost_usd 预算")
     parser.add_argument("--offline", action="store_true", help="离线自测模式（mock 目标 + 确定性裁判）")
-    parser.add_argument("--control-group", action="store_true",
-                        help="启用长度控制组：额外推理填充长度版本的提示词，并对照裁判（增强 vs 填充、填充 vs 原始）")
+    parser.add_argument("--no-control-group", dest="no_control_group", action="store_true",
+                        help="禁用长度控制组（默认开启 A/B/C 三组对照）")
+    parser.add_argument("--repeats", type=int, default=None,
+                        help="每个(样本×目标×变体)重复 N 次（默认取 config run.repeats，缺省 1）")
     parser.add_argument("--manual", action="store_true",
                         help="只生成人工评测清单（原始+增强提示词），供手动复制粘贴，不联网抓取")
     parser.add_argument("--manual-answers", default=None,

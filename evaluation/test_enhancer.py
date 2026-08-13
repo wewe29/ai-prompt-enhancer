@@ -127,14 +127,36 @@ def test_validate_result_ok():
     enhancer.validate_result(result)  # 不应抛错
 
 
-def test_validate_result_suggestions_must_be_5():
-    result = {"primary_prompt": "p", "suggestions": [{"id": "s1"}], "questions": []}
+def test_validate_result_suggestions_0_to_5():
+    for count in range(0, 6):
+        result = {"primary_prompt": "p", "suggestions": [{"id": f"s{i}"} for i in range(count)], "questions": []}
+        enhancer.validate_result(result)  # 0-5 条均不应抛错
+
+    result = {"primary_prompt": "p", "suggestions": [{"id": f"s{i}"} for i in range(6)], "questions": []}
     try:
         enhancer.validate_result(result)
     except ValueError as exc:
-        assert "恰好 5 个" in str(exc)
+        assert "超过 5 条" in str(exc)
     else:
         raise AssertionError("应当抛出异常")
+
+
+def test_normalize_result_derives_enhancement_level_and_delivery_status():
+    ready = enhancer.normalize_result({"primary_prompt": "p"})
+    assert ready["enhancement_level"] == "light"
+    assert ready["delivery_status"] == "complete"
+    assert ready["status"] == "ready"
+
+    clarifying = enhancer.normalize_result(
+        {"primary_prompt": "p", "status": "needs_clarification"}
+    )
+    assert clarifying["enhancement_level"] == "clarify"
+
+    preserved = enhancer.normalize_result(
+        {"primary_prompt": "p", "enhancement_level": "none", "delivery_status": "partial"}
+    )
+    assert preserved["enhancement_level"] == "none"
+    assert preserved["delivery_status"] == "partial"
 
 
 def test_validate_result_placeholder():

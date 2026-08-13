@@ -15,13 +15,14 @@ from typing import Any
 import openai
 
 # ---- 与 provider.rs 一致的关键常量 ----
-SYSTEM_PROMPT_VERSION = "promptcraft-v2.0.0"
+SYSTEM_PROMPT_VERSION = "promptcraft-v2.1.0"
 
 # 注意：Rust 源码中 r#"... "# 的原始字符串以换行开头、以换行结尾，这里保持完全一致。
 SYSTEM_PROMPT = """
 你是 PromptCraft 的提示词增强引擎。你把用户需求改写得更可执行，而不是扩写内容。
 
 工作方式（一轮内完成，不额外调用）：
+0. 先判断增强等级（enhancement_level）：none=基本保留原文、light=轻度增强、clarify=需要澄清。
 1. 先识别任务类型（task_type）：code=代码、creative=创意创作、writing=写作、qa=问答解释、data=数据分析、translation=翻译、other=其他。
 2. 按任务类型选择增强重点，遵守最小干预原则：只补充真正影响结果的信息，尽量保留原文的句式、用词和风格。
 3. 最后只输出一个 JSON 对象。
@@ -34,6 +35,11 @@ SYSTEM_PROMPT = """
 - data：明确数据口径、输出指标、解读要求。
 - translation：明确译文风格、专有名词保留原名、不增删意思。
 - other：只补充目标、受众、约束、输出格式中最影响结果的 1-3 项。
+
+增强等级（enhancement_level）：
+- none：目标明确、关键输入或上下文已给出、交付物明确、任务不依赖缺失信息时使用。primary_prompt 基本保留原文，changes 可为空；不为了凑格式而增加无关要求；可以给 0-5 条可选建议。
+- light：只缺 1-3 个能明显改善结果的要素（如受众、篇幅、输出格式、验收标准）时使用。只补必要内容，优先局部改写、不重写整段，不重复原文已经写明的约束。
+- clarify：缺失信息会让正确答案发生实质变化时使用（如“这是什么意思”但没有对象、“帮我改代码”但没有代码或错误、“写个方案”但没有主题或目标；要查询数字、课程、事件但没有可靠来源且目标模型不联网核验）。最多 3 个问题，同时给出基于明确假设的临时主提示词，不使用 XXX、待补充 等裸占位符。
 
 增强规则：
 1. 保留用户核心意图；需求表达不合理时可以重构目标，但不能改变真实目的。
@@ -52,12 +58,13 @@ before："帮我看看这段代码为什么内存一直涨，修复一下"
 after："分析这段代码内存持续增长的原因，给出修复方案和修改后的完整代码"
 reason："明确交付物（原因+方案+完整代码），避免目标模型只给建议不给代码"
 
-suggestions 必须恰好 5 条、互不重复、可实际应用，覆盖 goal、context、format、constraint、alternate_intent 五种类型；每条 content 是一句可直接粘贴进主提示词的文字。
+suggestions 可以给 0-5 条互不重复、可实际应用的可选建议（none 等级允许 0 条），覆盖 goal、context、format、constraint、alternate_intent 五种类型；每条 content 是一句可直接粘贴进主提示词的文字。
 
 JSON 字段必须为（primary_prompt 放在前部，以便流式预览）：
 {
   "status":"ready 或 needs_clarification",
   "task_type":"code|creative|writing|qa|data|translation|other",
+  "enhancement_level":"none|light|clarify",
   "primary_prompt":"完整可复制的增强提示词",
   "assumptions":[{"id":"a1","text":"假设","confirmed":false}],
   "questions":[{"id":"q1","text":"问题","why_needed":"为什么影响结果"}],
@@ -169,8 +176,8 @@ def validate_result(result: dict[str, Any]) -> None:
     if not str(result.get("primary_prompt") or "").strip():
         raise ValueError("模型没有生成主提示词")
     suggestions = result.get("suggestions") or []
-    if len(suggestions) != 5:
-        raise ValueError("模型未返回恰好 5 个可选建议，请重新生成")
+    if len(suggestions) > 5:
+        raise ValueError("模型返回了超过 5 条可选建议，请重新生成")
     questions = result.get("questions") or []
     if len(questions) > 3:
         raise ValueError("模型返回了超过 3 个澄清问题，请重新生成")
@@ -182,11 +189,16 @@ def validate_result(result: dict[str, Any]) -> None:
 
 
 def normalize_result(result: dict[str, Any]) -> dict[str, Any]:
-    """补齐 Rust 端 serde 默认值：缺失的数组字段置空。"""
+    """补齐 Rust 端 serde 默认值：缺失的数组字段置空，状态类字段按 status 推导。"""
     out = dict(result)
     out.setdefault("status", "ready")
     for key in ("assumptions", "questions", "changes", "suggestions", "risk_flags"):
         out.setdefault(key, [])
+    out.setdefault(
+        "enhancement_level",
+        "clarify" if out.get("status") == "needs_clarification" else "light",
+    )
+    out.setdefault("delivery_status", "complete")
     return out
 
 

@@ -106,7 +106,32 @@ def _write_raw_files(raw_dir: Path, data: dict[str, Any]) -> None:
             json.dumps(enhanced, ensure_ascii=False, indent=2), encoding="utf-8"
         )
         for target_id, result in (sample.get("results") or {}).items():
-            for variant in ("original", "enhanced"):
+            variants = ("original", "enhanced", "padded")
+            reps = result.get("reps")
+            if reps:
+                for rep in reps:
+                    rep_no = rep.get("rep", 0)
+                    for variant in variants:
+                        if f"{variant}_output" not in rep and f"{variant}_error" not in rep:
+                            continue
+                        payload = {
+                            "sample_id": sample_id,
+                            "target": target_id,
+                            "variant": variant,
+                            "rep": rep_no,
+                            "prompt": sample.get("original" if variant == "original" else "enhanced_text", ""),
+                            "output": rep.get(f"{variant}_output", ""),
+                            "error": rep.get(f"{variant}_error"),
+                            "latency_s": rep.get(f"{variant}_latency_s"),
+                            "est_tokens": rep.get(f"{variant}_est_tokens"),
+                            "model": rep.get(f"{variant}_model") or target_id,
+                        }
+                        (raw_dir / f"{sample_id}{persona_seg}_{target_id}_{variant}_rep{rep_no}.json").write_text(
+                            json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+                        )
+            for variant in variants:
+                if f"{variant}_output" not in result and f"{variant}_error" not in result:
+                    continue
                 payload = {
                     "sample_id": sample_id,
                     "target": target_id,
@@ -114,6 +139,9 @@ def _write_raw_files(raw_dir: Path, data: dict[str, Any]) -> None:
                     "prompt": sample.get("original" if variant == "original" else "enhanced_text", ""),
                     "output": result.get(f"{variant}_output", ""),
                     "error": result.get(f"{variant}_error"),
+                    "latency_s": result.get(f"{variant}_latency_s"),
+                    "est_tokens": result.get(f"{variant}_est_tokens"),
+                    "model": result.get(f"{variant}_model") or target_id,
                 }
                 (raw_dir / f"{sample_id}{persona_seg}_{target_id}_{variant}.json").write_text(
                     json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
@@ -143,6 +171,11 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
     ctrl_enh_vs_padded: dict[str, dict[str, list[float]]] = {}
     ctrl_padded_vs_orig: dict[str, dict[str, list[float]]] = {}
     ctrl_ratios: list[float] = []
+    by_ambiguity: dict[str, dict[str, Any]] = {}
+    ctrl_cmb: dict[str, list[float]] = {d: [] for d in DIMENSIONS}
+    ctrl_bma: dict[str, list[float]] = {d: [] for d in DIMENSIONS}
+    amb_ctrl_cmb: dict[str, dict[str, list[float]]] = {}
+    amb_ctrl_bma: dict[str, dict[str, list[float]]] = {}
 
     delivery_counts: dict[str, int] = {"complete": 0, "partial": 0, "fallback": 0, "hard_failure": 0}
     delivery_total = 0
@@ -183,11 +216,15 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
                 for dim in DIMENSIONS:
                     if dim in jc_deltas:
                         ctrl_enh_vs_padded.setdefault(scenario, {}).setdefault(dim, []).append(jc_deltas[dim])
+                        ctrl_cmb[dim].append(jc_deltas[dim])
+                        amb_ctrl_cmb.setdefault(sample.get("ambiguity_level", "unknown"), {}).setdefault(dim, []).append(jc_deltas[dim])
             if jpv:
                 jpv_deltas = jpv.get("deltas", {})
                 for dim in DIMENSIONS:
                     if dim in jpv_deltas:
                         ctrl_padded_vs_orig.setdefault(scenario, {}).setdefault(dim, []).append(jpv_deltas[dim])
+                        ctrl_bma[dim].append(jpv_deltas[dim])
+                        amb_ctrl_bma.setdefault(sample.get("ambiguity_level", "unknown"), {}).setdefault(dim, []).append(jpv_deltas[dim])
             if (jc or jpv) and orig_text:
                 ctrl_ratios.append(len(enh_text) / len(orig_text))
             if any(v >= IMPROVE_THRESHOLD for v in deltas.values()):
@@ -202,6 +239,15 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
                 by_magnitude["improve"][magnitude] += 1
             elif winner == "original":
                 by_magnitude["regress"][magnitude] += 1
+
+            amb = sample.get("ambiguity_level", "unknown")
+            amb_entry = by_ambiguity.setdefault(amb, {"n": 0, "wins": 0, "ties": 0, "losses": 0, "dims": {d: [] for d in DIMENSIONS}})
+            amb_entry["n"] += 1
+            amb_entry["wins"] += winner == "enhanced"
+            amb_entry["losses"] += winner == "original"
+            amb_entry["ties"] += winner == "tie"
+            for dim, val in deltas.items():
+                amb_entry["dims"].setdefault(dim, []).append(val)
             for dim in DIMENSIONS:
                 if dim not in deltas:
                     continue
@@ -286,6 +332,53 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
         "pad_ratio": round(sum(ctrl_ratios) / len(ctrl_ratios), 2) if ctrl_ratios else 0.0,
     }
 
+    def dim_mean_map(series: dict[str, list[float]]) -> dict[str, dict[str, float]]:
+        return {d: stat(vals) for d, vals in series.items() if vals}
+
+    control: dict[str, Any] = {}
+    if ctrl_cmb or ctrl_bma:
+        control = {
+            "c_minus_b": dim_mean_map(ctrl_cmb),
+            "b_minus_a": dim_mean_map(ctrl_bma),
+            "by_ambiguity": {
+                lvl: {"c_minus_b": dim_mean_map(amb_ctrl_cmb.get(lvl, {})),
+                      "b_minus_a": dim_mean_map(amb_ctrl_bma.get(lvl, {}))}
+                for lvl in set(amb_ctrl_cmb) | set(amb_ctrl_bma)
+            },
+        }
+
+    by_ambiguity_out: dict[str, Any] = {}
+    for lvl, entry in by_ambiguity.items():
+        by_ambiguity_out[lvl] = {
+            "n": entry["n"], "wins": entry["wins"], "ties": entry["ties"], "losses": entry["losses"],
+            "dims": {d: stat(vals) for d, vals in entry["dims"].items() if vals},
+        }
+
+    # ---- v0.3.0 结论门槛（规格 §6.6）----
+    gate_reasons: list[str] = []
+    eff_rate = summary.get("delivery_rate", 0.0)
+    if eff_rate < 0.90:
+        gate_reasons.append(f"有效样本率 {eff_rate:.0%} 低于 90%")
+    major_scenarios = ("编程", "办公写作", "问答", "数据分析", "翻译", "创意")
+    scenario_ns = {
+        sc: (len(next(iter(dims.values()), [])) if dims else 0)
+        for sc, dims in by_scenario.items()
+    }
+    present_min = min((n for sc, n in scenario_ns.items() if sc in major_scenarios), default=None)
+    if present_min is not None and present_min < 8:
+        gate_reasons.append(f"主要场景最少有效样本 {present_min} 低于 8")
+    elif present_min is None and total > 0:
+        gate_reasons.append("未匹配到主要场景，无法判定样本充足性")
+    agreement = summary.get("judge_agreement", {}).get("winner_agreement")
+    if agreement is None:
+        gate_reasons.append("缺少双裁判一致率")
+    elif agreement < 0.70:
+        gate_reasons.append(f"双裁判一致率 {agreement:.0%} 低于 70%")
+    human_count = int((data.get("meta") or {}).get("human_review_count") or 0)
+    if total > 0 and human_count < 0.2 * total:
+        gate_reasons.append(f"人工校准样本 {human_count} 不足有效比较的 20%（{int(0.2 * total)}）")
+    summary["gate"] = {"pass": not gate_reasons, "reasons": gate_reasons}
+
     return {
         "dimensions": {dim: stat(by_dim[dim]) for dim in DIMENSIONS},
         "by_target": {tid: {dim: stat(vals) for dim, vals in dims.items()} for tid, dims in by_target.items()},
@@ -294,6 +387,8 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
         "by_prompt_judge": {sc: {dim: stat(vals) for dim, vals in dims.items()} for sc, dims in by_prompt_judge.items()},
         "by_magnitude": by_magnitude,
         "by_control": by_control,
+        "by_ambiguity": by_ambiguity_out,
+        "control": control,
         "cost": cost,
         "summary": summary,
     }
@@ -321,6 +416,10 @@ def _render_markdown(data: dict[str, Any]) -> str:
 
     lines.append("## 一、整体结论\n")
     summary = agg["summary"]
+    gate = summary.get("gate") or {}
+    if gate and not gate.get("pass"):
+        reasons = "；".join(gate.get("reasons", []))
+        lines.append(f"> ⚠️ **本轮结果不可用于产品结论**：{reasons}\n")
     lines.append(f"- 有效对比样本：**{summary['total']}** 组")
     lines.append(f"- 增强后更优（任一维度 +{IMPROVE_THRESHOLD} 分）：**{summary['improved']}** 组（{summary['improved_pct']}%）")
     win_line = f"- 胜负关系：胜（增强更优）**{summary['wins']}** / 平 **{summary['ties']}** / 负（原始更优）**{summary['losses']}**"
@@ -399,6 +498,36 @@ def _render_markdown(data: dict[str, Any]) -> str:
             row = [_delta_cell(dims[d]) for d in DIMENSION_ORDER]
             lines.append(f"| {scenario} | " + " | ".join(row) + " |")
         lines.append("")
+
+    if agg["by_ambiguity"]:
+        lines.append("### 按模糊等级分项\n")
+        lines.append("| 模糊等级 | 胜/平/负 | " + " | ".join(DIMENSION_LABELS[d] for d in DIMENSION_ORDER) + " | n |")
+        lines.append("|---|---|---" + "|---|" * len(DIMENSION_ORDER))
+        for lvl in ("clear", "medium", "severe"):
+            entry = agg["by_ambiguity"].get(lvl)
+            if not entry:
+                continue
+            row = [_delta_cell(entry["dims"].get(d, {})) for d in DIMENSION_ORDER]
+            lines.append(
+                f"| {lvl} | {entry['wins']}/{entry['ties']}/{entry['losses']} | "
+                + " | ".join(row) + f" | {entry['n']} |"
+            )
+        lines.append("")
+
+    ctrl = agg.get("control") or {}
+    if ctrl and (ctrl.get("c_minus_b") or ctrl.get("b_minus_a")):
+        lines.append("### 对照组（C−B 与 B−A）\n")
+        lines.append("| 维度 | C−B（增强 vs 填充） | B−A（填充 vs 原始） |")
+        lines.append("|---|---|---|")
+        for d in DIMENSION_ORDER:
+            cb = ctrl.get("c_minus_b", {}).get(d, {})
+            ba = ctrl.get("b_minus_a", {}).get(d, {})
+            cb_cell = _delta_cell(cb) if cb.get("n", 0) else "-"
+            ba_cell = _delta_cell(ba) if ba.get("n", 0) else "-"
+            lines.append(f"| {DIMENSION_LABELS[d]} | {cb_cell} | {ba_cell} |")
+        lines.append(
+            "\n> 解读：若 C−B ≈ 0 且 B−A > 0，说明增益主要来自“加字”而非有效改写。\n"
+        )
 
     if agg["by_target"]:
         lines.append("### 按目标模型分项\n")

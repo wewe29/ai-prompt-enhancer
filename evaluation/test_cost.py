@@ -23,9 +23,9 @@ def test_pad_to_length_short_text_reaches_target():
     assert 950 <= len(out) <= 1000
 
 
-def test_pad_to_length_already_longer_unchanged():
+def test_pad_to_length_already_longer_truncated():
     text = "长" * 500
-    assert run_eval_mod.pad_to_length(text, 100) == text
+    assert run_eval_mod.pad_to_length(text, 100) == "长" * 100
 
 
 def test_pad_to_length_near_target_unchanged():

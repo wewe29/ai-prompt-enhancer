@@ -69,6 +69,9 @@
 
 <h2>一、整体结论</h2>
 {% set s = agg.summary %}
+{% if s.gate is defined and not s.gate.pass %}
+<div class="banner" style="background:#5b2333;color:#ffd7e2;border:1px solid #ff7a90;padding:10px 14px;border-radius:8px;margin:10px 0;">⚠️ 本轮结果不可用于产品结论：{{ s.gate.reasons | join("；") }}</div>
+{% endif %}
 <div class="cards">
   <div class="card"><div class="num">{{ s.total }}</div><div class="lab">有效对比样本</div></div>
   <div class="card"><div class="num up">{{ s.improved }}（{{ s.improved_pct }}%）</div><div class="lab">增强后更优（任一维度 +{{ improve_threshold }} 分）</div></div>
