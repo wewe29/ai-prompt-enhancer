@@ -13,7 +13,10 @@ $releaseRoot = Join-Path $repoRoot "release"
 $portableDir = Join-Path $releaseRoot "PromptCraft-$version-windows-x64-portable"
 New-Item -ItemType Directory -Path $portableDir -Force | Out-Null
 
-Copy-Item -LiteralPath (Join-Path $repoRoot "src-tauri\target\release\prompt-craft.exe") -Destination (Join-Path $portableDir "PromptCraft.exe") -Force
+# build-env.ps1 may redirect CARGO_TARGET_DIR (e.g. to %TEMP%), so follow the
+# actual cargo output directory rather than the hard-coded src-tauri/target.
+$promptCraftExe = Join-Path $env:CARGO_TARGET_DIR "release\prompt-craft.exe"
+Copy-Item -LiteralPath $promptCraftExe -Destination (Join-Path $portableDir "PromptCraft.exe") -Force
 
 $openSslBin = Join-Path $env:OPENSSL_DIR "bin"
 Get-ChildItem -LiteralPath $openSslBin -File | Where-Object { $_.Name -match '^lib(crypto|ssl)-.*-x64\.dll$' } | ForEach-Object {

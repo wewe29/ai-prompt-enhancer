@@ -1,6 +1,6 @@
 name: Bootstrap release
 
-# This workflow publishes the v0.1.0 GitHub Release with portable assets
+# This workflow publishes the v0.3.0 GitHub Release with portable assets
 # and lists any open Dependabot pull requests.
 #
 # Trigger: manual "Run workflow" from the Actions tab.
@@ -23,23 +23,23 @@ permissions:
 
 jobs:
   bootstrap:
-    name: Publish v0.1.0 and list Dependabot PRs
+    name: Publish v0.3.0 and list Dependabot PRs
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Publish v0.1.0 release
+      - name: Publish v0.3.0 release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.1.0
-          name: PromptCraft 0.1.0 — Initial open-source release
-          body_path: release-assets/RELEASE_NOTES-v0.1.0.md
+          tag_name: v0.3.0
+          name: PromptCraft 0.3.0 — Minimal-intervention enhancement with trustworthy evaluation
+          body_path: release-assets/RELEASE_NOTES-v0.3.0.md
           target_commitish: main
           fail_on_unmatched_files: true
           files: |
-            release/PromptCraft-0.1.0-windows-x64-portable.zip
+            release/PromptCraft-0.3.0-windows-x64-portable.zip
             release-assets/SHA256-zip.txt
             release-assets/SHA256-webview2.txt
             release-assets/README.txt
@@ -65,4 +65,4 @@ jobs:
         run: |
           echo "Bootstrap complete."
           echo "Repository : https://github.com/${GITHUB_REPOSITORY}"
-          echo "Release    : https://github.com/${GITHUB_REPOSITORY}/releases/tag/v0.1.0"
+          echo "Release    : https://github.com/${GITHUB_REPOSITORY}/releases/tag/v0.3.0"

@@ -3,6 +3,7 @@ dist/
 src-tauri/target/
 release/*
 !release/*.md
+!release/*.zip
 
 release-assets/*.exe
 .env
