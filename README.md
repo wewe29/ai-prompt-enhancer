@@ -2,6 +2,9 @@
 
 [![CI](https://github.com/wewe29/ai-prompt-enhancer/actions/workflows/ci.yml/badge.svg)](https://github.com/wewe29/ai-prompt-enhancer/actions/workflows/ci.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/wewe29/ai-prompt-enhancer)](https://github.com/wewe29/ai-prompt-enhancer/releases)
+
+> 📖 **[English version →](./README.en.md)**
 
 PromptCraft 是一款面向 Windows 10/11 的本地 AI 提示词增强器。它分析用户的原始需求和参考资料，最多进行三轮必要澄清，再通过用户自己的 API 生成可编辑的主提示词、修改说明和 0-5 条可选补充建议，并在模型返回结构异常时保留可交付结果（部分交付/原文回退）。
 
