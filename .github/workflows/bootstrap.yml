@@ -31,7 +31,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Publish v0.3.0 release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v0.3.0
           name: PromptCraft 0.3.0 — Minimal-intervention enhancement with trustworthy evaluation
