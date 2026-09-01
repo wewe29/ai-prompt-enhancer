@@ -45,7 +45,7 @@ jobs:
             release-assets/README.txt
 
       - name: List open Dependabot pull requests
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             // github-script v7: REST API methods are under github.rest.*
