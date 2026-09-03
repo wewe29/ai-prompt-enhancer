@@ -15,6 +15,7 @@
 - `build-portable.ps1`：打包前校验 `package.json` / `Cargo.toml` / `tauri.conf.json` / `Cargo.lock` 四处版本一致；校验 exe `ProductVersion`；重建前清空旧目录；打包后自动生成 `release-assets/SHA256-zip.txt`（sha256sum 格式）。
 - 新增 `scripts/smoke-portable.ps1` 便携版端到端冒烟：全新目录解压、凭据备份/恢复（Windows 凭据管理器 `deepseek-api-key.PromptCraft`）、流式生成/停止/重新生成/复制/历史恢复/API 失败保留原文/临时目录残留检查（CDP 自动化），人工核对项在结束时打印。
 - workspace sanity 阶段对 ZIP 改为 `git ls-files` 索引硬检查（原 `git status` 正则检查在 ignore 修复后恒为空，属假安全）。
+- `evaluation/requirements.txt` 全量锁定为本地 venv 验证通过的精确版本（含传递依赖）。此前 `openai>=1.40.0` 等浮动约束使 CI 每次安装最新版，上游破坏性更新导致 CI 的 "Run evaluation unit tests" 自 2026-08-14 起持续失败（本地始终通过）；另注意该文件必须保持纯 ASCII——pip 对无 BOM 文件按系统本地编码解码，中文注释在中文 Windows 上会让 `pip install -r` 直接报 GBK 解码错误。
 
 ## [0.3.0] - 2026-08-14
 

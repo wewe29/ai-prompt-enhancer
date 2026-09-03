@@ -45,6 +45,7 @@ Get-FileHash .\MicrosoftEdgeWebView2Setup.exe -Algorithm SHA256
 - **OpenSSL probing** checks a list of common install locations (verifying `include\openssl\ssl.h`) and, when nothing is found, prints every probed path plus exact `winget` / `setx` fix commands.
 - **`build-portable.ps1`** verifies version consistency across `package.json` / `Cargo.toml` / `tauri.conf.json` / `Cargo.lock`, checks the built exe's `ProductVersion`, rebuilds the staging folder from scratch, and writes `release-assets/SHA256-zip.txt` automatically.
 - **`scripts/smoke-portable.ps1`** automates an end-to-end smoke test of the portable build: fresh extraction, credential-manager backup/restore, streaming generation, stop, regenerate, clipboard copy, history save/restore, original-prompt retention on API failure, and a temp-directory residue check.
+- **`evaluation/requirements.txt` is fully pinned** (including transitive dependencies) to the versions verified in the local venv. Previously floating ranges (`openai>=1.40.0` etc.) made CI install the newest versions on every run; a breaking upstream release kept CI's evaluation-test step red since 2026-08-14 while the local venv passed.
 
 ## Features
 
