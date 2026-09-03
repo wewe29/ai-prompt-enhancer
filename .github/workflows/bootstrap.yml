@@ -1,5 +1,14 @@
 name: Bootstrap release
 
+# FROZEN — v0.3.0 only. DO NOT run this workflow for v0.3.1 or later.
+#
+# Since v0.3.1, portable ZIP archives are no longer committed to the
+# repository (they are uploaded to GitHub Releases directly via the
+# `gh` CLI from a local build). This workflow reads
+# `release/PromptCraft-0.3.0-windows-x64-portable.zip` from the checkout
+# and uses `fail_on_unmatched_files: true`, so it will fail once that
+# file is no longer tracked. Keep it for the v0.3.0 release history.
+#
 # This workflow publishes the v0.3.0 GitHub Release with portable assets
 # and lists any open Dependabot pull requests.
 #
