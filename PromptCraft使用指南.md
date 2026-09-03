@@ -1,6 +1,6 @@
 # PromptCraft 使用指南
 
-> 适用版本：PromptCraft 0.2.0 Windows 便携版  
+> 适用版本：PromptCraft 0.3.1 Windows 便携版  
 > 适用人群：第一次使用 API、不了解提示词结构的零基础用户
 
 这是作者第一次公开开源的软件项目。如果你在体验过程中发现问题、困惑或可以优化的地方，欢迎提交 GitHub Issue，也可以发送邮件至 `3986351310@qq.com`。反馈时请先删除 API Key、密码和其他敏感信息。

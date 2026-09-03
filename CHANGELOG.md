@@ -2,6 +2,20 @@
 
 本项目遵循语义化版本。发布日期使用 `YYYY-MM-DD`。
 
+## [0.3.1] - 2026-09-02
+
+### 发布稳定性
+
+- 便携 ZIP 一律不进版本库：`.gitignore` 恢复忽略 `release/*.zip`，已入库的 0.3.0 ZIP 从索引移除（本地保留，GitHub 上已发布的 v0.3.0 资产不受影响）；`bootstrap.yml` 标注为 v0.3.0 专用冻结，v0.3.1 起改为本地 `gh release create` 直接上传。
+- 测试/构建临时目录统一为扁平的 `%TEMP%\PromptCraft-*`：`PromptCraft-vite-<pid>`（进程退出即清理）、`PromptCraft-pytest-<pid>`（会话结束即清理）、`PromptCraft-cargo-target`（持久保留 Rust 增量编译缓存；改名会使下一次构建全量重编译一次）。
+- `evaluation/conftest.py`（新增）：直跑 `python -m pytest evaluation -q` 时 basetemp 重定向到 `%TEMP%\PromptCraft-pytest-<pid>` 并在会话结束清理；显式 `--basetemp` 时不干预。
+- `build-check.ps1`：新增 `-Clean` 开关一键清空全部 `PromptCraft-*` 目录；启动时清扫陈旧临时目录（vite/pytest >7 天、cargo target >30 天）；pytest basetemp 在 `finally` 中清理。
+- 错误分类：preflight 环境预检（node/npm/python/cargo/git/node_modules/OpenSSL），退出码 0=通过、1=代码错误（CODE）、2=环境错误（ENVIRONMENT）；阶段输出带 `(CODE|ENVIRONMENT)` 标注与 SUMMARY 汇总。
+- OpenSSL 探测增强：按顺序探测 `OPENSSL_DIR`、`%ProgramFiles%\OpenSSL-Win64`、`%ProgramFiles(x86)%\OpenSSL-Win64`、`%ProgramFiles%\OpenSSL`、`%LOCALAPPDATA%\Programs\OpenSSL-Win64`，以 `include\openssl\ssl.h` 判定命中；缺失时列出已探测路径、winget/setx 安装命令与 README「OpenSSL 依赖」指引。
+- `build-portable.ps1`：打包前校验 `package.json` / `Cargo.toml` / `tauri.conf.json` / `Cargo.lock` 四处版本一致；校验 exe `ProductVersion`；重建前清空旧目录；打包后自动生成 `release-assets/SHA256-zip.txt`（sha256sum 格式）。
+- 新增 `scripts/smoke-portable.ps1` 便携版端到端冒烟：全新目录解压、凭据备份/恢复（Windows 凭据管理器 `deepseek-api-key.PromptCraft`）、流式生成/停止/重新生成/复制/历史恢复/API 失败保留原文/临时目录残留检查（CDP 自动化），人工核对项在结束时打印。
+- workspace sanity 阶段对 ZIP 改为 `git ls-files` 索引硬检查（原 `git status` 正则检查在 ignore 修复后恒为空，属假安全）。
+
 ## [0.3.0] - 2026-08-14
 
 ### 增强必要性判断与最小干预
