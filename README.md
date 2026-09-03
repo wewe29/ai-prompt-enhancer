@@ -62,6 +62,17 @@ PromptCraft 是一款面向 Windows 10/11 的本地 AI 提示词增强器。它�
 - Visual Studio 2022 Build Tools 的“使用 C++ 的桌面开发”工作负载。
 - 64 位 OpenSSL 开发文件。通过 `OPENSSL_DIR` 指向安装目录；默认会检测 `%ProgramFiles%\OpenSSL-Win64`。
 
+#### OpenSSL 依赖
+
+Rust 构建需要 64 位 OpenSSL **开发文件**（`include\openssl\ssl.h` 与 `lib` 目录），只装运行库不够：
+
+```powershell
+winget install ShiningLight.OpenSSL
+setx OPENSSL_DIR "C:\Program Files\OpenSSL-Win64"
+```
+
+`setx` 之后需要重新打开终端才会生效。`scripts\build-env.ps1` 会按顺序探测 `%OPENSSL_DIR%`、`%ProgramFiles%\OpenSSL-Win64`、`%ProgramFiles(x86)%\OpenSSL-Win64`、`%ProgramFiles%\OpenSSL`、`%LOCALAPPDATA%\Programs\OpenSSL-Win64`；全部未命中时输出探测清单与上述安装命令。已有自定义安装时，把 `OPENSSL_DIR` 指向该目录即可。CI 上使用 vcpkg 的 `openssl:x64-windows`（见 `.github/workflows/ci.yml`）。
+
 ### 安装依赖
 
 ```powershell
