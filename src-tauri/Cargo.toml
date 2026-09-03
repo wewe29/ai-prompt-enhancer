@@ -43,4 +43,4 @@ uuid = { version = "1.16", features = ["v4", "serde"] }
 zip = { version = "4", default-features = false, features = ["deflate"] }
 
 [target.'cfg(windows)'.dependencies]
-windows = { version = "0.61", features = ["Win32_System_Memory"] }
+windows = { version = "0.62", features = ["Win32_System_Memory"] }
