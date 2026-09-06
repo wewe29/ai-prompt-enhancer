@@ -1,0 +1,674 @@
+[
+  {
+    "item": 1,
+    "sample_id": "v30_qa_cloud_costs",
+    "target": "plan_glm_5_2",
+    "difficulty": "medium",
+    "enhanced_label": "A",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 0.6666666666666666,
+      "completeness": 1.3333333333333333,
+      "relevance": 0.3333333333333333,
+      "clarity": 0.0
+    }
+  },
+  {
+    "item": 2,
+    "sample_id": "v30_office_annual_report",
+    "target": "plan_glm_5_2",
+    "difficulty": "medium",
+    "enhanced_label": "B",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 0.0,
+      "completeness": 0.6666666666666666,
+      "relevance": 0.0,
+      "clarity": -0.3333333333333333
+    }
+  },
+  {
+    "item": 3,
+    "sample_id": "v30_data_sql_cohort",
+    "target": "plan_doubao_pro",
+    "difficulty": "clear",
+    "enhanced_label": "B",
+    "judge_winner": "original",
+    "judge_deltas": {
+      "accuracy": -3.0,
+      "completeness": 1.6666666666666667,
+      "relevance": 0.0,
+      "clarity": 0.0
+    }
+  },
+  {
+    "item": 4,
+    "sample_id": "v30_office_write_plan",
+    "target": "plan_doubao",
+    "difficulty": "severe",
+    "enhanced_label": "A",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 0.0,
+      "completeness": 3.6666666666666665,
+      "relevance": 2.3333333333333335,
+      "clarity": 0.3333333333333333
+    }
+  },
+  {
+    "item": 5,
+    "sample_id": "v30_creative_wechat_post",
+    "target": "plan_doubao_pro",
+    "difficulty": "medium",
+    "enhanced_label": "B",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 2.3333333333333335,
+      "completeness": 1.0,
+      "relevance": 1.0,
+      "clarity": 1.0
+    }
+  },
+  {
+    "item": 6,
+    "sample_id": "v30_office_followup_email",
+    "target": "plan_glm",
+    "difficulty": "medium",
+    "enhanced_label": "A",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 0.6666666666666666,
+      "completeness": 1.0,
+      "relevance": 0.3333333333333333,
+      "clarity": 0.6666666666666666
+    }
+  },
+  {
+    "item": 7,
+    "sample_id": "v30_code_decorator_retry",
+    "target": "plan_doubao",
+    "difficulty": "clear",
+    "enhanced_label": "B",
+    "judge_winner": "original",
+    "judge_deltas": {
+      "accuracy": -0.3333333333333333,
+      "completeness": 0.3333333333333333,
+      "relevance": -0.6666666666666666,
+      "clarity": -2.0
+    }
+  },
+  {
+    "item": 8,
+    "sample_id": "v30_creative_story_opening",
+    "target": "plan_doubao",
+    "difficulty": "clear",
+    "enhanced_label": "A",
+    "judge_winner": "original",
+    "judge_deltas": {
+      "accuracy": 0.0,
+      "completeness": 0.0,
+      "relevance": 0.0,
+      "clarity": 0.6666666666666666
+    }
+  },
+  {
+    "item": 9,
+    "sample_id": "v30_sql_order_query",
+    "target": "plan_doubao_pro",
+    "difficulty": "clear",
+    "enhanced_label": "A",
+    "judge_winner": "tie",
+    "judge_deltas": {
+      "accuracy": 0.0,
+      "completeness": 0.0,
+      "relevance": 0.0,
+      "clarity": -0.6666666666666666
+    }
+  },
+  {
+    "item": 10,
+    "sample_id": "v30_js_promise_race",
+    "target": "plan_doubao",
+    "difficulty": "clear",
+    "enhanced_label": "A",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 0.6666666666666666,
+      "completeness": 1.0,
+      "relevance": 0.3333333333333333,
+      "clarity": 0.0
+    }
+  },
+  {
+    "item": 11,
+    "sample_id": "v30_qa_cloud_costs",
+    "target": "plan_glm",
+    "difficulty": "medium",
+    "enhanced_label": "B",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 0.0,
+      "completeness": -0.6666666666666666,
+      "relevance": -1.0,
+      "clarity": -0.6666666666666666
+    }
+  },
+  {
+    "item": 12,
+    "sample_id": "v30_code_refactor_goal",
+    "target": "plan_doubao",
+    "difficulty": "severe",
+    "enhanced_label": "A",
+    "judge_winner": "original",
+    "judge_deltas": {
+      "accuracy": -0.6666666666666666,
+      "completeness": -1.3333333333333333,
+      "relevance": -0.6666666666666666,
+      "clarity": -0.6666666666666666
+    }
+  },
+  {
+    "item": 13,
+    "sample_id": "v30_data_retention_analysis",
+    "target": "plan_glm_5_2",
+    "difficulty": "clear",
+    "enhanced_label": "B",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 0.6666666666666666,
+      "completeness": 1.0,
+      "relevance": 0.0,
+      "clarity": 0.6666666666666666
+    }
+  },
+  {
+    "item": 14,
+    "sample_id": "v30_data_analyze_excel",
+    "target": "plan_doubao_pro",
+    "difficulty": "severe",
+    "enhanced_label": "B",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 0.0,
+      "completeness": -0.3333333333333333,
+      "relevance": 0.3333333333333333,
+      "clarity": 0.6666666666666666
+    }
+  },
+  {
+    "item": 15,
+    "sample_id": "v30_translate_ui_strings",
+    "target": "plan_doubao_pro",
+    "difficulty": "medium",
+    "enhanced_label": "A",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 0.0,
+      "completeness": 0.3333333333333333,
+      "relevance": 2.0,
+      "clarity": 1.6666666666666667
+    }
+  },
+  {
+    "item": 16,
+    "sample_id": "v30_office_announcement",
+    "target": "plan_glm_5_2",
+    "difficulty": "severe",
+    "enhanced_label": "A",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 0.6666666666666666,
+      "completeness": 3.6666666666666665,
+      "relevance": 3.3333333333333335,
+      "clarity": 1.0
+    }
+  },
+  {
+    "item": 17,
+    "sample_id": "v30_code_error_log",
+    "target": "plan_doubao",
+    "difficulty": "medium",
+    "enhanced_label": "B",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 0.6666666666666666,
+      "completeness": 0.6666666666666666,
+      "relevance": 0.6666666666666666,
+      "clarity": 0.3333333333333333
+    }
+  },
+  {
+    "item": 18,
+    "sample_id": "v30_code_algorithm_optimize",
+    "target": "plan_doubao_pro",
+    "difficulty": "medium",
+    "enhanced_label": "B",
+    "judge_winner": "tie",
+    "judge_deltas": {
+      "accuracy": 0.3333333333333333,
+      "completeness": 0.3333333333333333,
+      "relevance": 0.0,
+      "clarity": 0.0
+    }
+  },
+  {
+    "item": 19,
+    "sample_id": "v30_code_decorator_retry",
+    "target": "plan_glm",
+    "difficulty": "clear",
+    "enhanced_label": "A",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 0.0,
+      "completeness": 0.3333333333333333,
+      "relevance": 0.0,
+      "clarity": 0.3333333333333333
+    }
+  },
+  {
+    "item": 20,
+    "sample_id": "v30_creative_story_opening",
+    "target": "plan_glm_5_2",
+    "difficulty": "clear",
+    "enhanced_label": "A",
+    "judge_winner": "original",
+    "judge_deltas": {
+      "accuracy": 0.0,
+      "completeness": 0.0,
+      "relevance": -0.6666666666666666,
+      "clarity": -0.6666666666666666
+    }
+  },
+  {
+    "item": 21,
+    "sample_id": "v30_data_kpi_dashboard",
+    "target": "plan_glm",
+    "difficulty": "medium",
+    "enhanced_label": "A",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 1.0,
+      "completeness": 3.0,
+      "relevance": 1.0,
+      "clarity": 1.0
+    }
+  },
+  {
+    "item": 22,
+    "sample_id": "v30_office_write_plan",
+    "target": "plan_doubao_pro",
+    "difficulty": "severe",
+    "enhanced_label": "B",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 2.6666666666666665,
+      "completeness": 6.333333333333333,
+      "relevance": 5.333333333333333,
+      "clarity": 1.0
+    }
+  },
+  {
+    "item": 23,
+    "sample_id": "v30_data_analyze_excel",
+    "target": "plan_glm",
+    "difficulty": "severe",
+    "enhanced_label": "B",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 0.3333333333333333,
+      "completeness": 2.0,
+      "relevance": 0.6666666666666666,
+      "clarity": 1.0
+    }
+  },
+  {
+    "item": 24,
+    "sample_id": "v30_code_error_log",
+    "target": "plan_glm",
+    "difficulty": "medium",
+    "enhanced_label": "A",
+    "judge_winner": "original",
+    "judge_deltas": {
+      "accuracy": -2.5,
+      "completeness": -7.0,
+      "relevance": -3.0,
+      "clarity": -1.5
+    }
+  },
+  {
+    "item": 25,
+    "sample_id": "v30_qa_https_explain",
+    "target": "plan_glm",
+    "difficulty": "clear",
+    "enhanced_label": "A",
+    "judge_winner": "tie",
+    "judge_deltas": {
+      "accuracy": 0.0,
+      "completeness": 1.0,
+      "relevance": 0.0,
+      "clarity": 0.3333333333333333
+    }
+  },
+  {
+    "item": 26,
+    "sample_id": "v30_creative_advertise",
+    "target": "plan_glm",
+    "difficulty": "severe",
+    "enhanced_label": "A",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 3.3333333333333335,
+      "completeness": 7.0,
+      "relevance": 7.0,
+      "clarity": 2.3333333333333335
+    }
+  },
+  {
+    "item": 27,
+    "sample_id": "v30_code_contradictory",
+    "target": "plan_doubao",
+    "difficulty": "severe",
+    "enhanced_label": "B",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 2.0,
+      "completeness": 1.6666666666666667,
+      "relevance": 1.6666666666666667,
+      "clarity": 1.3333333333333333
+    }
+  },
+  {
+    "item": 28,
+    "sample_id": "v30_data_retention_analysis",
+    "target": "plan_glm",
+    "difficulty": "clear",
+    "enhanced_label": "B",
+    "judge_winner": "tie",
+    "judge_deltas": {
+      "accuracy": 0.0,
+      "completeness": 0.0,
+      "relevance": 0.0,
+      "clarity": 0.0
+    }
+  },
+  {
+    "item": 29,
+    "sample_id": "v30_translate_audio_transcript",
+    "target": "plan_doubao_pro",
+    "difficulty": "severe",
+    "enhanced_label": "B",
+    "judge_winner": "original",
+    "judge_deltas": {
+      "accuracy": -0.3333333333333333,
+      "completeness": -1.3333333333333333,
+      "relevance": -0.6666666666666666,
+      "clarity": -0.6666666666666666
+    }
+  },
+  {
+    "item": 30,
+    "sample_id": "v30_office_report_summary",
+    "target": "plan_glm",
+    "difficulty": "severe",
+    "enhanced_label": "B",
+    "judge_winner": "original",
+    "judge_deltas": {
+      "accuracy": 0.0,
+      "completeness": -1.6666666666666667,
+      "relevance": 0.0,
+      "clarity": -0.6666666666666666
+    }
+  },
+  {
+    "item": 31,
+    "sample_id": "v30_translate_generic",
+    "target": "plan_doubao",
+    "difficulty": "severe",
+    "enhanced_label": "A",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 0.3333333333333333,
+      "completeness": 1.6666666666666667,
+      "relevance": 0.0,
+      "clarity": 1.0
+    }
+  },
+  {
+    "item": 32,
+    "sample_id": "v30_code_refactor_goal",
+    "target": "plan_glm_5_2",
+    "difficulty": "severe",
+    "enhanced_label": "B",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 1.0,
+      "completeness": 2.0,
+      "relevance": 0.6666666666666666,
+      "clarity": 1.3333333333333333
+    }
+  },
+  {
+    "item": 33,
+    "sample_id": "v30_code_refactor_class",
+    "target": "plan_doubao",
+    "difficulty": "medium",
+    "enhanced_label": "B",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 0.3333333333333333,
+      "completeness": 0.3333333333333333,
+      "relevance": 0.3333333333333333,
+      "clarity": 0.3333333333333333
+    }
+  },
+  {
+    "item": 34,
+    "sample_id": "v30_code_algorithm_optimize",
+    "target": "plan_glm_5_2",
+    "difficulty": "medium",
+    "enhanced_label": "B",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 0.0,
+      "completeness": 1.3333333333333333,
+      "relevance": 0.0,
+      "clarity": 0.3333333333333333
+    }
+  },
+  {
+    "item": 35,
+    "sample_id": "v30_office_report_summary",
+    "target": "plan_glm_5_2",
+    "difficulty": "severe",
+    "enhanced_label": "A",
+    "judge_winner": "original",
+    "judge_deltas": {
+      "accuracy": -0.6666666666666666,
+      "completeness": -3.0,
+      "relevance": -1.3333333333333333,
+      "clarity": -1.6666666666666667
+    }
+  },
+  {
+    "item": 36,
+    "sample_id": "v30_qa_wrong_premise",
+    "target": "plan_glm_5_2",
+    "difficulty": "severe",
+    "enhanced_label": "B",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 0.3333333333333333,
+      "completeness": 2.3333333333333335,
+      "relevance": 0.6666666666666666,
+      "clarity": 0.6666666666666666
+    }
+  },
+  {
+    "item": 37,
+    "sample_id": "v30_js_promise_race",
+    "target": "plan_doubao_pro",
+    "difficulty": "clear",
+    "enhanced_label": "A",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 2.6666666666666665,
+      "completeness": 1.6666666666666667,
+      "relevance": 1.3333333333333333,
+      "clarity": 1.0
+    }
+  },
+  {
+    "item": 38,
+    "sample_id": "v30_launch_email",
+    "target": "plan_doubao",
+    "difficulty": "clear",
+    "enhanced_label": "A",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 0.0,
+      "completeness": 0.6666666666666666,
+      "relevance": 0.3333333333333333,
+      "clarity": 0.3333333333333333
+    }
+  },
+  {
+    "item": 39,
+    "sample_id": "v30_data_forecast",
+    "target": "plan_doubao",
+    "difficulty": "medium",
+    "enhanced_label": "A",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 3.0,
+      "completeness": 3.3333333333333335,
+      "relevance": 2.0,
+      "clarity": 2.6666666666666665
+    }
+  },
+  {
+    "item": 40,
+    "sample_id": "v30_creative_slogan",
+    "target": "plan_doubao_pro",
+    "difficulty": "clear",
+    "enhanced_label": "B",
+    "judge_winner": "original",
+    "judge_deltas": {
+      "accuracy": -1.0,
+      "completeness": -1.3333333333333333,
+      "relevance": -1.0,
+      "clarity": -1.0
+    }
+  },
+  {
+    "item": 41,
+    "sample_id": "v30_qa_nginx_502",
+    "target": "plan_glm_5_2",
+    "difficulty": "clear",
+    "enhanced_label": "B",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 0.6666666666666666,
+      "completeness": 1.6666666666666667,
+      "relevance": 0.0,
+      "clarity": 0.3333333333333333
+    }
+  },
+  {
+    "item": 42,
+    "sample_id": "v30_qa_compare_plans",
+    "target": "plan_doubao_pro",
+    "difficulty": "severe",
+    "enhanced_label": "A",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": -4.0,
+      "completeness": 4.666666666666667,
+      "relevance": -2.0,
+      "clarity": -1.0
+    }
+  },
+  {
+    "item": 43,
+    "sample_id": "v30_sql_order_query",
+    "target": "plan_glm_5_2",
+    "difficulty": "clear",
+    "enhanced_label": "B",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 0.0,
+      "completeness": 0.0,
+      "relevance": 0.6666666666666666,
+      "clarity": -0.3333333333333333
+    }
+  },
+  {
+    "item": 44,
+    "sample_id": "v30_office_project_proposal",
+    "target": "plan_glm_5_2",
+    "difficulty": "medium",
+    "enhanced_label": "A",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 1.5,
+      "completeness": 3.5,
+      "relevance": 1.5,
+      "clarity": 2.5
+    }
+  },
+  {
+    "item": 45,
+    "sample_id": "v30_translate_abstract",
+    "target": "plan_doubao_pro",
+    "difficulty": "medium",
+    "enhanced_label": "B",
+    "judge_winner": "tie",
+    "judge_deltas": {
+      "accuracy": 0.0,
+      "completeness": 0.0,
+      "relevance": 0.6666666666666666,
+      "clarity": 0.3333333333333333
+    }
+  },
+  {
+    "item": 46,
+    "sample_id": "v30_code_refactor_goal",
+    "target": "plan_glm",
+    "difficulty": "severe",
+    "enhanced_label": "B",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 0.3333333333333333,
+      "completeness": 1.3333333333333333,
+      "relevance": 0.6666666666666666,
+      "clarity": 1.0
+    }
+  },
+  {
+    "item": 47,
+    "sample_id": "v30_creative_landing_hero",
+    "target": "plan_doubao",
+    "difficulty": "medium",
+    "enhanced_label": "A",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 0.3333333333333333,
+      "completeness": 0.0,
+      "relevance": 0.6666666666666666,
+      "clarity": 0.0
+    }
+  },
+  {
+    "item": 48,
+    "sample_id": "v30_meeting_minutes",
+    "target": "plan_glm",
+    "difficulty": "clear",
+    "enhanced_label": "B",
+    "judge_winner": "enhanced",
+    "judge_deltas": {
+      "accuracy": 0.0,
+      "completeness": 1.0,
+      "relevance": 1.0,
+      "clarity": 1.5
+    }
+  }
+]

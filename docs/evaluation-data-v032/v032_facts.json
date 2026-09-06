@@ -1,0 +1,983 @@
+{
+  "gen_calls_recorded": 2160,
+  "gen_timeout": 0,
+  "gen_timeout_ratio": 0.0,
+  "delivery": {
+    "complete": 60,
+    "partial": 0,
+    "fallback": 0,
+    "hard_failure": 0
+  },
+  "delivery_rate": 1.0,
+  "coverage_by_target": {
+    "plan_doubao": {
+      "samples": 60,
+      "judged": 60,
+      "rep_error": 0,
+      "rep_total": 180
+    },
+    "plan_glm": {
+      "samples": 60,
+      "judged": 54,
+      "rep_error": 25,
+      "rep_total": 180
+    },
+    "plan_doubao_pro": {
+      "samples": 60,
+      "judged": 60,
+      "rep_error": 0,
+      "rep_total": 180
+    },
+    "plan_glm_5_2": {
+      "samples": 60,
+      "judged": 48,
+      "rep_error": 44,
+      "rep_total": 180
+    }
+  },
+  "failure_count": 157,
+  "failures": [
+    {
+      "sample_id": "v30_js_promise_race",
+      "target": "plan_glm",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_js_promise_race",
+      "target": "plan_glm",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_js_promise_race",
+      "target": "plan_glm",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_js_promise_race",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_js_promise_race",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_js_promise_race",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_js_promise_race",
+      "target": "plan_glm_5_2",
+      "stage": "judge:judge",
+      "detail": "judge 缺失（生成缺失或裁判失败）"
+    },
+    {
+      "sample_id": "v30_js_promise_race",
+      "target": "plan_glm_5_2",
+      "stage": "judge:judge2",
+      "detail": "judge 缺失（生成缺失或裁判失败）"
+    },
+    {
+      "sample_id": "v30_js_promise_race",
+      "target": "plan_glm_5_2",
+      "stage": "judge:judge_control",
+      "detail": "judge 缺失（生成缺失或裁判失败）"
+    },
+    {
+      "sample_id": "v30_js_promise_race",
+      "target": "plan_glm_5_2",
+      "stage": "judge:judge_padded_vs_orig",
+      "detail": "judge 缺失（生成缺失或裁判失败）"
+    },
+    {
+      "sample_id": "v30_rust_borrow_fix",
+      "target": "plan_glm",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_rust_borrow_fix",
+      "target": "plan_glm",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_rust_borrow_fix",
+      "target": "plan_glm",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_rust_borrow_fix",
+      "target": "plan_glm",
+      "stage": "judge:judge",
+      "detail": "judge 缺失（生成缺失或裁判失败）"
+    },
+    {
+      "sample_id": "v30_rust_borrow_fix",
+      "target": "plan_glm",
+      "stage": "judge:judge2",
+      "detail": "judge 缺失（生成缺失或裁判失败）"
+    },
+    {
+      "sample_id": "v30_rust_borrow_fix",
+      "target": "plan_glm",
+      "stage": "judge:judge_control",
+      "detail": "judge 缺失（生成缺失或裁判失败）"
+    },
+    {
+      "sample_id": "v30_rust_borrow_fix",
+      "target": "plan_glm",
+      "stage": "judge:judge_padded_vs_orig",
+      "detail": "judge 缺失（生成缺失或裁判失败）"
+    },
+    {
+      "sample_id": "v30_rust_borrow_fix",
+      "target": "plan_glm",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_rust_borrow_fix",
+      "target": "plan_glm",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_rust_borrow_fix",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_rust_borrow_fix",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_rust_borrow_fix",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_rust_borrow_fix",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_rust_borrow_fix",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_rust_borrow_fix",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_rust_borrow_fix",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_rust_borrow_fix",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_rust_borrow_fix",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_meeting_minutes",
+      "target": "plan_glm",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_meeting_minutes",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_qa_sql_injection",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_qa_sql_injection",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_qa_sql_injection",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_sql_cohort",
+      "target": "plan_glm",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_sql_cohort",
+      "target": "plan_glm",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_sql_cohort",
+      "target": "plan_glm",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_sql_cohort",
+      "target": "plan_glm",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_sql_cohort",
+      "target": "plan_glm",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_sql_cohort",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_sql_cohort",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_sql_cohort",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_sql_cohort",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_sql_cohort",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_sql_cohort",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_sql_cohort",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_sql_cohort",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_sql_cohort",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_code_error_log",
+      "target": "plan_glm",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_code_error_log",
+      "target": "plan_glm_5_2",
+      "stage": "judge:judge",
+      "detail": "judge 缺失（生成缺失或裁判失败）"
+    },
+    {
+      "sample_id": "v30_code_error_log",
+      "target": "plan_glm_5_2",
+      "stage": "judge:judge2",
+      "detail": "judge 缺失（生成缺失或裁判失败）"
+    },
+    {
+      "sample_id": "v30_code_error_log",
+      "target": "plan_glm_5_2",
+      "stage": "judge:judge_control",
+      "detail": "judge 缺失（生成缺失或裁判失败）"
+    },
+    {
+      "sample_id": "v30_code_error_log",
+      "target": "plan_glm_5_2",
+      "stage": "judge:judge_padded_vs_orig",
+      "detail": "judge 缺失（生成缺失或裁判失败）"
+    },
+    {
+      "sample_id": "v30_code_error_log",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_office_project_proposal",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_qa_git_flow",
+      "target": "plan_glm",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_qa_git_flow",
+      "target": "plan_glm",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_qa_git_flow",
+      "target": "plan_glm",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_qa_git_flow",
+      "target": "plan_glm",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_qa_git_flow",
+      "target": "plan_glm",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_qa_git_flow",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_qa_git_flow",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_qa_git_flow",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_qa_git_flow",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_qa_git_flow",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_qa_git_flow",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_qa_git_flow",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_kpi_dashboard",
+      "target": "plan_glm",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_kpi_dashboard",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_kpi_dashboard",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_kpi_dashboard",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_forecast",
+      "target": "plan_glm",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_forecast",
+      "target": "plan_glm",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_forecast",
+      "target": "plan_glm",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_forecast",
+      "target": "plan_glm",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_forecast",
+      "target": "plan_glm",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_forecast",
+      "target": "plan_glm",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_forecast",
+      "target": "plan_glm",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_forecast",
+      "target": "plan_glm",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_forecast",
+      "target": "plan_glm",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_forecast",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_forecast",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_forecast",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_forecast",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_forecast",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_forecast",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_forecast",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_forecast",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_forecast",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_creative_video_script",
+      "target": "plan_glm",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_creative_video_script",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_code_schema_design",
+      "target": "plan_glm",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_code_schema_design",
+      "target": "plan_glm",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_code_schema_design",
+      "target": "plan_glm",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_code_schema_design",
+      "target": "plan_glm",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_code_schema_design",
+      "target": "plan_glm",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_code_schema_design",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_code_schema_design",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_code_schema_design",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_code_schema_design",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_code_schema_design",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_code_schema_design",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_code_schema_design",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_code_contradictory",
+      "target": "plan_glm",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_code_contradictory",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_office_email_generic",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_office_email_generic",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_office_email_generic",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_office_email_generic",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_office_email_generic",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_office_email_generic",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_office_email_generic",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_office_email_generic",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_office_email_generic",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_qa_what_is_this",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_qa_what_is_this",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_qa_what_is_this",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_qa_what_is_this",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_qa_what_is_this",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_qa_what_is_this",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_qa_what_is_this",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_qa_what_is_this",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_qa_what_is_this",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_improve_conversion",
+      "target": "plan_glm",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_improve_conversion",
+      "target": "plan_glm",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_improve_conversion",
+      "target": "plan_glm",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_improve_conversion",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_improve_conversion",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_improve_conversion",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_improve_conversion",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_improve_conversion",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_improve_conversion",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_improve_conversion",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_improve_conversion",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_improve_conversion",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_write_report",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_data_write_report",
+      "target": "plan_glm_5_2",
+      "stage": "judge:judge",
+      "detail": "judge 缺失（生成缺失或裁判失败）"
+    },
+    {
+      "sample_id": "v30_data_write_report",
+      "target": "plan_glm_5_2",
+      "stage": "judge:judge2",
+      "detail": "judge 缺失（生成缺失或裁判失败）"
+    },
+    {
+      "sample_id": "v30_data_write_report",
+      "target": "plan_glm_5_2",
+      "stage": "judge:judge_control",
+      "detail": "judge 缺失（生成缺失或裁判失败）"
+    },
+    {
+      "sample_id": "v30_data_write_report",
+      "target": "plan_glm_5_2",
+      "stage": "judge:judge_padded_vs_orig",
+      "detail": "judge 缺失（生成缺失或裁判失败）"
+    },
+    {
+      "sample_id": "v30_translate_generic",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_translate_generic",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_translate_generic",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_translate_generic",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_translate_generic",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_translate_generic",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_translate_generic",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_translate_generic",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_translate_generic",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_creative_advertise",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_creative_advertise",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_creative_advertise",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_creative_advertise",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_creative_advertise",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_creative_advertise",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_creative_advertise",
+      "target": "plan_glm_5_2",
+      "stage": "gen:original",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_creative_advertise",
+      "target": "plan_glm_5_2",
+      "stage": "gen:enhanced",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    },
+    {
+      "sample_id": "v30_creative_advertise",
+      "target": "plan_glm_5_2",
+      "stage": "gen:padded",
+      "detail": "生成缺失（多次重试后仍失败/超时）"
+    }
+  ]
+}

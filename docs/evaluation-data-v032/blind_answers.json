@@ -1,0 +1,818 @@
+[
+ {
+  "item": 1,
+  "winner": "A",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 8,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "reason": "A 对每类原因逐项给出排查路径与数据清单、建议分级清晰；B 亦扎实但诊断可操作性略弱。"
+ },
+ {
+  "item": 2,
+  "winner": "A",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 8
+  },
+  "reason": "两版结构均完整规范，A 项目细节更具体并将指标与项目关联，B 略多套话空泛。"
+ },
+ {
+  "item": 3,
+  "winner": "A",
+  "dims_a": {
+   "accuracy": 8,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 5,
+   "completeness": 8,
+   "relevance": 9,
+   "clarity": 8
+  },
+  "reason": "B 分母未按用户去重，多单用户会被重复计数导致结果错误；A 逻辑正确，仅误称兼容 MySQL。"
+ },
+ {
+  "item": 4,
+  "winner": "A",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 8,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 8,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "reason": "A 直接交付数据自洽的完整方案且假设明示；B 偏框架与示例，成品交付度略低。"
+ },
+ {
+  "item": 5,
+  "winner": "A",
+  "dims_a": {
+   "accuracy": 8,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 8,
+   "relevance": 8,
+   "clarity": 9
+  },
+  "reason": "A 三渠道版本卖点齐全、更有吸引力；B 稳健但冲击力不足，A 仅口罩识别略有夸大。"
+ },
+ {
+  "item": 6,
+  "winner": "tie",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 8
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "reason": "两封均完整得体、覆盖催时间与确认联系人两诉求；B 更简洁具体，A 稍显冗饰，整体接近。"
+ },
+ {
+  "item": 7,
+  "winner": "B",
+  "dims_a": {
+   "accuracy": 8,
+   "completeness": 7,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 7,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "reason": "B 覆盖并发与退避两焦点并确认退避合规，但误称 except Exception 捕获键盘中断；A 漏答退避焦点。"
+ },
+ {
+  "item": 8,
+  "winner": "tie",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "reason": "两者均满足人称、悬念要求且未点明外星人；A 意象更浓但字数略超，B 更精炼，难分高下。"
+ },
+ {
+  "item": 9,
+  "winner": "tie",
+  "dims_a": {
+   "accuracy": 10,
+   "completeness": 10,
+   "relevance": 10,
+   "clarity": 10
+  },
+  "dims_b": {
+   "accuracy": 10,
+   "completeness": 10,
+   "relevance": 10,
+   "clarity": 9
+  },
+  "reason": "两者SQL均正确且满足单查询、无窗口函数、月升序内金额降序全部约束，仅别名与嵌套代码块格式差异，判平。"
+ },
+ {
+  "item": 10,
+  "winner": "tie",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 10,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 10,
+   "relevance": 10,
+   "clarity": 9
+  },
+  "reason": "两方案都能保证结果来自最后一次请求并保留取消能力；B闭包封装更干净但解释第4点含混，A略冗余，接近平手。"
+ },
+ {
+  "item": 11,
+  "winner": "A",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 10,
+   "relevance": 10,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 8,
+   "completeness": 3,
+   "relevance": 9,
+   "clarity": 7
+  },
+  "reason": "A完整覆盖涨因定位、分级降本建议与行动顺序且结构清晰；B在排查表中途截断，完全缺失降本建议主体。"
+ },
+ {
+  "item": 12,
+  "winner": "tie",
+  "dims_a": {
+   "accuracy": 10,
+   "completeness": 10,
+   "relevance": 10,
+   "clarity": 8
+  },
+  "dims_b": {
+   "accuracy": 10,
+   "completeness": 10,
+   "relevance": 10,
+   "clarity": 9
+  },
+  "reason": "两者均正确指出缺少代码并索要补充信息，B以清单列出语言、报错日志等更易执行，但差距小判平。"
+ },
+ {
+  "item": 13,
+  "winner": "tie",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 10,
+   "relevance": 10,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 10,
+   "completeness": 10,
+   "relevance": 10,
+   "clarity": 9
+  },
+  "reason": "两者数据核算均准确、趋势与异常解读到位且严守只用给定数据；B附数据局限说明更严谨，整体接近判平。"
+ },
+ {
+  "item": 14,
+  "winner": "A",
+  "dims_a": {
+   "accuracy": 10,
+   "completeness": 10,
+   "relevance": 10,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 10,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 7
+  },
+  "reason": "A主动列出表结构、分析目标等多路径信息清单更可执行；B仅一句索要附件且『按指定步骤』表述含混。"
+ },
+ {
+  "item": 15,
+  "winner": "tie",
+  "dims_a": {
+   "accuracy": 10,
+   "completeness": 10,
+   "relevance": 10,
+   "clarity": 10
+  },
+  "dims_b": {
+   "accuracy": 10,
+   "completeness": 10,
+   "relevance": 10,
+   "clarity": 9
+  },
+  "reason": "五条译文均正确且都尊重『添加账单=新增记录』的语境，B逐条选词及地区差异说明更有价值但略冗长，判平。"
+ },
+ {
+  "item": 16,
+  "winner": "tie",
+  "dims_a": {
+   "accuracy": 8,
+   "completeness": 9,
+   "relevance": 10,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 10,
+   "completeness": 9,
+   "relevance": 10,
+   "clarity": 9
+  },
+  "reason": "A直接给出完整可用通知示例但虚构『您提供的暂定信息』；B以模板加澄清问题应对模糊需求更稳妥，接近平手。"
+ },
+ {
+  "item": 17,
+  "winner": "A",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 8,
+   "completeness": 8,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "reason": "A 给出各根因的具体修复代码与验证步骤，更可落地；B 偏排查流程，且 LeakCanary Java 版说法欠妥。"
+ },
+ {
+  "item": 18,
+  "winner": "tie",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "reason": "两者复杂度分析与 O(n) 字典方案均正确；A 多性能对比和 pandas，B 多等价性验证测试，各有侧重。"
+ },
+ {
+  "item": 19,
+  "winner": "tie",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "reason": "五条问题与三段结构几乎等价，竞态字节码分析与退避缺抖动、无上限的论证均准确，难分高下。"
+ },
+ {
+  "item": 20,
+  "winner": "tie",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "reason": "均满足第一人称、字数与悬念要求且未点破外星人袭击；A 意境更独特，B 钩子更抓人，文风各有千秋。"
+ },
+ {
+  "item": 21,
+  "winner": "tie",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 10,
+   "relevance": 9,
+   "clarity": 8
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "reason": "A 指标口径与数据可得性标注更完备；B 布局示意与落地建议更直观，整体质量接近故判平。"
+ },
+ {
+  "item": 22,
+  "winner": "A",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 8,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 6,
+   "completeness": 8,
+   "relevance": 7,
+   "clarity": 8
+  },
+  "reason": "提示词过于模糊，A 先澄清并给通用模板更稳妥；B 编造品牌与市场数据且引伪出处，准确性受损。"
+ },
+ {
+  "item": 23,
+  "winner": "tie",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "reason": "均正确指出无附件且拒绝编造分析，A 简洁友好，B 附待执行分析计划表，差异细微判平。"
+ },
+ {
+  "item": 24,
+  "winner": "B",
+  "dims_a": {
+   "accuracy": 6,
+   "completeness": 2,
+   "relevance": 8,
+   "clarity": 3
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 10,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "reason": "A 回答明显截断，仅剩开头一句；B 判断、止血、定位、修复、预防完整准确，B 完胜。"
+ },
+ {
+  "item": 25,
+  "winner": "tie",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 8,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "reason": "两者均准确合规且控制在字数内；B 比喻更贴近非技术读者，A 结尾备注略显多余，整体非常接近。"
+ },
+ {
+  "item": 26,
+  "winner": "A",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 8,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 2,
+   "relevance": 8,
+   "clarity": 9
+  },
+  "reason": "A 直接交付可用的完整广告文案并附创作思路与调整选项；B 只罗列反问问题，未产出任何广告内容。"
+ },
+ {
+  "item": 27,
+  "winner": "tie",
+  "dims_a": {
+   "accuracy": 8,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 8,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "reason": "两案均全面且守住不改接口约束；A 示例更落地但 MQ 方案改变返回语义，B 严谨但配置示例有小瑕疵，难分高下。"
+ },
+ {
+  "item": 28,
+  "winner": "B",
+  "dims_a": {
+   "accuracy": 7,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "reason": "B 环比表与线性拟合均准确；A 把5月-2pp误算为-3pp，并错误宣称每月等差下滑3pp，数据报告出现硬伤。"
+ },
+ {
+  "item": 29,
+  "winner": "A",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 8,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 7,
+   "relevance": 9,
+   "clarity": 8
+  },
+  "reason": "两者都正确指出缺少录音并索要文字稿；A 补充了提交方式与术语适配建议，引导更充分。"
+ },
+ {
+  "item": 30,
+  "winner": "A",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 6,
+   "relevance": 9,
+   "clarity": 8
+  },
+  "reason": "两者都正确要求提供文档；A 给出粘贴/上传两种方式并预收总结偏好，B 仅一句话，帮助有限。"
+ },
+ {
+  "item": 31,
+  "winner": "tie",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 8
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "reason": "两者都正确索要原文与目标语言；A 信息更全但语气生硬，B 友好简洁，整体相当。"
+ },
+ {
+  "item": 32,
+  "winner": "tie",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 8,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "reason": "都正确指出未收到代码；B 分层列出必要/辅助信息并预告排查思路与交付形式，略更周全但优势不大。"
+ },
+ {
+  "item": 33,
+  "winner": "A",
+  "dims_a": {
+   "accuracy": 8,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 7,
+   "completeness": 6,
+   "relevance": 8,
+   "clarity": 8
+  },
+  "reason": "A给出两种可行重构、示例完整且接口不变；B只有占位骨架，逻辑留待用户补齐，乱源分析含臆测。"
+ },
+ {
+  "item": 34,
+  "winner": "tie",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 10,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 8
+  },
+  "reason": "两者都准确指出O(N²)并用Counter降到O(N)；B附验证代码更严谨，A更简洁并给出pandas等替代，整体接近。"
+ },
+ {
+  "item": 35,
+  "winner": "B",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 5,
+   "relevance": 9,
+   "clarity": 6
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 10,
+   "clarity": 9
+  },
+  "reason": "文档缺失时B礼貌说明缺失、引导补发并澄清总结偏好；A仅一句索要文档，帮助性差距明显。"
+ },
+ {
+  "item": 36,
+  "winner": "A",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 8,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 8,
+   "completeness": 9,
+   "relevance": 8,
+   "clarity": 7
+  },
+  "reason": "A聚焦Python列出四类成因并给出id打印排查法，具体可执行；B覆盖广但跨语言铺陈冗长，开头还误称用户给了方向。"
+ },
+ {
+  "item": 37,
+  "winner": "tie",
+  "dims_a": {
+   "accuracy": 8,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 8,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "reason": "两者都保证最新请求胜出且不改调用方；A自动abort旧请求、解释透彻但旧错处理不一，B语义干净却不取消在途请求。"
+ },
+ {
+  "item": 38,
+  "winner": "A",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 10,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 8,
+   "clarity": 9
+  },
+  "reason": "两者要素齐全、正文均达标；A语气更贴合专业友好，B的语气词与表情符号偏随意，A主题行也更扣召回目标。"
+ },
+ {
+  "item": 39,
+  "winner": "A",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 8
+  },
+  "dims_b": {
+   "accuracy": 7,
+   "completeness": 8,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "reason": "A情景化预测数字自洽并交代假设、不确定性与数据局限；B月度加总910与均值920矛盾，部分统计口径粗糙。"
+ },
+ {
+  "item": 40,
+  "winner": "A",
+  "dims_a": {
+   "accuracy": 8,
+   "completeness": 9,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 6,
+   "completeness": 9,
+   "relevance": 8,
+   "clarity": 9
+  },
+  "reason": "两者都超字数但A为12-13字更接近8-12字要求且卖点全覆盖；B三句均约15字并额外引入考纲这一题外卖点。"
+ },
+ {
+  "item": 41,
+  "winner": "B",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 10,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 10,
+   "relevance": 10,
+   "clarity": 9
+  },
+  "reason": "两者命令均准确无误；B 额外覆盖应用日志、fd 上限、磁盘与占位符指引，且每步给出正常/异常判据，略胜。"
+ },
+ {
+  "item": 42,
+  "winner": "B",
+  "dims_a": {
+   "accuracy": 5,
+   "completeness": 6,
+   "relevance": 5,
+   "clarity": 7
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 5,
+   "relevance": 9,
+   "clarity": 9
+  },
+  "reason": "任务缺两方案信息，A 擅自虚构门店场景且成本自相矛盾（32000≠27000），B 恰当索要关键信息，更稳妥。"
+ },
+ {
+  "item": 43,
+  "winner": "A",
+  "dims_a": {
+   "accuracy": 10,
+   "completeness": 10,
+   "relevance": 10,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 10,
+   "completeness": 10,
+   "relevance": 10,
+   "clarity": 8
+  },
+  "reason": "SQL 均正确且满足全部约束；A 额外解释索引友好的日期过滤与排序逻辑，并给出 PostgreSQL 写法，更清晰实用。"
+ },
+ {
+  "item": 44,
+  "winner": "A",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 10,
+   "relevance": 10,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 3,
+   "relevance": 9,
+   "clarity": 7
+  },
+  "reason": "A 口径治理、里程碑、预算、风险齐备且假设均明确标注；B 中途截断，缺预算、排期、风险等核心章节。"
+ },
+ {
+  "item": 45,
+  "winner": "tie",
+  "dims_a": {
+   "accuracy": 10,
+   "completeness": 10,
+   "relevance": 10,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 10,
+   "completeness": 10,
+   "relevance": 10,
+   "clarity": 9
+  },
+  "reason": "两份译文完全一致、准确且专业；A 侧重句式调整说明，B 术语注释更细，质量难分高下，判平。"
+ },
+ {
+  "item": 46,
+  "winner": "B",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 8,
+   "relevance": 10,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 10,
+   "clarity": 9
+  },
+  "reason": "两者均正确指出未收到代码并请求补充；B 给出具体症状示例、长代码发送建议与交付说明，引导更充分。"
+ },
+ {
+  "item": 47,
+  "winner": "tie",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 8,
+   "relevance": 10,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 10,
+   "clarity": 9
+  },
+  "reason": "A 文案更有情感张力但仅 2 版且零基础卖点覆盖不全；B 四种风格齐全、各卖点均覆盖，整体相当，判平。"
+ },
+ {
+  "item": 48,
+  "winner": "A",
+  "dims_a": {
+   "accuracy": 9,
+   "completeness": 9,
+   "relevance": 10,
+   "clarity": 9
+  },
+  "dims_b": {
+   "accuracy": 9,
+   "completeness": 7,
+   "relevance": 10,
+   "clarity": 9
+  },
+  "reason": "两者均忠实原信息、未编造；A 待办含前后端开发、联调、测试计划与风险跟进共 5 项，B 仅列 2 项，完整性偏弱。"
+ }
+]

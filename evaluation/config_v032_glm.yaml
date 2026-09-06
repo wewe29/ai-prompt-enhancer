@@ -1,0 +1,222 @@
+enhancer:
+  base_url: https://api.deepseek.com
+  protocol: openai
+  model: deepseek-v4-flash
+  verbosity: standard
+  custom_instructions: ''
+  temperature: 0.35
+scenario_temperatures:
+  编程: 0.2
+  翻译: 0.2
+  数据分析: 0.2
+  问答: 0.4
+  写作: 0.5
+  模糊请求: 0.5
+  创意: 0.7
+key_source: keyring
+browser:
+  mode: playwright
+  channel: msedge
+  cdp_url: http://localhost:9222
+  headless: false
+  slow_input_chars: 200
+  input_delay_ms: 30
+targets:
+  deepseek_web:
+    enabled: false
+    mode: web
+    url: https://chat.deepseek.com/
+    timeout: 30
+    stabilize_seconds: 6
+    wait_strategy: stop_button
+    selectors:
+      input:
+      - '#chat-input'
+      - textarea
+      - '[contenteditable=''true'']'
+      send: ''
+      stop:
+      - div[class*='stop']
+      - button[class*='stop']
+      - .ds-icon-button
+      output_selector:
+      - .ds-markdown
+      - div[class*='markdown']
+      - div[class*='message-content']
+      new_chat:
+      - button:has-text('新对话')
+      - div[class*='new-chat']
+      include_code: true
+  doubao:
+    enabled: false
+    mode: web
+    url: https://www.doubao.com/chat/
+    timeout: 30
+    stabilize_seconds: 6
+    wait_strategy: stabilize
+    selectors:
+      input:
+      - textarea.semi-input-textarea
+      - textarea[placeholder*='发消息']
+      - textarea
+      - div[contenteditable='true']
+      send: ''
+      stop:
+      - div[class*='stop']
+      - button[class*='stop']
+      output_selector:
+      - '[class*=''v_list_row'']'
+      - div[class*='message-list']
+      - '[class*=''message''] [class*=''content'']'
+      - '[class*=''message''] [class*=''markdown'']'
+      - '[class*=''answer'']'
+      - '[class*=''chat''] [class*=''message'']'
+      - div[class*='message']:last-of-type
+      - '[class*=''markdown'']'
+      new_chat:
+      - div[class*='new-chat']
+      - button:has-text('新对话')
+      include_code: true
+  qwen:
+    enabled: false
+    mode: web
+    url: https://www.qianwen.com/
+    timeout: 45
+    stabilize_seconds: 6
+    wait_strategy: stop_button
+    selectors:
+      input:
+      - '[class*=''whitespace-pre-wrap''][contenteditable=''true'']'
+      - div[contenteditable='true']
+      - textarea
+      - '#chat-input'
+      send: ''
+      stop:
+      - div[class*='stop']
+      - button[class*='stop']
+      output_selector:
+      - '[class*=''markdown'']'
+      - div[class*='answer']
+      - div[class*='message']:last-of-type
+      - main [class*='whitespace-pre-wrap']
+      - main
+      new_chat:
+      - button:has-text('新建对话')
+      - div:has-text('新建对话')
+      include_code: true
+  minimax:
+    enabled: false
+    mode: web
+    url: https://chat.minimaxi.com/
+    timeout: 30
+    stabilize_seconds: 6
+    wait_strategy: stabilize
+    selectors:
+      input:
+      - textarea
+      - div[contenteditable='true']
+      send:
+      - button[class*='send']
+      - div[class*='send']
+      stop:
+      - button[class*='stop']
+      - div[class*='stop']
+      output_selector:
+      - div[class*='markdown']
+      - div[class*='message']:last-of-type
+      new_chat:
+      - button:has-text('新对话')
+      include_code: true
+  plan_doubao:
+    enabled: false
+    mode: anthropic
+    base_url: https://ark.cn-beijing.volces.com/api/plan
+    model: doubao-seed-2.0-mini
+    api_key_env: ARK_PLAN_API_KEY
+    temperature: 0.7
+    max_tokens: 8192
+  plan_glm:
+    enabled: true
+    mode: anthropic
+    base_url: https://ark.cn-beijing.volces.com/api/plan
+    model: glm-5.2
+    api_key_env: ARK_PLAN_API_KEY
+    temperature: 0.7
+    max_tokens: 16384
+    timeout_s: 480
+  plan_doubao_pro:
+    enabled: false
+    mode: anthropic
+    base_url: https://ark.cn-beijing.volces.com/api/plan
+    model: doubao-seed-2-0-pro-260215
+    api_key_env: ARK_PLAN_API_KEY
+    temperature: 0.7
+    max_tokens: 8192
+  plan_glm_5_2:
+    enabled: true
+    mode: anthropic
+    base_url: https://ark.cn-beijing.volces.com/api/plan
+    model: glm-5-2-260617
+    api_key_env: ARK_PLAN_API_KEY
+    temperature: 0.7
+    max_tokens: 16384
+    timeout_s: 480
+  plan_deepseek:
+    enabled: false
+    mode: anthropic
+    base_url: https://ark.cn-beijing.volces.com/api/plan
+    model: deepseek-v4-flash
+    api_key_env: ARK_PLAN_API_KEY
+    temperature: 0.7
+    max_tokens: 8192
+  ark_doubao:
+    enabled: false
+    mode: api
+    base_url: https://ark.cn-beijing.volces.com/api/v3
+    model: doubao-seed-2-1-pro-260628
+    api_key_env: ARK_API_KEY
+    temperature: 0.7
+  ark_deepseek:
+    enabled: false
+    mode: api
+    base_url: https://ark.cn-beijing.volces.com/api/v3
+    model: deepseek-v4-flash-ga-260731
+    api_key_env: ARK_API_KEY
+    temperature: 0.7
+  ark_qwen:
+    enabled: false
+    mode: api
+    base_url: https://ark.cn-beijing.volces.com/api/v3
+    model: qwen3-32b-20250429
+    api_key_env: ARK_API_KEY
+    temperature: 0.7
+  ark_glm:
+    enabled: false
+    mode: api
+    base_url: https://ark.cn-beijing.volces.com/api/v3
+    model: glm-5-2-260617
+    api_key_env: ARK_API_KEY
+    temperature: 0.7
+  ark_kimi:
+    enabled: false
+    mode: api
+    base_url: https://ark.cn-beijing.volces.com/api/v3
+    model: kimi-k2-250905
+    api_key_env: ARK_API_KEY
+    temperature: 0.7
+judge:
+  base_url: https://ark.cn-beijing.volces.com/api/plan/v1
+  api_key_env: ARK_PLAN_API_KEY
+  api_key_file: key.local
+  model: deepseek-v4-flash
+  temperature: 0
+  randomize_order: true
+  cross_check: true
+  second_model: glm-5.2
+samples: samples/samples.yaml
+run:
+  delay_between: 2.0
+  max_cost_usd: 2.0
+  retry_seconds: 60
+  control_group: true
+  repeats: 1

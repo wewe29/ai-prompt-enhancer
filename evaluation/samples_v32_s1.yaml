@@ -1,0 +1,337 @@
+samples:
+- id: v30_sql_order_query
+  scenario: 编程
+  ambiguity_level: clear
+  original: '表结构：orders(id, user_id, product_id, amount, city, order_date)。
+
+    写一条 SQL 统计 2024 年每个城市、每个月的订单金额和订单数，并按月份升序输出。
+
+    要求单条查询、不使用窗口函数，城市按订单金额降序展示结果，直接给出可执行 SQL。
+
+    '
+  must_preserve:
+  - '2024'
+  - orders
+  - 城市
+  - 按月份升序
+  must_not_add:
+  - 不要添加分区或索引优化建议
+  - 不要虚构表结构之外的字段
+  expected_behavior: none
+- id: v30_meeting_minutes
+  scenario: 办公写作
+  ambiguity_level: clear
+  original: '根据以下会议记录整理一份会议纪要，读者是参会同事，格式要求：标题、时间、参会人、决议、待办事项五个部分。
+
+    只整理给出的信息，不要补充没有提到的内容。
+
+    会议记录：
+
+    1. 产品经理提出下月 15 日上线新版登录页。
+
+    2. 前端负责人确认可在 10 日内完成，后端需 5 个工作日。
+
+    3. 决定由张伟负责联调，周五前出测试计划。
+
+    4. 上线风险：短信服务商切换可能延迟，李娜跟进。
+
+    '
+  must_preserve:
+  - 登录页
+  - 15 日
+  - 张伟
+  - 李娜
+  must_not_add:
+  - 不要虚构会议结论
+  - 不要添加预算相关内容
+  expected_behavior: none
+- id: v30_performance_review
+  scenario: 办公写作
+  ambiguity_level: clear
+  original: '帮我写年终自我评价，要求三段式：工作成果、能力提升、下一年目标。
+
+    我的成果：主导上线订单模块，日处理订单从 1 万提升到 3 万；带 2 名实习生完成数据迁移。
+
+    能力提升：熟悉了消息队列与缓存设计。目标：明年独立负责核心交易链路。
+
+    语气客观，不吹嘘，总长度 400 字以内，面向直属主管。
+
+    '
+  must_preserve:
+  - 订单模块
+  - 1 万
+  - 3 万
+  - 消息队列
+  must_not_add:
+  - 不要虚构项目数据
+  - 不要添加具体薪资或晋升要求
+  expected_behavior: none
+- id: v30_qa_nginx_502
+  scenario: 问答
+  ambiguity_level: clear
+  original: '服务器偶尔返回 502 Bad Gateway，帮我在命令行逐步排查，环境是 Nginx 1.24 + 单台 Node.js 应用。
+
+    请按顺序列出：先看什么日志、每个命令的结果怎么判断、最后给出三条常见原因。
+
+    每步给出具体命令，不需要写修复脚本。
+
+    '
+  must_preserve:
+  - 502 Bad Gateway
+  - Nginx 1.24
+  - Node.js
+  - 三条常见原因
+  must_not_add:
+  - 不要虚构客户端 IP 或具体报错时间
+  - 不要推荐更换架构
+  expected_behavior: none
+- id: v30_data_retention_analysis
+  scenario: 数据分析
+  ambiguity_level: clear
+  original: '下面是我产品近 6 个月的月度留存数据（百分比），帮我做留存分析，输出趋势解读、异常点、结论和建议，限制在一页内：
+
+    1月 42，2月 45，3月 41，4月 38，5月 36，6月 33。
+
+    只依据给出的数据，不要假设其他运营动作。
+
+    '
+  must_preserve:
+  - '42'
+  - '45'
+  - '41'
+  - '38'
+  must_not_add:
+  - 不要虚构流失原因调查结论
+  - 不要添加竞品对比数据
+  expected_behavior: none
+- id: v30_translate_product_manual
+  scenario: 翻译
+  ambiguity_level: clear
+  original: '把下面的咖啡机用户手册章节翻译成德语，编号步骤保留，单位不换算，警告句加粗：
+
+    「1. 取下水箱并注入清水至 MAX 线。2. 放入滤纸并加入咖啡粉，每杯约 10 克。
+
+    3. 按下启动键。警告：清洗时请先断电。」
+
+    '
+  must_preserve:
+  - MAX 线
+  - 10 克
+  - 警告
+  - 断电
+  must_not_add:
+  - 不要添加品牌名称
+  - 不要改写步骤顺序
+  expected_behavior: none
+- id: v30_creative_story_opening
+  scenario: 创意
+  ambiguity_level: clear
+  original: '写一篇科幻短篇的开头段：设定是火星殖民地，主角是一位维修工程师，开场冲突是主气闸门意外关闭。
+
+    要求第一人称、150-200 字、结尾留一个悬念，避免直接点明「外星人袭击」。
+
+    '
+  must_preserve:
+  - 火星
+  - 维修工程师
+  - 主气闸门
+  - 150-200 字
+  must_not_add:
+  - 不要虚构具体年份
+  - 不要引入其他角色
+  expected_behavior: light
+- id: v30_code_refactor_class
+  scenario: 编程
+  ambiguity_level: medium
+  original: "这个 Python 类越写越乱，帮我重构一下：\n```python\nclass ReportService:\n    def build(self,\
+    \ data):\n        ...\n    def save(self, path):\n        ...\n    def send_email(self,\
+    \ addr):\n        ...\n    def audit(self):\n        ...\n```\n重构后要保持对外接口不变。\n"
+  must_preserve:
+  - ReportService
+  - 对外接口不变
+  - send_email
+  must_not_add:
+  - 不要虚构类内部方法的具体实现
+  - 不要要求补充业务规则说明
+  expected_behavior: light
+- id: v30_office_project_proposal
+  scenario: 办公写作
+  ambiguity_level: medium
+  original: '写一份项目立项方案：我们要自研内部指标平台，解决目前依赖外包报表、数据口径不统一的问题。
+
+    预算 60 万元，预计周期 6 个月，团队 4 人。请你把方案写出来。
+
+    '
+  must_preserve:
+  - 60 万元
+  - 6 个月
+  - 4 人
+  - 口径不统一
+  must_not_add:
+  - 不要虚构具体供应商报价
+  - 不要添加人员招聘数量
+  expected_behavior: light
+- id: v30_qa_ml_explain
+  scenario: 问答
+  ambiguity_level: medium
+  original: '给我讲讲机器学习和深度学习的区别，还有监督学习和无监督学习分别适合什么场景，最好举几个例子。
+
+    '
+  must_preserve:
+  - 机器学习
+  - 深度学习
+  - 监督学习
+  - 无监督学习
+  must_not_add:
+  - 不要虚构具体模型效果数字
+  - 不要推荐需要付费的课程
+  expected_behavior: light
+- id: v30_data_kpi_dashboard
+  scenario: 数据分析
+  ambiguity_level: medium
+  original: '我们上线了一个新的积分商城，老板要一个看板来跟踪效果，帮我设计要监控哪些指标，
+
+    怎么定义，以及大致怎么可视化。目前数据在订单表和积分流水表里。
+
+    '
+  must_preserve:
+  - 积分商城
+  - 积分流水表
+  - 指标
+  - 可视化
+  must_not_add:
+  - 不要虚构具体积分规则
+  - 不要要求补充用户画像数据
+  expected_behavior: light
+- id: v30_translate_abstract
+  scenario: 翻译
+  ambiguity_level: medium
+  original: '把下面这段论文摘要翻译成英文：
+
+    「本研究基于 2023 至 2024 年某电商平台的用户行为日志，采用因果森林方法估计个性化优惠券对复购率的影响，
+
+    结果表明定向发放可将复购率提升约 12%。」
+
+    需要翻译得专业一些。
+
+    '
+  must_preserve:
+  - 因果森林
+  - 复购率
+  - 12%
+  - 优惠券
+  must_not_add:
+  - 不要虚构作者信息或期刊名
+  - 不要添加英文缩写注释
+  expected_behavior: light
+- id: v30_creative_landing_hero
+  scenario: 创意
+  ambiguity_level: medium
+  original: '为我们的在线绘画课程写首页主视觉区的标题和副标题。课程主打零基础成人学水彩，老师有十年教学经验，
+
+    支持随到随学。希望文案能吸引人点进来。
+
+    '
+  must_preserve:
+  - 水彩
+  - 零基础
+  - 十年
+  - 随到随学
+  must_not_add:
+  - 不要虚构学员人数或好评率
+  - 不要添加限时折扣
+  expected_behavior: light
+- id: v30_code_undefined_error
+  scenario: 编程
+  ambiguity_level: severe
+  original: '帮我看看这个报错怎么解决。
+
+    '
+  must_preserve:
+  - 报错
+  - 解决
+  must_not_add:
+  - 不要虚构具体的报错信息
+  - 不要假设是某一特定语言
+  expected_behavior: clarify
+- id: v30_code_contradictory
+  scenario: 编程
+  ambiguity_level: severe
+  original: '这段代码现在运行正常，但我要它同时支持一千个并发用户、响应时间小于 50 毫秒、
+
+    而且不能动任何现有接口和数据结构，帮我看看怎么改。
+
+    '
+  must_preserve:
+  - 一千个并发用户
+  - 50 毫秒
+  - 不能动
+  must_not_add:
+  - 不要虚构代码内容
+  - 不要承诺不可能的性能目标
+  expected_behavior: clarify
+- id: v30_office_report_summary
+  scenario: 办公写作
+  ambiguity_level: severe
+  original: '帮我把这个文档总结一下，做完发我。
+
+    '
+  must_preserve:
+  - 总结
+  - 文档
+  must_not_add:
+  - 不要虚构文档内容
+  - 不要假设文档格式
+  expected_behavior: clarify
+- id: v30_qa_compare_plans
+  scenario: 问答
+  ambiguity_level: severe
+  original: '帮我比较一下这两个方案哪个更好。
+
+    '
+  must_preserve:
+  - 比较
+  - 方案
+  must_not_add:
+  - 不要虚构两个方案的内容
+  - 不要假设比较维度
+  expected_behavior: clarify
+- id: v30_data_analyze_excel
+  scenario: 数据分析
+  ambiguity_level: severe
+  original: '帮我分析一下这份 Excel 数据，里面有很多表。
+
+    '
+  must_preserve:
+  - Excel
+  - 表
+  must_not_add:
+  - 不要虚构数据内容
+  - 不要假设表结构
+  expected_behavior: clarify
+- id: v30_translate_audio_transcript
+  scenario: 翻译
+  ambiguity_level: severe
+  original: '把这段会议录音翻译成英文，我后面要用。
+
+    '
+  must_preserve:
+  - 录音
+  - 英文
+  must_not_add:
+  - 不要虚构录音内容
+  - 不要假设讲话人身份
+  expected_behavior: clarify
+- id: v30_creative_birthday_poem
+  scenario: 创意
+  ambiguity_level: severe
+  original: '写一首诗送给朋友。
+
+    '
+  must_preserve:
+  - 诗
+  - 朋友
+  must_not_add:
+  - 不要虚构朋友信息
+  - 不要假设场合与风格
+  expected_behavior: clarify

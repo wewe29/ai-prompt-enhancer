@@ -1,0 +1,336 @@
+samples:
+- id: v30_code_decorator_retry
+  scenario: 编程
+  ambiguity_level: clear
+  original: "帮我审查下面这个 Python 装饰器，重点是并发场景下计数器是否会竞态，以及重试逻辑是否符合指数退避约定。\n只指出问题并说明原因，不要重写代码：\n\
+    ```python\nimport threading, time\n\nattempts = {\"count\": 0}\n\ndef retry(max_attempts=3,\
+    \ base_delay=1.0):\n    def deco(fn):\n        def wrapper(*args, **kwargs):\n\
+    \            attempts[\"count\"] += 1\n            for i in range(max_attempts):\n\
+    \                try:\n                    return fn(*args, **kwargs)\n      \
+    \          except Exception:\n                    if i == max_attempts - 1:\n\
+    \                        raise\n                    time.sleep(base_delay * (2\
+    \ ** i))\n        return wrapper\n    return deco\n```\n输出请按「问题清单 + 原因 + 影响」三段组织，最多\
+    \ 5 条。\n"
+  must_preserve:
+  - 指数退避
+  - 只指出问题并说明原因
+  - max_attempts
+  - base_delay
+  must_not_add:
+  - 不要要求补充运行环境信息
+  - 不要虚构性能测试数据
+  expected_behavior: none
+- id: v30_rust_borrow_fix
+  scenario: 编程
+  ambiguity_level: clear
+  original: "这段 Rust 编译不过，报 borrow checker 错误：\n```rust\nfn push_all(v: &mut Vec<i32>,\
+    \ src: &Vec<i32>) {\n    for &x in src {\n        v.push(x);\n    }\n}\nlet mut\
+    \ a = vec![1, 2];\npush_all(&mut a, &a);\n```\n请给出能通过编译的最小修改，保持 push_all 的行为不变，并解释为什么原来的写法不允许。\n\
+    运行环境是 Rust 1.80，不使用 unsafe。\n"
+  must_preserve:
+  - push_all
+  - Vec<i32>
+  - unsafe
+  - Rust 1.80
+  must_not_add:
+  - 不要引入第三方 crate
+  - 不要要求补充完整错误信息原文
+  expected_behavior: none
+- id: v30_onboarding_doc
+  scenario: 办公写作
+  ambiguity_level: clear
+  original: '为新入职的 Python 后端工程师写一份入职第一周指引文档，包含：环境搭建、代码规范、常用命令、求助对象四部分。
+
+    项目用 FastAPI + PostgreSQL，代码规范遵循 PEP 8，环境要求 Python 3.11。
+
+    文档要简洁，每部分不超过 5 条，直接给出可操作内容。
+
+    '
+  must_preserve:
+  - FastAPI
+  - PostgreSQL
+  - PEP 8
+  - Python 3.11
+  must_not_add:
+  - 不要虚构公司内部工具名称
+  - 不要添加入职培训的具体课表
+  expected_behavior: light
+- id: v30_qa_sql_injection
+  scenario: 问答
+  ambiguity_level: clear
+  original: '给刚入行的 Java 开发讲清楚 SQL 注入：什么是注入、一个真实示例、如何用参数化查询防御。
+
+    要求分三段，给出可运行的示例代码，并强调只允许使用原生 JDBC 预编译语句（PreparedStatement），禁用字符串拼接。
+
+    '
+  must_preserve:
+  - SQL 注入
+  - 参数化
+  - PreparedStatement
+  - 字符串拼接
+  must_not_add:
+  - 不要要求补充具体数据库类型
+  - 不要引入 ORM 框架推荐
+  expected_behavior: none
+- id: v30_data_sql_cohort
+  scenario: 数据分析
+  ambiguity_level: clear
+  original: '订单表 orders(id, user_id, amount, order_date)，用户表 users(id, signup_date)。
+
+    写 SQL 计算 2024 年 1 月注册用户的 30 天留存率：按注册周分组，统计该周注册用户在注册后 30 天内下过单的人数占比。
+
+    要求：一条查询完成，使用窗口函数按注册周分组，输出注册周与留存率两列，金额字段不影响结果。
+
+    '
+  must_preserve:
+  - orders
+  - signup_date
+  - 30 天
+  - 注册周
+  must_not_add:
+  - 不要虚构数据仓库表名
+  - 不要添加留存口径之外的指标
+  expected_behavior: none
+- id: v30_translate_api_doc
+  scenario: 翻译
+  ambiguity_level: clear
+  original: '把这段 API 接口说明翻译成日文，代码、字段名和 URL 一律保留原样：
+
+    「调用 GET /api/v1/users 获取用户列表，返回 JSON 数组。参数 page 用于分页，默认 1，每页最多 50 条。
+
+    认证方式为 Bearer Token，缺少令牌时返回 401。」
+
+    目标读者是日方合作团队的技术成员，使用书面语。
+
+    '
+  must_preserve:
+  - /api/v1/users
+  - Bearer Token
+  - '401'
+  - page
+  must_not_add:
+  - 不要虚构错误码以外的接口行为
+  - 不要添加调用示例代码
+  expected_behavior: none
+- id: v30_creative_haiku
+  scenario: 创意
+  ambiguity_level: clear
+  original: '写一首关于深夜便利店的现代短诗，要求：不超过 8 行，出现「灯光」和「收银机」两个意象，
+
+    情感基调孤独但不消极，避免「寂静」「孤独」等直白词语，不押韵。
+
+    '
+  must_preserve:
+  - 灯光
+  - 收银机
+  - 不押韵
+  - 8 行
+  must_not_add:
+  - 不要虚构具体品牌名
+  - 不要添加「孤独」等直白情绪词
+  expected_behavior: light
+- id: v30_code_error_log
+  scenario: 编程
+  ambiguity_level: medium
+  original: '生产环境日志里一直刷这条错误，帮我定位原因并给出修复方案：
+
+    `java.lang.OutOfMemoryError: Java heap space`
+
+    服务是 Spring Boot 的订单服务，最近一次发布后开始出现，之前一直正常。
+
+    '
+  must_preserve:
+  - OutOfMemoryError
+  - Java heap space
+  - Spring Boot
+  - 订单服务
+  must_not_add:
+  - 不要虚构具体堆内存大小
+  - 不要要求补充完整堆栈以外的信息
+  expected_behavior: light
+- id: v30_office_annual_report
+  scenario: 办公写作
+  ambiguity_level: medium
+  original: '帮我写今年部门的年度工作报告，今年主要做了三个项目：新官网上线、客户管理系统重构、数据中台一期。
+
+    年度销售额同比增长 18%，客户满意度从 82 分升到 88 分。
+
+    请你帮忙组织成一篇完整的报告。
+
+    '
+  must_preserve:
+  - 客户管理系统
+  - 18%
+  - 82 分
+  - 88 分
+  must_not_add:
+  - 不要虚构未提及的项目
+  - 不要添加明年预算规划
+  expected_behavior: light
+- id: v30_office_meeting_invite
+  scenario: 办公写作
+  ambiguity_level: medium
+  original: '帮我写一封会议邀请邮件，主题是「Q3 目标对齐会」，参会人是产品和研发两个团队，讨论下季度优先级。
+
+    需要包含时间、地点和议程。
+
+    '
+  must_preserve:
+  - Q3
+  - 目标对齐
+  - 产品
+  - 议程
+  must_not_add:
+  - 不要虚构具体开会日期
+  - 不要添加参会人数要求
+  expected_behavior: light
+- id: v30_qa_git_flow
+  scenario: 问答
+  ambiguity_level: medium
+  original: '我们团队准备从主干开发切到 GitFlow，帮我讲清楚 GitFlow 的分支模型和日常操作，
+
+    包括 feature、release、hotfix 分支什么时候用。
+
+    '
+  must_preserve:
+  - GitFlow
+  - feature
+  - release
+  - hotfix
+  must_not_add:
+  - 不要虚构团队规模
+  - 不要添加具体工具推荐
+  expected_behavior: light
+- id: v30_data_forecast
+  scenario: 数据分析
+  ambiguity_level: medium
+  original: '我们电商平台过去一年每月 GMV 如下，帮我预测下季度 GMV 大概多少，并说明预测依据。
+
+    1月 120 万，2月 98 万，3月 145 万，4月 160 万，5月 152 万，6月 175 万，
+
+    7月 190 万，8月 210 万，9月 205 万，10月 230 万，11月 285 万，12月 320 万。
+
+    '
+  must_preserve:
+  - GMV
+  - 120 万
+  - 320 万
+  - 预测依据
+  must_not_add:
+  - 不要虚构节假日促销计划
+  - 不要给出无依据的具体数字承诺
+  expected_behavior: light
+- id: v30_translate_ui_strings
+  scenario: 翻译
+  ambiguity_level: medium
+  original: '把下面这些界面文案翻译成西班牙语，产品是记账 App，句子都比较短：
+
+    「添加账单 / 本月支出 / 收入 / 余额不足 / 删除这条记录？」
+
+    注意「添加账单」在产品里用来表示新增一笔记录。
+
+    '
+  must_preserve:
+  - 添加账单
+  - 本月支出
+  - 余额不足
+  - 删除这条记录
+  must_not_add:
+  - 不要虚构平台用语规范
+  - 不要改写为长句
+  expected_behavior: light
+- id: v30_creative_video_script
+  scenario: 创意
+  ambiguity_level: medium
+  original: '给我们的企业协作软件拍一条 60 秒介绍视频，视频脚本要包含画面描述和口播文案。
+
+    软件主打文档协作和音视频会议，客户是中型企业。
+
+    '
+  must_preserve:
+  - 60 秒
+  - 文档协作
+  - 音视频会议
+  - 中型企业
+  must_not_add:
+  - 不要虚构客户案例
+  - 不要添加具体演员或场地要求
+  expected_behavior: light
+- id: v30_code_schema_design
+  scenario: 编程
+  ambiguity_level: severe
+  original: '帮我设计一套数据库表结构。
+
+    '
+  must_preserve:
+  - 数据库
+  - 表结构
+  must_not_add:
+  - 不要虚构业务场景
+  - 不要假设具体数据库类型
+  expected_behavior: clarify
+- id: v30_office_email_generic
+  scenario: 办公写作
+  ambiguity_level: severe
+  original: '帮我写一封邮件，内容你看着定。
+
+    '
+  must_preserve:
+  - 邮件
+  - 你看着定
+  must_not_add:
+  - 不要虚构收件人与事由
+  - 不要编造事件背景
+  expected_behavior: clarify
+- id: v30_qa_what_is_this
+  scenario: 问答
+  ambiguity_level: severe
+  original: '这是什么意思？
+
+    '
+  must_preserve:
+  - 这是
+  - 意思
+  must_not_add:
+  - 不要猜测所指对象
+  - 不要编造具体术语解释
+  expected_behavior: clarify
+- id: v30_data_improve_conversion
+  scenario: 数据分析
+  ambiguity_level: severe
+  original: '怎么提升我们的转化率？
+
+    '
+  must_preserve:
+  - 提升
+  - 转化率
+  must_not_add:
+  - 不要虚构行业基准数据
+  - 不要假设具体业务形态
+  expected_behavior: clarify
+- id: v30_translate_generic
+  scenario: 翻译
+  ambiguity_level: severe
+  original: '帮我翻译一下。
+
+    '
+  must_preserve:
+  - 翻译
+  - 帮我翻译
+  must_not_add:
+  - 不要虚构原文内容
+  - 不要假设目标语言
+  expected_behavior: clarify
+- id: v30_creative_advertise
+  scenario: 创意
+  ambiguity_level: severe
+  original: '帮我写个广告。
+
+    '
+  must_preserve:
+  - 广告
+  - 写个广告
+  must_not_add:
+  - 不要虚构产品信息
+  - 不要假设投放渠道
+  expected_behavior: clarify

@@ -1,0 +1,1178 @@
+{
+  "reviewed": 48,
+  "non_tie_pairs": 26,
+  "winner_agreement_non_tie": 0.2692,
+  "tie_or_vs_tie_cases": 22,
+  "direction_consistent": false,
+  "dims_mad_vs_judge": {
+    "accuracy": 0.792,
+    "completeness": 1.497,
+    "relevance": 1.087,
+    "clarity": 1.094
+  },
+  "overall_mad": 1.117,
+  "conflicts": [
+    {
+      "item": 1,
+      "sample_id": "v30_qa_cloud_costs",
+      "target": "plan_glm_5_2",
+      "difficulty": "medium",
+      "human": "original",
+      "judge": "enhanced"
+    },
+    {
+      "item": 2,
+      "sample_id": "v30_office_annual_report",
+      "target": "plan_glm_5_2",
+      "difficulty": "medium",
+      "human": "original",
+      "judge": "enhanced"
+    },
+    {
+      "item": 4,
+      "sample_id": "v30_office_write_plan",
+      "target": "plan_doubao",
+      "difficulty": "severe",
+      "human": "original",
+      "judge": "enhanced"
+    },
+    {
+      "item": 5,
+      "sample_id": "v30_creative_wechat_post",
+      "target": "plan_doubao_pro",
+      "difficulty": "medium",
+      "human": "original",
+      "judge": "enhanced"
+    },
+    {
+      "item": 11,
+      "sample_id": "v30_qa_cloud_costs",
+      "target": "plan_glm",
+      "difficulty": "medium",
+      "human": "original",
+      "judge": "enhanced"
+    },
+    {
+      "item": 14,
+      "sample_id": "v30_data_analyze_excel",
+      "target": "plan_doubao_pro",
+      "difficulty": "severe",
+      "human": "original",
+      "judge": "enhanced"
+    },
+    {
+      "item": 17,
+      "sample_id": "v30_code_error_log",
+      "target": "plan_doubao",
+      "difficulty": "medium",
+      "human": "original",
+      "judge": "enhanced"
+    },
+    {
+      "item": 22,
+      "sample_id": "v30_office_write_plan",
+      "target": "plan_doubao_pro",
+      "difficulty": "severe",
+      "human": "original",
+      "judge": "enhanced"
+    },
+    {
+      "item": 26,
+      "sample_id": "v30_creative_advertise",
+      "target": "plan_glm",
+      "difficulty": "severe",
+      "human": "original",
+      "judge": "enhanced"
+    },
+    {
+      "item": 33,
+      "sample_id": "v30_code_refactor_class",
+      "target": "plan_doubao",
+      "difficulty": "medium",
+      "human": "original",
+      "judge": "enhanced"
+    },
+    {
+      "item": 36,
+      "sample_id": "v30_qa_wrong_premise",
+      "target": "plan_glm_5_2",
+      "difficulty": "severe",
+      "human": "original",
+      "judge": "enhanced"
+    },
+    {
+      "item": 38,
+      "sample_id": "v30_launch_email",
+      "target": "plan_doubao",
+      "difficulty": "clear",
+      "human": "original",
+      "judge": "enhanced"
+    },
+    {
+      "item": 39,
+      "sample_id": "v30_data_forecast",
+      "target": "plan_doubao",
+      "difficulty": "medium",
+      "human": "original",
+      "judge": "enhanced"
+    },
+    {
+      "item": 41,
+      "sample_id": "v30_qa_nginx_502",
+      "target": "plan_glm_5_2",
+      "difficulty": "clear",
+      "human": "original",
+      "judge": "enhanced"
+    },
+    {
+      "item": 42,
+      "sample_id": "v30_qa_compare_plans",
+      "target": "plan_doubao_pro",
+      "difficulty": "severe",
+      "human": "original",
+      "judge": "enhanced"
+    },
+    {
+      "item": 43,
+      "sample_id": "v30_sql_order_query",
+      "target": "plan_glm_5_2",
+      "difficulty": "clear",
+      "human": "original",
+      "judge": "enhanced"
+    },
+    {
+      "item": 44,
+      "sample_id": "v30_office_project_proposal",
+      "target": "plan_glm_5_2",
+      "difficulty": "medium",
+      "human": "original",
+      "judge": "enhanced"
+    },
+    {
+      "item": 46,
+      "sample_id": "v30_code_refactor_goal",
+      "target": "plan_glm",
+      "difficulty": "severe",
+      "human": "original",
+      "judge": "enhanced"
+    },
+    {
+      "item": 48,
+      "sample_id": "v30_meeting_minutes",
+      "target": "plan_glm",
+      "difficulty": "clear",
+      "human": "original",
+      "judge": "enhanced"
+    }
+  ],
+  "rows": [
+    {
+      "item": 1,
+      "sample_id": "v30_qa_cloud_costs",
+      "target": "plan_glm_5_2",
+      "difficulty": "medium",
+      "human_winner": "original",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 1.0,
+        "relevance": 0.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.6666666666666666,
+        "completeness": 1.3333333333333333,
+        "relevance": 0.3333333333333333,
+        "clarity": 0.0
+      },
+      "reason": "A 对每类原因逐项给出排查路径与数据清单、建议分级清晰；B 亦扎实但诊断可操作性略弱。"
+    },
+    {
+      "item": 2,
+      "sample_id": "v30_office_annual_report",
+      "target": "plan_glm_5_2",
+      "difficulty": "medium",
+      "human_winner": "original",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "relevance": 0.0,
+        "clarity": -1.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.6666666666666666,
+        "relevance": 0.0,
+        "clarity": -0.3333333333333333
+      },
+      "reason": "两版结构均完整规范，A 项目细节更具体并将指标与项目关联，B 略多套话空泛。"
+    },
+    {
+      "item": 3,
+      "sample_id": "v30_data_sql_cohort",
+      "target": "plan_doubao_pro",
+      "difficulty": "clear",
+      "human_winner": "original",
+      "judge_winner": "original",
+      "human_deltas": {
+        "accuracy": -3.0,
+        "completeness": -1.0,
+        "relevance": 0.0,
+        "clarity": -1.0
+      },
+      "judge_deltas": {
+        "accuracy": -3.0,
+        "completeness": 1.6666666666666667,
+        "relevance": 0.0,
+        "clarity": 0.0
+      },
+      "reason": "B 分母未按用户去重，多单用户会被重复计数导致结果错误；A 逻辑正确，仅误称兼容 MySQL。"
+    },
+    {
+      "item": 4,
+      "sample_id": "v30_office_write_plan",
+      "target": "plan_doubao",
+      "difficulty": "severe",
+      "human_winner": "original",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 1.0,
+        "relevance": -1.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.0,
+        "completeness": 3.6666666666666665,
+        "relevance": 2.3333333333333335,
+        "clarity": 0.3333333333333333
+      },
+      "reason": "A 直接交付数据自洽的完整方案且假设明示；B 偏框架与示例，成品交付度略低。"
+    },
+    {
+      "item": 5,
+      "sample_id": "v30_creative_wechat_post",
+      "target": "plan_doubao_pro",
+      "difficulty": "medium",
+      "human_winner": "original",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 1.0,
+        "completeness": -1.0,
+        "relevance": -1.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": 2.3333333333333335,
+        "completeness": 1.0,
+        "relevance": 1.0,
+        "clarity": 1.0
+      },
+      "reason": "A 三渠道版本卖点齐全、更有吸引力；B 稳健但冲击力不足，A 仅口罩识别略有夸大。"
+    },
+    {
+      "item": 6,
+      "sample_id": "v30_office_followup_email",
+      "target": "plan_glm",
+      "difficulty": "medium",
+      "human_winner": "tie",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "relevance": 0.0,
+        "clarity": -1.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.6666666666666666,
+        "completeness": 1.0,
+        "relevance": 0.3333333333333333,
+        "clarity": 0.6666666666666666
+      },
+      "reason": "两封均完整得体、覆盖催时间与确认联系人两诉求；B 更简洁具体，A 稍显冗饰，整体接近。"
+    },
+    {
+      "item": 7,
+      "sample_id": "v30_code_decorator_retry",
+      "target": "plan_doubao",
+      "difficulty": "clear",
+      "human_winner": "original",
+      "judge_winner": "original",
+      "human_deltas": {
+        "accuracy": -1.0,
+        "completeness": 2.0,
+        "relevance": 0.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": -0.3333333333333333,
+        "completeness": 0.3333333333333333,
+        "relevance": -0.6666666666666666,
+        "clarity": -2.0
+      },
+      "reason": "B 覆盖并发与退避两焦点并确认退避合规，但误称 except Exception 捕获键盘中断；A 漏答退避焦点。"
+    },
+    {
+      "item": 8,
+      "sample_id": "v30_creative_story_opening",
+      "target": "plan_doubao",
+      "difficulty": "clear",
+      "human_winner": "tie",
+      "judge_winner": "original",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "relevance": 0.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "relevance": 0.0,
+        "clarity": 0.6666666666666666
+      },
+      "reason": "两者均满足人称、悬念要求且未点明外星人；A 意象更浓但字数略超，B 更精炼，难分高下。"
+    },
+    {
+      "item": 9,
+      "sample_id": "v30_sql_order_query",
+      "target": "plan_doubao_pro",
+      "difficulty": "clear",
+      "human_winner": "tie",
+      "judge_winner": "tie",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "relevance": 0.0,
+        "clarity": 1.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "relevance": 0.0,
+        "clarity": -0.6666666666666666
+      },
+      "reason": "两者SQL均正确且满足单查询、无窗口函数、月升序内金额降序全部约束，仅别名与嵌套代码块格式差异，判平。"
+    },
+    {
+      "item": 10,
+      "sample_id": "v30_js_promise_race",
+      "target": "plan_doubao",
+      "difficulty": "clear",
+      "human_winner": "tie",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "relevance": -1.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.6666666666666666,
+        "completeness": 1.0,
+        "relevance": 0.3333333333333333,
+        "clarity": 0.0
+      },
+      "reason": "两方案都能保证结果来自最后一次请求并保留取消能力；B闭包封装更干净但解释第4点含混，A略冗余，接近平手。"
+    },
+    {
+      "item": 11,
+      "sample_id": "v30_qa_cloud_costs",
+      "target": "plan_glm",
+      "difficulty": "medium",
+      "human_winner": "original",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": -1.0,
+        "completeness": -7.0,
+        "relevance": -1.0,
+        "clarity": -2.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.0,
+        "completeness": -0.6666666666666666,
+        "relevance": -1.0,
+        "clarity": -0.6666666666666666
+      },
+      "reason": "A完整覆盖涨因定位、分级降本建议与行动顺序且结构清晰；B在排查表中途截断，完全缺失降本建议主体。"
+    },
+    {
+      "item": 12,
+      "sample_id": "v30_code_refactor_goal",
+      "target": "plan_doubao",
+      "difficulty": "severe",
+      "human_winner": "tie",
+      "judge_winner": "original",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "relevance": 0.0,
+        "clarity": -1.0
+      },
+      "judge_deltas": {
+        "accuracy": -0.6666666666666666,
+        "completeness": -1.3333333333333333,
+        "relevance": -0.6666666666666666,
+        "clarity": -0.6666666666666666
+      },
+      "reason": "两者均正确指出缺少代码并索要补充信息，B以清单列出语言、报错日志等更易执行，但差距小判平。"
+    },
+    {
+      "item": 13,
+      "sample_id": "v30_data_retention_analysis",
+      "target": "plan_glm_5_2",
+      "difficulty": "clear",
+      "human_winner": "tie",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 1.0,
+        "completeness": 0.0,
+        "relevance": 0.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.6666666666666666,
+        "completeness": 1.0,
+        "relevance": 0.0,
+        "clarity": 0.6666666666666666
+      },
+      "reason": "两者数据核算均准确、趋势与异常解读到位且严守只用给定数据；B附数据局限说明更严谨，整体接近判平。"
+    },
+    {
+      "item": 14,
+      "sample_id": "v30_data_analyze_excel",
+      "target": "plan_doubao_pro",
+      "difficulty": "severe",
+      "human_winner": "original",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": -1.0,
+        "relevance": -1.0,
+        "clarity": -2.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.0,
+        "completeness": -0.3333333333333333,
+        "relevance": 0.3333333333333333,
+        "clarity": 0.6666666666666666
+      },
+      "reason": "A主动列出表结构、分析目标等多路径信息清单更可执行；B仅一句索要附件且『按指定步骤』表述含混。"
+    },
+    {
+      "item": 15,
+      "sample_id": "v30_translate_ui_strings",
+      "target": "plan_doubao_pro",
+      "difficulty": "medium",
+      "human_winner": "tie",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "relevance": 0.0,
+        "clarity": 1.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.3333333333333333,
+        "relevance": 2.0,
+        "clarity": 1.6666666666666667
+      },
+      "reason": "五条译文均正确且都尊重『添加账单=新增记录』的语境，B逐条选词及地区差异说明更有价值但略冗长，判平。"
+    },
+    {
+      "item": 16,
+      "sample_id": "v30_office_announcement",
+      "target": "plan_glm_5_2",
+      "difficulty": "severe",
+      "human_winner": "tie",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": -2.0,
+        "completeness": 0.0,
+        "relevance": 0.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.6666666666666666,
+        "completeness": 3.6666666666666665,
+        "relevance": 3.3333333333333335,
+        "clarity": 1.0
+      },
+      "reason": "A直接给出完整可用通知示例但虚构『您提供的暂定信息』；B以模板加澄清问题应对模糊需求更稳妥，接近平手。"
+    },
+    {
+      "item": 17,
+      "sample_id": "v30_code_error_log",
+      "target": "plan_doubao",
+      "difficulty": "medium",
+      "human_winner": "original",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": -1.0,
+        "completeness": -1.0,
+        "relevance": 0.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.6666666666666666,
+        "completeness": 0.6666666666666666,
+        "relevance": 0.6666666666666666,
+        "clarity": 0.3333333333333333
+      },
+      "reason": "A 给出各根因的具体修复代码与验证步骤，更可落地；B 偏排查流程，且 LeakCanary Java 版说法欠妥。"
+    },
+    {
+      "item": 18,
+      "sample_id": "v30_code_algorithm_optimize",
+      "target": "plan_doubao_pro",
+      "difficulty": "medium",
+      "human_winner": "tie",
+      "judge_winner": "tie",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "relevance": 0.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.3333333333333333,
+        "completeness": 0.3333333333333333,
+        "relevance": 0.0,
+        "clarity": 0.0
+      },
+      "reason": "两者复杂度分析与 O(n) 字典方案均正确；A 多性能对比和 pandas，B 多等价性验证测试，各有侧重。"
+    },
+    {
+      "item": 19,
+      "sample_id": "v30_code_decorator_retry",
+      "target": "plan_glm",
+      "difficulty": "clear",
+      "human_winner": "tie",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "relevance": 0.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.3333333333333333,
+        "relevance": 0.0,
+        "clarity": 0.3333333333333333
+      },
+      "reason": "五条问题与三段结构几乎等价，竞态字节码分析与退避缺抖动、无上限的论证均准确，难分高下。"
+    },
+    {
+      "item": 20,
+      "sample_id": "v30_creative_story_opening",
+      "target": "plan_glm_5_2",
+      "difficulty": "clear",
+      "human_winner": "tie",
+      "judge_winner": "original",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "relevance": 0.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "relevance": -0.6666666666666666,
+        "clarity": -0.6666666666666666
+      },
+      "reason": "均满足第一人称、字数与悬念要求且未点破外星人袭击；A 意境更独特，B 钩子更抓人，文风各有千秋。"
+    },
+    {
+      "item": 21,
+      "sample_id": "v30_data_kpi_dashboard",
+      "target": "plan_glm",
+      "difficulty": "medium",
+      "human_winner": "tie",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 1.0,
+        "relevance": 0.0,
+        "clarity": -1.0
+      },
+      "judge_deltas": {
+        "accuracy": 1.0,
+        "completeness": 3.0,
+        "relevance": 1.0,
+        "clarity": 1.0
+      },
+      "reason": "A 指标口径与数据可得性标注更完备；B 布局示意与落地建议更直观，整体质量接近故判平。"
+    },
+    {
+      "item": 22,
+      "sample_id": "v30_office_write_plan",
+      "target": "plan_doubao_pro",
+      "difficulty": "severe",
+      "human_winner": "original",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": -3.0,
+        "completeness": 0.0,
+        "relevance": -2.0,
+        "clarity": -1.0
+      },
+      "judge_deltas": {
+        "accuracy": 2.6666666666666665,
+        "completeness": 6.333333333333333,
+        "relevance": 5.333333333333333,
+        "clarity": 1.0
+      },
+      "reason": "提示词过于模糊，A 先澄清并给通用模板更稳妥；B 编造品牌与市场数据且引伪出处，准确性受损。"
+    },
+    {
+      "item": 23,
+      "sample_id": "v30_data_analyze_excel",
+      "target": "plan_glm",
+      "difficulty": "severe",
+      "human_winner": "tie",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "relevance": 0.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.3333333333333333,
+        "completeness": 2.0,
+        "relevance": 0.6666666666666666,
+        "clarity": 1.0
+      },
+      "reason": "均正确指出无附件且拒绝编造分析，A 简洁友好，B 附待执行分析计划表，差异细微判平。"
+    },
+    {
+      "item": 24,
+      "sample_id": "v30_code_error_log",
+      "target": "plan_glm",
+      "difficulty": "medium",
+      "human_winner": "original",
+      "judge_winner": "original",
+      "human_deltas": {
+        "accuracy": -3.0,
+        "completeness": -8.0,
+        "relevance": -1.0,
+        "clarity": -6.0
+      },
+      "judge_deltas": {
+        "accuracy": -2.5,
+        "completeness": -7.0,
+        "relevance": -3.0,
+        "clarity": -1.5
+      },
+      "reason": "A 回答明显截断，仅剩开头一句；B 判断、止血、定位、修复、预防完整准确，B 完胜。"
+    },
+    {
+      "item": 25,
+      "sample_id": "v30_qa_https_explain",
+      "target": "plan_glm",
+      "difficulty": "clear",
+      "human_winner": "tie",
+      "judge_winner": "tie",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "relevance": -1.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.0,
+        "completeness": 1.0,
+        "relevance": 0.0,
+        "clarity": 0.3333333333333333
+      },
+      "reason": "两者均准确合规且控制在字数内；B 比喻更贴近非技术读者，A 结尾备注略显多余，整体非常接近。"
+    },
+    {
+      "item": 26,
+      "sample_id": "v30_creative_advertise",
+      "target": "plan_glm",
+      "difficulty": "severe",
+      "human_winner": "original",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 6.0,
+        "relevance": 1.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": 3.3333333333333335,
+        "completeness": 7.0,
+        "relevance": 7.0,
+        "clarity": 2.3333333333333335
+      },
+      "reason": "A 直接交付可用的完整广告文案并附创作思路与调整选项；B 只罗列反问问题，未产出任何广告内容。"
+    },
+    {
+      "item": 27,
+      "sample_id": "v30_code_contradictory",
+      "target": "plan_doubao",
+      "difficulty": "severe",
+      "human_winner": "tie",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "relevance": 0.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": 2.0,
+        "completeness": 1.6666666666666667,
+        "relevance": 1.6666666666666667,
+        "clarity": 1.3333333333333333
+      },
+      "reason": "两案均全面且守住不改接口约束；A 示例更落地但 MQ 方案改变返回语义，B 严谨但配置示例有小瑕疵，难分高下。"
+    },
+    {
+      "item": 28,
+      "sample_id": "v30_data_retention_analysis",
+      "target": "plan_glm",
+      "difficulty": "clear",
+      "human_winner": "original",
+      "judge_winner": "tie",
+      "human_deltas": {
+        "accuracy": 2.0,
+        "completeness": 0.0,
+        "relevance": 0.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "relevance": 0.0,
+        "clarity": 0.0
+      },
+      "reason": "B 环比表与线性拟合均准确；A 把5月-2pp误算为-3pp，并错误宣称每月等差下滑3pp，数据报告出现硬伤。"
+    },
+    {
+      "item": 29,
+      "sample_id": "v30_translate_audio_transcript",
+      "target": "plan_doubao_pro",
+      "difficulty": "severe",
+      "human_winner": "original",
+      "judge_winner": "original",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": -1.0,
+        "relevance": 0.0,
+        "clarity": -1.0
+      },
+      "judge_deltas": {
+        "accuracy": -0.3333333333333333,
+        "completeness": -1.3333333333333333,
+        "relevance": -0.6666666666666666,
+        "clarity": -0.6666666666666666
+      },
+      "reason": "两者都正确指出缺少录音并索要文字稿；A 补充了提交方式与术语适配建议，引导更充分。"
+    },
+    {
+      "item": 30,
+      "sample_id": "v30_office_report_summary",
+      "target": "plan_glm",
+      "difficulty": "severe",
+      "human_winner": "original",
+      "judge_winner": "original",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": -3.0,
+        "relevance": 0.0,
+        "clarity": -1.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.0,
+        "completeness": -1.6666666666666667,
+        "relevance": 0.0,
+        "clarity": -0.6666666666666666
+      },
+      "reason": "两者都正确要求提供文档；A 给出粘贴/上传两种方式并预收总结偏好，B 仅一句话，帮助有限。"
+    },
+    {
+      "item": 31,
+      "sample_id": "v30_translate_generic",
+      "target": "plan_doubao",
+      "difficulty": "severe",
+      "human_winner": "tie",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "relevance": 0.0,
+        "clarity": -1.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.3333333333333333,
+        "completeness": 1.6666666666666667,
+        "relevance": 0.0,
+        "clarity": 1.0
+      },
+      "reason": "两者都正确索要原文与目标语言；A 信息更全但语气生硬，B 友好简洁，整体相当。"
+    },
+    {
+      "item": 32,
+      "sample_id": "v30_code_refactor_goal",
+      "target": "plan_glm_5_2",
+      "difficulty": "severe",
+      "human_winner": "tie",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 1.0,
+        "relevance": 0.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": 1.0,
+        "completeness": 2.0,
+        "relevance": 0.6666666666666666,
+        "clarity": 1.3333333333333333
+      },
+      "reason": "都正确指出未收到代码；B 分层列出必要/辅助信息并预告排查思路与交付形式，略更周全但优势不大。"
+    },
+    {
+      "item": 33,
+      "sample_id": "v30_code_refactor_class",
+      "target": "plan_doubao",
+      "difficulty": "medium",
+      "human_winner": "original",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": -1.0,
+        "completeness": -3.0,
+        "relevance": -1.0,
+        "clarity": -1.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.3333333333333333,
+        "completeness": 0.3333333333333333,
+        "relevance": 0.3333333333333333,
+        "clarity": 0.3333333333333333
+      },
+      "reason": "A给出两种可行重构、示例完整且接口不变；B只有占位骨架，逻辑留待用户补齐，乱源分析含臆测。"
+    },
+    {
+      "item": 34,
+      "sample_id": "v30_code_algorithm_optimize",
+      "target": "plan_glm_5_2",
+      "difficulty": "medium",
+      "human_winner": "tie",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "relevance": -1.0,
+        "clarity": -1.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.0,
+        "completeness": 1.3333333333333333,
+        "relevance": 0.0,
+        "clarity": 0.3333333333333333
+      },
+      "reason": "两者都准确指出O(N²)并用Counter降到O(N)；B附验证代码更严谨，A更简洁并给出pandas等替代，整体接近。"
+    },
+    {
+      "item": 35,
+      "sample_id": "v30_office_report_summary",
+      "target": "plan_glm_5_2",
+      "difficulty": "severe",
+      "human_winner": "original",
+      "judge_winner": "original",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": -4.0,
+        "relevance": -1.0,
+        "clarity": -3.0
+      },
+      "judge_deltas": {
+        "accuracy": -0.6666666666666666,
+        "completeness": -3.0,
+        "relevance": -1.3333333333333333,
+        "clarity": -1.6666666666666667
+      },
+      "reason": "文档缺失时B礼貌说明缺失、引导补发并澄清总结偏好；A仅一句索要文档，帮助性差距明显。"
+    },
+    {
+      "item": 36,
+      "sample_id": "v30_qa_wrong_premise",
+      "target": "plan_glm_5_2",
+      "difficulty": "severe",
+      "human_winner": "original",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": -1.0,
+        "completeness": 1.0,
+        "relevance": -1.0,
+        "clarity": -2.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.3333333333333333,
+        "completeness": 2.3333333333333335,
+        "relevance": 0.6666666666666666,
+        "clarity": 0.6666666666666666
+      },
+      "reason": "A聚焦Python列出四类成因并给出id打印排查法，具体可执行；B覆盖广但跨语言铺陈冗长，开头还误称用户给了方向。"
+    },
+    {
+      "item": 37,
+      "sample_id": "v30_js_promise_race",
+      "target": "plan_doubao_pro",
+      "difficulty": "clear",
+      "human_winner": "tie",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "relevance": 0.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": 2.6666666666666665,
+        "completeness": 1.6666666666666667,
+        "relevance": 1.3333333333333333,
+        "clarity": 1.0
+      },
+      "reason": "两者都保证最新请求胜出且不改调用方；A自动abort旧请求、解释透彻但旧错处理不一，B语义干净却不取消在途请求。"
+    },
+    {
+      "item": 38,
+      "sample_id": "v30_launch_email",
+      "target": "plan_doubao",
+      "difficulty": "clear",
+      "human_winner": "original",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 1.0,
+        "relevance": 1.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.6666666666666666,
+        "relevance": 0.3333333333333333,
+        "clarity": 0.3333333333333333
+      },
+      "reason": "两者要素齐全、正文均达标；A语气更贴合专业友好，B的语气词与表情符号偏随意，A主题行也更扣召回目标。"
+    },
+    {
+      "item": 39,
+      "sample_id": "v30_data_forecast",
+      "target": "plan_doubao",
+      "difficulty": "medium",
+      "human_winner": "original",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 2.0,
+        "completeness": 1.0,
+        "relevance": 0.0,
+        "clarity": -1.0
+      },
+      "judge_deltas": {
+        "accuracy": 3.0,
+        "completeness": 3.3333333333333335,
+        "relevance": 2.0,
+        "clarity": 2.6666666666666665
+      },
+      "reason": "A情景化预测数字自洽并交代假设、不确定性与数据局限；B月度加总910与均值920矛盾，部分统计口径粗糙。"
+    },
+    {
+      "item": 40,
+      "sample_id": "v30_creative_slogan",
+      "target": "plan_doubao_pro",
+      "difficulty": "clear",
+      "human_winner": "original",
+      "judge_winner": "original",
+      "human_deltas": {
+        "accuracy": -2.0,
+        "completeness": 0.0,
+        "relevance": -1.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": -1.0,
+        "completeness": -1.3333333333333333,
+        "relevance": -1.0,
+        "clarity": -1.0
+      },
+      "reason": "两者都超字数但A为12-13字更接近8-12字要求且卖点全覆盖；B三句均约15字并额外引入考纲这一题外卖点。"
+    },
+    {
+      "item": 41,
+      "sample_id": "v30_qa_nginx_502",
+      "target": "plan_glm_5_2",
+      "difficulty": "clear",
+      "human_winner": "original",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 1.0,
+        "relevance": 0.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.6666666666666666,
+        "completeness": 1.6666666666666667,
+        "relevance": 0.0,
+        "clarity": 0.3333333333333333
+      },
+      "reason": "两者命令均准确无误；B 额外覆盖应用日志、fd 上限、磁盘与占位符指引，且每步给出正常/异常判据，略胜。"
+    },
+    {
+      "item": 42,
+      "sample_id": "v30_qa_compare_plans",
+      "target": "plan_doubao_pro",
+      "difficulty": "severe",
+      "human_winner": "original",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": -4.0,
+        "completeness": 1.0,
+        "relevance": -4.0,
+        "clarity": -2.0
+      },
+      "judge_deltas": {
+        "accuracy": -4.0,
+        "completeness": 4.666666666666667,
+        "relevance": -2.0,
+        "clarity": -1.0
+      },
+      "reason": "任务缺两方案信息，A 擅自虚构门店场景且成本自相矛盾（32000≠27000），B 恰当索要关键信息，更稳妥。"
+    },
+    {
+      "item": 43,
+      "sample_id": "v30_sql_order_query",
+      "target": "plan_glm_5_2",
+      "difficulty": "clear",
+      "human_winner": "original",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "relevance": 0.0,
+        "clarity": -1.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "relevance": 0.6666666666666666,
+        "clarity": -0.3333333333333333
+      },
+      "reason": "SQL 均正确且满足全部约束；A 额外解释索引友好的日期过滤与排序逻辑，并给出 PostgreSQL 写法，更清晰实用。"
+    },
+    {
+      "item": 44,
+      "sample_id": "v30_office_project_proposal",
+      "target": "plan_glm_5_2",
+      "difficulty": "medium",
+      "human_winner": "original",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 7.0,
+        "relevance": 1.0,
+        "clarity": 2.0
+      },
+      "judge_deltas": {
+        "accuracy": 1.5,
+        "completeness": 3.5,
+        "relevance": 1.5,
+        "clarity": 2.5
+      },
+      "reason": "A 口径治理、里程碑、预算、风险齐备且假设均明确标注；B 中途截断，缺预算、排期、风险等核心章节。"
+    },
+    {
+      "item": 45,
+      "sample_id": "v30_translate_abstract",
+      "target": "plan_doubao_pro",
+      "difficulty": "medium",
+      "human_winner": "tie",
+      "judge_winner": "tie",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "relevance": 0.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.0,
+        "completeness": 0.0,
+        "relevance": 0.6666666666666666,
+        "clarity": 0.3333333333333333
+      },
+      "reason": "两份译文完全一致、准确且专业；A 侧重句式调整说明，B 术语注释更细，质量难分高下，判平。"
+    },
+    {
+      "item": 46,
+      "sample_id": "v30_code_refactor_goal",
+      "target": "plan_glm",
+      "difficulty": "severe",
+      "human_winner": "original",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": 1.0,
+        "relevance": 0.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.3333333333333333,
+        "completeness": 1.3333333333333333,
+        "relevance": 0.6666666666666666,
+        "clarity": 1.0
+      },
+      "reason": "两者均正确指出未收到代码并请求补充；B 给出具体症状示例、长代码发送建议与交付说明，引导更充分。"
+    },
+    {
+      "item": 47,
+      "sample_id": "v30_creative_landing_hero",
+      "target": "plan_doubao",
+      "difficulty": "medium",
+      "human_winner": "tie",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": -1.0,
+        "relevance": 0.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.3333333333333333,
+        "completeness": 0.0,
+        "relevance": 0.6666666666666666,
+        "clarity": 0.0
+      },
+      "reason": "A 文案更有情感张力但仅 2 版且零基础卖点覆盖不全；B 四种风格齐全、各卖点均覆盖，整体相当，判平。"
+    },
+    {
+      "item": 48,
+      "sample_id": "v30_meeting_minutes",
+      "target": "plan_glm",
+      "difficulty": "clear",
+      "human_winner": "original",
+      "judge_winner": "enhanced",
+      "human_deltas": {
+        "accuracy": 0.0,
+        "completeness": -2.0,
+        "relevance": 0.0,
+        "clarity": 0.0
+      },
+      "judge_deltas": {
+        "accuracy": 0.0,
+        "completeness": 1.0,
+        "relevance": 1.0,
+        "clarity": 1.5
+      },
+      "reason": "两者均忠实原信息、未编造；A 待办含前后端开发、联调、测试计划与风险跟进共 5 项，B 仅列 2 项，完整性偏弱。"
+    }
+  ]
+}
