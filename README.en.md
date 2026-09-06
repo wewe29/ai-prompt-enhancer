@@ -29,6 +29,8 @@ Prefer filing an issue on GitHub so other users can see and verify it. You can a
 - Manual edit, undo, redo (`Ctrl+Z` / `Ctrl+Shift+Z` · `Ctrl+Y`), quick send (`Ctrl+Enter`), and close (`Esc`).
 - 0–5 optional supplementary suggestions.
 - Enhancement-level judgement (no meaningful change / light enhancement / clarification needed) plus task-aware pre-send quick check.
+- Result view shows a delivery badge, user-provided facts, risk flags with required protection, and switchable prompt candidates (1-3).
+- Change list supports per-item or batch accept / reject; partial deliveries list missing fields; clarification shows current and remaining rounds.
 - Delivery-degradation guarantee: on a structurally invalid model response, fall back to partial delivery or the original prompt so input is never lost.
 - Local text extraction from TXT, code, text-layer PDF and DOCX attachments.
 - API key stored in the Windows credential manager.

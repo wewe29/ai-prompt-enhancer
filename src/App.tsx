@@ -18,7 +18,7 @@ import { HistoryView } from "./views/HistoryView";
 import { ProfileView } from "./views/ProfileView";
 import { SettingsView } from "./views/SettingsView";
 
-const SYSTEM_PROMPT_VERSION = "promptcraft-v2.1.0";
+const SYSTEM_PROMPT_VERSION = "promptcraft-v2.2.0";
 
 const defaultProvider: ProviderConfig = {
   baseUrl: "https://api.deepseek.com",
@@ -75,6 +75,7 @@ export default function App() {
   const [monthlyWarningLimit, setMonthlyWarningLimit] = useState(8);
   const [monthlyLimit, setMonthlyLimit] = useState(10);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [activeCandidate, setActiveCandidate] = useState(1);
   const generationRef = useRef(0);
 
   useEffect(() => {
@@ -154,7 +155,7 @@ export default function App() {
     if (monthlyLimit > 0 && projectedMonthTotal > monthlyLimit) { setError(`预计本次请求会使本月费用达到约 ¥${projectedMonthTotal.toFixed(2)}，超过强制额度 ¥${monthlyLimit.toFixed(2)}，已阻止调用。`); return; }
 
     const generationId = ++generationRef.current;
-    setShowSecurity(false); setError(monthlyWarningLimit > 0 && projectedMonthTotal >= monthlyWarningLimit ? `费用提醒：预计本次后本月累计约 ¥${projectedMonthTotal.toFixed(2)}，仍允许继续。` : ""); setState("streaming"); setResult(null); setOutput(""); setUndoStack([]); setRedoStack([]); setNotices([]);
+    setShowSecurity(false); setError(monthlyWarningLimit > 0 && projectedMonthTotal >= monthlyWarningLimit ? `费用提醒：预计本次后本月累计约 ¥${projectedMonthTotal.toFixed(2)}，仍允许继续。` : ""); setState("streaming"); setResult(null); setOutput(""); setUndoStack([]); setRedoStack([]); setNotices([]); setActiveCandidate(1);
     const request: EnhancementRequest = {
       originalText: original,
       contextText: overrideContext ?? context,
@@ -185,6 +186,9 @@ export default function App() {
           const nextNotices = [...new Set(normalized.notices ?? [])];
           if (normalized.delivery_status === "fallback" && nextNotices.length === 0) {
             nextNotices.push("已保留原文（增强服务未返回可用结构）");
+          }
+          if (original.length > 0 && normalized.primary_prompt.length > original.length * 3) {
+            nextNotices.push("结果明显长于原文，可尝试『仅保留必要修改』精简。");
           }
           setNotices(nextNotices);
           setOutput(normalized.primary_prompt);
@@ -235,6 +239,39 @@ export default function App() {
   };
 
   const hasActionableChanges = result?.changes.some((change) => change.state === "pending" || change.state === "accepted") ?? false;
+  const hasPendingChanges = result?.changes.some((change) => change.state === "pending") ?? false;
+
+  const acceptAllChanges = () => {
+    if (!result || state === "streaming") return;
+    const pending = result.changes.filter((change) => change.state === "pending");
+    if (!pending.length) return;
+    let text = output;
+    const failed: string[] = [];
+    for (const change of pending) {
+      const { text: next, applied } = applyChangeDecisionSafe(text, change, "accepted");
+      if (applied) text = next;
+      else failed.push(change.reason);
+    }
+    commitOutput(text);
+    if (failed.length) {
+      setNotices((current) => [...new Set([...current, ...failed.map((reason) => `原文已被编辑，无法自动应用该项：${reason}`)])]);
+    }
+    setResult((current) => current ? { ...current, changes: current.changes.map((item) => item.state === "pending" ? { ...item, state: "accepted" } : item) } : current);
+  };
+
+  const rejectAllChanges = () => {
+    if (!result || state === "streaming") return;
+    setResult((current) => current ? { ...current, changes: current.changes.map((item) => item.state === "pending" ? { ...item, state: "rejected" } : item) } : current);
+  };
+
+  const switchCandidate = (index: number) => {
+    if (!result || state === "streaming") return;
+    const list = result.candidates?.length ? result.candidates : [{ index: 1, text: result.primary_prompt }];
+    const target = list.find((item) => item.index === index);
+    if (!target) return;
+    setActiveCandidate(index);
+    if (target.text !== output) commitOutput(target.text);
+  };
 
   const restoreOriginal = () => { if (output !== original) commitOutput(original); };
 
@@ -274,7 +311,7 @@ export default function App() {
 
   return <div className="app-shell">
     <Sidebar view={view} onView={setView} collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />
-    {view !== "enhance" ? mainContent : <EnhanceView model={model} setModel={setModel} provider={provider} target={target} setTarget={setTarget} verbosity={verbosity} setVerbosity={setVerbosity} state={state} setState={setState} stop={stop} runEnhance={runEnhance} customInstructions={customInstructions} setCustomInstructions={setCustomInstructions} customTargetUrl={customTargetUrl} setCustomTargetUrl={setCustomTargetUrl} error={error} setError={setError} original={original} setOriginal={setOriginal} context={context} setContext={setContext} totalChars={totalChars} attachments={attachments} setAttachments={setAttachments} addAttachments={addAttachments} output={output} commitOutput={commitOutput} undo={undo} redo={redo} undoStack={undoStack} redoStack={redoStack} result={result} setResult={setResult} usage={usage} handleCopyOpen={handleCopyOpen} currentTarget={currentTarget} clarificationRound={clarificationRound} answers={answers} setAnswers={setAnswers} submitClarification={submitClarification} changeState={changeState} setSelectedSuggestion={setSelectedSuggestion} showSecurity={showSecurity} setShowSecurity={setShowSecurity} selectedSuggestionData={selectedSuggestionData ?? null} notices={notices} deliveryStatus={result?.delivery_status} restoreOriginal={restoreOriginal} keepEssentialEdits={keepEssentialEdits} hasActionableChanges={hasActionableChanges} regenerate={regenerate} />}
+    {view !== "enhance" ? mainContent : <EnhanceView model={model} setModel={setModel} provider={provider} target={target} setTarget={setTarget} verbosity={verbosity} setVerbosity={setVerbosity} state={state} setState={setState} stop={stop} runEnhance={runEnhance} customInstructions={customInstructions} setCustomInstructions={setCustomInstructions} customTargetUrl={customTargetUrl} setCustomTargetUrl={setCustomTargetUrl} error={error} setError={setError} original={original} setOriginal={setOriginal} context={context} setContext={setContext} totalChars={totalChars} attachments={attachments} setAttachments={setAttachments} addAttachments={addAttachments} output={output} commitOutput={commitOutput} undo={undo} redo={redo} undoStack={undoStack} redoStack={redoStack} result={result} setResult={setResult} usage={usage} handleCopyOpen={handleCopyOpen} currentTarget={currentTarget} clarificationRound={clarificationRound} answers={answers} setAnswers={setAnswers} submitClarification={submitClarification} changeState={changeState} setSelectedSuggestion={setSelectedSuggestion} showSecurity={showSecurity} setShowSecurity={setShowSecurity} selectedSuggestionData={selectedSuggestionData ?? null} notices={notices} deliveryStatus={result?.delivery_status} restoreOriginal={restoreOriginal} keepEssentialEdits={keepEssentialEdits} hasActionableChanges={hasActionableChanges} regenerate={regenerate} activeCandidate={activeCandidate} switchCandidate={switchCandidate} acceptAllChanges={acceptAllChanges} rejectAllChanges={rejectAllChanges} hasPendingChanges={hasPendingChanges} />}
     {showSecurity && <SecurityModal findings={securityFindings} onCancel={() => setShowSecurity(false)} onConfirm={() => runEnhance(true)} />}
     {selectedSuggestionData && <SuggestionModal suggestion={selectedSuggestionData} onCancel={() => setSelectedSuggestion(null)} onApply={applySuggestion} />}
   </div>;

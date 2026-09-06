@@ -529,6 +529,15 @@ fn normalize_value(mut value: Value) -> (Value, Vec<String>) {
             }
         }
     }
+    // facts/candidates 是 v2.2.0 新增字段：旧模型不返回时静默置空，不产生噪音提示
+    for field in ["facts", "candidates"] {
+        match object.get(field) {
+            Some(Value::Array(_)) => {}
+            _ => {
+                object.insert(field.into(), Value::Array(Vec::new()));
+            }
+        }
+    }
     if let Some(suggestions) = object.get_mut("suggestions").and_then(Value::as_array_mut) {
         if suggestions.len() > 5 {
             suggestions.truncate(5);
@@ -549,6 +558,42 @@ fn normalize_value(mut value: Value) -> (Value, Vec<String>) {
         let trimmed = prompt.trim().to_string();
         if trimmed != *prompt {
             *prompt = trimmed;
+        }
+    }
+    // 契约：第 1 个候选必须与 primary_prompt 一致；index 按 1..N 重排
+    let prompt_text = object
+        .get("primary_prompt")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    if let Some(candidates) = object.get_mut("candidates").and_then(Value::as_array_mut) {
+        if candidates.len() > 3 {
+            candidates.truncate(3);
+            notices.push("模型返回的候选超过 3 个，已保留前 3 个".into());
+        }
+        candidates.retain(|item| {
+            item.get("text")
+                .and_then(Value::as_str)
+                .map(|text| !text.trim().is_empty())
+                .unwrap_or(false)
+        });
+        let first_matches = candidates
+            .first()
+            .and_then(|item| item.get("text"))
+            .and_then(Value::as_str)
+            == Some(prompt_text.as_str());
+        if !first_matches && !prompt_text.is_empty() {
+            let mut first = serde_json::Map::new();
+            first.insert("index".into(), Value::from(1u32));
+            first.insert("text".into(), Value::String(prompt_text.clone()));
+            first.insert("note".into(), Value::String(String::new()));
+            candidates.insert(0, Value::Object(first));
+            candidates.truncate(3);
+        }
+        for (position, item) in candidates.iter_mut().enumerate() {
+            if let Some(entry) = item.as_object_mut() {
+                entry.insert("index".into(), Value::from(position as u32 + 1));
+            }
         }
     }
     (value, notices)
@@ -779,6 +824,8 @@ fn partial_result(prompt: String) -> EnhancementResult {
         changes: Vec::new(),
         suggestions: Vec::new(),
         risk_flags: Vec::new(),
+        facts: Vec::new(),
+        candidates: Vec::new(),
         delivery_status: "partial".into(),
         enhancement_level: "none".into(),
         notices: vec!["模型返回不完整的增强结构，主提示词仍可使用。".into()],
@@ -795,6 +842,8 @@ fn fallback_result(original: &str) -> EnhancementResult {
         changes: Vec::new(),
         suggestions: Vec::new(),
         risk_flags: Vec::new(),
+        facts: Vec::new(),
+        candidates: Vec::new(),
         delivery_status: "fallback".into(),
         enhancement_level: "none".into(),
         notices: vec!["增强服务未返回可用结构，本次已保留原始提示词".into()],
@@ -875,6 +924,8 @@ mod tests {
                 })
                 .collect(),
             risk_flags: Vec::new(),
+            facts: Vec::new(),
+            candidates: Vec::new(),
             delivery_status: "complete".into(),
             enhancement_level: "light".into(),
             notices: Vec::new(),
@@ -960,6 +1011,8 @@ mod tests {
                 })
                 .collect(),
             risk_flags: Vec::new(),
+            facts: Vec::new(),
+            candidates: Vec::new(),
             delivery_status: "complete".into(),
             enhancement_level: "light".into(),
             notices: Vec::new(),

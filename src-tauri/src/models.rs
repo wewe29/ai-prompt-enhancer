@@ -35,6 +35,8 @@ pub struct EnhancementResult {
     pub task_type: String,
     pub primary_prompt: String,
     #[serde(default)]
+    pub facts: Vec<String>,
+    #[serde(default)]
     pub assumptions: Vec<Assumption>,
     #[serde(default)]
     pub questions: Vec<ClarifyingQuestion>,
@@ -44,6 +46,8 @@ pub struct EnhancementResult {
     pub suggestions: Vec<Suggestion>,
     #[serde(default)]
     pub risk_flags: Vec<RiskFlag>,
+    #[serde(default)]
+    pub candidates: Vec<PromptCandidate>,
     #[serde(default = "default_delivery_status")]
     pub delivery_status: String,
     #[serde(default = "default_enhancement_level")]
@@ -111,6 +115,15 @@ pub struct RiskFlag {
     pub category: String,
     pub message: String,
     pub required_protection: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromptCandidate {
+    #[serde(default)]
+    pub index: u32,
+    pub text: String,
+    #[serde(default)]
+    pub note: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

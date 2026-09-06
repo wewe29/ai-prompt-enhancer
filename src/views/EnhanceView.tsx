@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowRight, Check, ChevronDown, Clipboard, FileCode2, FilePlus2, LoaderCircle, MessageSquareText, Plus, RefreshCw, RotateCw, Send, Sparkles, Square, Undo2, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, Ban, Check, CheckCheck, ChevronDown, Clipboard, FileCode2, FilePlus2, FileText, LoaderCircle, MessageSquareText, Plus, RefreshCw, RotateCw, Send, ShieldAlert, Sparkles, Square, Undo2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { copyText, targetModels } from "../lib";
@@ -64,6 +64,11 @@ export interface EnhanceViewProps {
   keepEssentialEdits: () => void;
   hasActionableChanges: boolean;
   regenerate: () => void;
+  activeCandidate: number;
+  switchCandidate: (index: number) => void;
+  acceptAllChanges: () => void;
+  rejectAllChanges: () => void;
+  hasPendingChanges: boolean;
 }
 
 export function EnhanceView(props: EnhanceViewProps) {
@@ -75,6 +80,7 @@ export function EnhanceView(props: EnhanceViewProps) {
     currentTarget, clarificationRound, answers, setAnswers, submitClarification, changeState, setSelectedSuggestion,
     showSecurity, setShowSecurity, selectedSuggestionData,
     notices, deliveryStatus, restoreOriginal, keepEssentialEdits, hasActionableChanges, regenerate,
+    activeCandidate, switchCandidate, acceptAllChanges, rejectAllChanges, hasPendingChanges,
   } = props;
   const [preflightDismissed, setPreflightDismissed] = useState(false);
   const findings = useMemo(() => preflight(original, context.length > 0, classifyTask(original)), [original, context]);
@@ -87,6 +93,26 @@ export function EnhanceView(props: EnhanceViewProps) {
     remove_redundancy: "精简重复内容",
   };
   const enhancementLevelLabels: Record<string, string> = { none: "无需明显修改", light: "轻度增强", clarify: "需要澄清" };
+  const deliveryLabels: Record<string, string> = { complete: "完整交付", partial: "部分交付", fallback: "原文回退" };
+  const suggestionKindLabels: Record<string, string> = { goal: "目标", context: "背景", format: "格式", constraint: "约束", alternate_intent: "备选意图" };
+  const riskCategoryLabels: Record<string, string> = { destructive: "破坏性操作", medical: "医疗", legal: "法律", financial: "金融", credential: "凭据", privacy: "隐私", factual: "事实性" };
+  const displayCandidates = useMemo(() => {
+    if (!result) return [];
+    return result.candidates?.length ? result.candidates : [{ index: 1, text: result.primary_prompt, note: "" }];
+  }, [result]);
+  const activeShown = displayCandidates.some((item) => item.index === activeCandidate) ? activeCandidate : 1;
+  const missingFields = useMemo(() => {
+    if (!result || result.delivery_status !== "partial") return [] as string[];
+    const checks: Array<[boolean, string]> = [
+      [result.assumptions.length === 0, "假设"],
+      [result.changes.length === 0, "修改明细"],
+      [result.suggestions.length === 0, "可选建议"],
+      [result.risk_flags.length === 0, "风险提示"],
+      [(result.facts?.length ?? 0) === 0, "用户原始事实"],
+      [(result.candidates?.length ?? 0) === 0, "候选提示词"],
+    ];
+    return checks.filter(([empty]) => empty).map(([, label]) => label);
+  }, [result]);
   const resultSummary = useMemo(() => {
     if (!result) return null;
     const level = enhancementLevelLabels[result.enhancement_level ?? "light"] ?? "轻度增强";
@@ -163,8 +189,9 @@ export function EnhanceView(props: EnhanceViewProps) {
       </article>
 
       <article className="editor-panel output-panel">
-        <div className="panel-heading"><div><span className="step-index">02</span><h2>增强结果</h2></div><div className="panel-actions"><StatusBadge state={state} /><button onClick={undo} disabled={!undoStack.length} title="撤销"><Undo2 size={16} /></button><button onClick={redo} disabled={!redoStack.length} title="重做"><RotateCw size={16} /></button></div></div>
-        {notices.length > 0 && <div className={`notices-strip${deliveryStatus ? ` ${deliveryStatus}` : ""}`}><AlertTriangle size={15} /><ul>{[...new Set(notices)].map((notice) => <li key={notice}>{notice}</li>)}</ul></div>}
+        <div className="panel-heading"><div><span className="step-index">02</span><h2>增强结果</h2></div><div className="panel-actions">{deliveryStatus && result ? <span className={`delivery-badge ${deliveryStatus}`}>{deliveryLabels[deliveryStatus] ?? deliveryStatus}</span> : null}{result?.enhancement_level === "none" && state !== "streaming" ? <span className="none-hint">增强器判断无需修改，建议直接使用原文</span> : null}<StatusBadge state={state} /><button onClick={undo} disabled={!undoStack.length} title="撤销"><Undo2 size={16} /></button><button onClick={redo} disabled={!redoStack.length} title="重做"><RotateCw size={16} /></button></div></div>
+        {notices.length > 0 && <div className={`notices-strip${deliveryStatus ? ` ${deliveryStatus}` : ""}`}><AlertTriangle size={15} /><ul>{deliveryStatus === "partial" && missingFields.length > 0 && <li className="missing-line" key="missing-fields">本次交付缺失：{missingFields.join("、")}</li>}{[...new Set(notices)].map((notice) => <li key={notice}>{notice}</li>)}</ul></div>}
+        {result && state !== "streaming" && <div className="candidate-strip"><span>候选 {activeShown}/{displayCandidates.length}</span>{displayCandidates.length > 1 && displayCandidates.map((item) => <button key={item.index} className={item.index === activeShown ? "selected" : ""} onClick={() => switchCandidate(item.index)} title={item.note || `切换到候选 ${item.index}`}>{item.index}</button>)}{displayCandidates.length > 1 && <small>切换候选会替换当前输出，可用撤销恢复</small>}</div>}
         <div className="output-wrap">
           {state === "streaming" && !output && <div className="generating"><LoaderCircle className="spin" size={20} />正在理解意图并检查缺失信息</div>}
           <textarea value={output} onChange={(event) => commitOutput(event.target.value)} placeholder="增强后的提示词会显示在这里" />
@@ -183,27 +210,38 @@ export function EnhanceView(props: EnhanceViewProps) {
 
     {resultSummary && <section className="result-summary">
       <div className="summary-row"><span>增强等级</span><strong>{resultSummary.level}</strong></div>
+      <div className="summary-row"><span>交付状态</span><strong>{deliveryStatus ? deliveryLabels[deliveryStatus] ?? deliveryStatus : "完整交付"}</strong></div>
       <div className="summary-row"><span>长度变化</span><strong>{resultSummary.lengthChange}</strong></div>
       <div className="summary-row"><span>修改摘要</span><strong>{resultSummary.changesText}</strong></div>
       <div className="summary-row"><span>事实来源</span><strong>{resultSummary.source}</strong></div>
     </section>}
 
+    {result && <section className="facts-section">
+      <div className="section-title"><div><FileText size={18} /><span>用户原始事实</span></div><p>逐字或近逐字摘自你的输入；增强只允许使用这些事实。</p></div>
+      {result.facts?.length ? <ul className="facts-list">{result.facts.map((fact, index) => <li key={index}>{fact}</li>)}</ul> : <p className="facts-empty">未从输入中提取到明确事实</p>}
+    </section>}
+
+    {result?.risk_flags.length ? <section className="risk-section">
+      <div className="section-title"><div><ShieldAlert size={18} /><span>风险提示</span></div><p>涉及不可逆或敏感操作时，先确认保护措施再执行。</p></div>
+      <div className="risk-grid">{result.risk_flags.map((flag, index) => <div className={`risk-card ${flag.category}`} key={index}><strong>{riskCategoryLabels[flag.category] ?? flag.category}</strong><p>{flag.message}</p>{flag.required_protection ? <small>需要保护：{flag.required_protection}</small> : null}</div>)}</div>
+    </section> : null}
+
     {result?.assumptions.length ? <section className="assumption-strip"><AlertTriangle size={17} /><div><strong>当前假设</strong>{result.assumptions.map((item) => <span key={item.id}>{item.text}</span>)}</div></section> : null}
 
     {state === "needs_clarification" && result && <section className="clarification-band">
-      <div className="section-title"><div><MessageSquareText size={19} /><span>需要补充的信息</span><b>{clarificationRound + 1}/3 轮</b></div><p>临时版本已生成。回答会直接用于下一版提示词。</p></div>
+      <div className="section-title"><div><MessageSquareText size={19} /><span>需要补充的信息</span><b>当前第 {clarificationRound + 1}/3 轮 · 剩余 {Math.max(0, 3 - clarificationRound - 1)} 轮</b></div><p>临时版本已生成。回答会直接用于下一版提示词，也可以留空跳过。</p></div>
       <div className="question-grid">{result.questions.map((question) => <label key={question.id}><span>{question.text}</span><small>{question.why_needed}</small><input value={answers[question.id] ?? ""} onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.target.value }))} placeholder="输入回答，也可以留空跳过" /></label>)}</div>
       <div className="band-actions"><button className="secondary" onClick={() => { setState("ready"); setResult({ ...result, status: "ready", questions: [] }); }}>结束澄清</button><button className="primary" onClick={submitClarification}><Send size={16} />提交并继续增强</button></div>
     </section>}
 
     {result?.changes.length ? <section className="changes-section">
-      <div className="section-title"><div><RefreshCw size={18} /><span>修改明细</span><b>{result.changes.length} 项</b></div><p>逐项决定哪些改动保留在最终提示词中。</p></div>
+      <div className="section-title"><div><RefreshCw size={18} /><span>修改明细</span><b>{result.changes.length} 项</b><div className="batch-actions">{hasPendingChanges && <button onClick={acceptAllChanges} disabled={state === "streaming"} title="依次应用全部未决修改，未命中锚点的项会跳过并提示"><CheckCheck size={14} />接受全部</button>}{hasPendingChanges && <button onClick={rejectAllChanges} disabled={state === "streaming"} title="拒绝全部未决修改，不影响已接受的项"><Ban size={14} />拒绝全部</button>}</div></div><p>逐项决定哪些改动保留在最终提示词中。</p></div>
       <div className="change-list">{result.changes.map((change) => <div className={`change-row ${change.state}`} key={change.id}><div className="change-copy"><span className="change-type">{change.type}</span><strong>{change.reason}</strong><div className="diff-line"><del>{change.before || "无"}</del><ArrowRight size={14} /><ins>{change.after}</ins></div></div><div className="change-actions"><button className={change.state === "rejected" ? "selected reject" : ""} onClick={() => changeState(change.id, "rejected")} title="拒绝修改"><X size={16} /></button><button className={change.state === "accepted" ? "selected accept" : ""} onClick={() => changeState(change.id, "accepted")} title="接受修改"><Check size={16} /></button></div></div>)}</div>
     </section> : null}
 
     {result?.suggestions.length ? <section className="suggestions-section">
-      <div className="section-title"><div><Plus size={18} /><span>可选补充</span><b>5 项</b></div><p>只在确实符合你的目标时加入。</p></div>
-      <div className="suggestion-grid">{result.suggestions.map((suggestion) => <button key={suggestion.id} disabled={suggestion.applied} onClick={() => setSelectedSuggestion(suggestion.id)}><span className="suggestion-kind">{suggestion.kind}</span><strong>{suggestion.applied ? "已加入" : suggestion.title}</strong><p>{suggestion.purpose}</p><Plus size={17} /></button>)}</div>
+      <div className="section-title"><div><Plus size={18} /><span>可选补充</span><b>{result.suggestions.length} 项</b></div><p>只在确实符合你的目标时加入。</p></div>
+      <div className="suggestion-grid">{result.suggestions.map((suggestion) => <button key={suggestion.id} disabled={suggestion.applied} onClick={() => setSelectedSuggestion(suggestion.id)}><span className="suggestion-kind">{suggestionKindLabels[suggestion.kind] ?? suggestion.kind}</span><strong>{suggestion.applied ? "已加入" : suggestion.title}</strong><p>{suggestion.purpose}</p><Plus size={17} /></button>)}</div>
     </section> : null}
   </main>;
 }

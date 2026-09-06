@@ -19,23 +19,27 @@ export function blankResult(text: string): EnhancementResult {
     enhancement_level: "light",
     notices: [],
     primary_prompt: text,
+    facts: [],
     assumptions: [],
     questions: [],
     changes: [],
     suggestions: [],
     risk_flags: [],
+    candidates: [],
   };
 }
 
 function mockResult(request: EnhancementRequest): EnhancementResult {
   const text = request.originalText.trim();
+  const primary = `「${text || "我的需求"}」\n\n请先确认我提供的对象或上下文。若信息不足，先列出你需要的具体信息，并基于明确假设给出临时方案。`;
   return {
     status: "needs_clarification",
     delivery_status: "complete",
     enhancement_level: "clarify",
     notices: [],
     task_type: "other",
-    primary_prompt: `「${text || "我的需求"}」\n\n请先确认我提供的对象或上下文。若信息不足，先列出你需要的具体信息，并基于明确假设给出临时方案。`,
+    primary_prompt: primary,
+    facts: text ? [text] : [],
     assumptions: [{ id: "a1", text: "临时版本不替用户猜测对象和上下文。", confirmed: false }],
     questions: [{ id: "q1", text: "请提供需要处理的具体对象、原文或上下文。", why_needed: "没有对象时无法保留你的真实意图。" }],
     changes: [{ id: "c1", type: "clarify", before: text, after: text, reason: "浏览器预览模式使用固定示例，不模拟真实增强。", state: "pending" }],
@@ -47,6 +51,10 @@ function mockResult(request: EnhancementRequest): EnhancementResult {
       { id: "s5", kind: "alternate_intent", title: "列出歧义分支", purpose: "适合输入可能对应多个目标的情况。", content: "如果目标存在多种合理理解，请先列出差异，再分别给出最短可行方案。", operation: "insert", anchor: "", applied: false },
     ],
     risk_flags: [],
+    candidates: [
+      { index: 1, text: primary, note: "默认候选" },
+      { index: 2, text: `请基于以下需求给出最短可行方案，不要扩写：${text || "我的需求"}`, note: "更简洁" },
+    ],
   };
 }
 
