@@ -96,9 +96,103 @@ fn extract_docx(path: &Path) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write as _;
+    use zip::write::SimpleFileOptions;
+
+    fn temp_dir() -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("PromptCraft-attach-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&dir).expect("create temp dir");
+        dir
+    }
 
     #[test]
     fn rejects_unknown_extension() {
         assert!(extract("not-a-real-file.exe").is_err());
+    }
+
+    #[test]
+    fn empty_text_file_fails_safely() {
+        let dir = temp_dir();
+        let path = dir.join("empty.txt");
+        fs::write(&path, b"").expect("write empty file");
+        let error = extract(path.to_str().unwrap()).unwrap_err();
+        assert!(error.contains("没有可提取的文本"), "{error}");
+    }
+
+    #[test]
+    fn oversized_file_fails_safely() {
+        let dir = temp_dir();
+        let path = dir.join("big.txt");
+        fs::write(&path, vec![b'a'; 10 * 1024 * 1024 + 1]).expect("write big file");
+        let error = extract(path.to_str().unwrap()).unwrap_err();
+        assert!(error.contains("10 MB"), "{error}");
+    }
+
+    #[test]
+    fn corrupt_pdf_fails_safely() {
+        let dir = temp_dir();
+        let path = dir.join("broken.pdf");
+        fs::write(&path, b"this is definitely not a pdf document").expect("write pdf");
+        assert!(extract(path.to_str().unwrap()).is_err());
+    }
+
+    #[test]
+    fn corrupt_docx_fails_safely() {
+        let dir = temp_dir();
+        let path = dir.join("broken.docx");
+        fs::write(&path, b"hello world, not a zip archive").expect("write docx");
+        let error = extract(path.to_str().unwrap()).unwrap_err();
+        assert!(error.contains("DOCX 文件结构无效"), "{error}");
+    }
+
+    #[test]
+    fn docx_without_document_fails_safely() {
+        let dir = temp_dir();
+        let path = dir.join("no-document.docx");
+        let file = fs::File::create(&path).expect("create docx");
+        let mut writer = zip::ZipWriter::new(file);
+        writer
+            .start_file("other.txt", SimpleFileOptions::default())
+            .expect("start entry");
+        writer.write_all(b"nothing useful").expect("write entry");
+        writer.finish().expect("finish docx");
+        let error = extract(path.to_str().unwrap()).unwrap_err();
+        assert!(error.contains("DOCX 缺少正文内容"), "{error}");
+    }
+
+    #[test]
+    fn binary_looking_text_file_is_rejected() {
+        let dir = temp_dir();
+        let path = dir.join("binary.txt");
+        fs::write(&path, b"abc\x00\x00\x00\x00\x00def").expect("write binary");
+        let error = extract(path.to_str().unwrap()).unwrap_err();
+        assert!(error.contains("不像纯文本"), "{error}");
+    }
+
+    #[test]
+    fn extraction_leaves_no_temp_files_behind() {
+        // 附件原地读取，不产生任何临时文件：处理前后目录内容必须完全一致
+        let dir = temp_dir();
+        let path = dir.join("input.txt");
+        fs::write(&path, "需要分析的文本内容").expect("write input");
+        let before = file_list(&dir);
+        extract(path.to_str().unwrap()).expect("extract input");
+        let after = file_list(&dir);
+        assert_eq!(before, after);
+    }
+
+    fn file_list(dir: &Path) -> Vec<String> {
+        let mut names: Vec<String> = fs::read_dir(dir)
+            .expect("read dir")
+            .map(|entry| {
+                entry
+                    .expect("dir entry")
+                    .file_name()
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .collect();
+        names.sort();
+        names
     }
 }
