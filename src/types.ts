@@ -41,6 +41,12 @@ export interface RiskFlag {
   required_protection: string;
 }
 
+export interface PromptCandidate {
+  index: number;
+  text: string;
+  note?: string;
+}
+
 export interface EnhancementResult {
   status: "ready" | "needs_clarification";
   delivery_status?: "complete" | "partial" | "fallback";
@@ -48,11 +54,13 @@ export interface EnhancementResult {
   notices?: string[];
   task_type?: string;
   primary_prompt: string;
+  facts?: string[];
   assumptions: Assumption[];
   questions: ClarifyingQuestion[];
   changes: PromptChange[];
   suggestions: Suggestion[];
   risk_flags: RiskFlag[];
+  candidates?: PromptCandidate[];
 }
 
 export interface Attachment {
