@@ -1,0 +1,321 @@
+samples:
+- id: v30_js_promise_race
+  scenario: 编程
+  ambiguity_level: clear
+  original: "下面这段 JavaScript 有竞态问题：并发请求时，先发出但后返回的请求会覆盖后发请求的结果。\n请修复 fetchUser，让结果始终来自最后一次发出的请求，同时保留\
+    \ AbortController 的取消能力，不改动调用方。\n```javascript\nfunction fetchUser(id) {\n  const\
+    \ controller = new AbortController();\n  return fetch(`/api/user/${id}`, { signal:\
+    \ controller.signal }).then(r => r.json());\n}\n```\n输出修复后的完整函数，并解释改动点。\n"
+  must_preserve:
+  - fetchUser
+  - AbortController
+  - 最后一次发出的请求
+  - 改动点
+  must_not_add:
+  - 不要虚构接口返回的数据结构
+  - 不要要求补充用户接口文档
+  expected_behavior: none
+- id: v30_launch_email
+  scenario: 办公写作
+  ambiguity_level: clear
+  original: '写一封给注册用户的产品发布邮件：新版协作工具「轻舟」上线，支持实时多人编辑与任务看板。
+
+    要求：主题行 + 正文，正文不超过 200 字，语气专业友好，结尾附官网链接 www.qingzhou.example 和「立即体验」按钮文案。
+
+    收件人是已注册但 30 天内未登录的用户，目的是召回。
+
+    '
+  must_preserve:
+  - 轻舟
+  - www.qingzhou.example
+  - 立即体验
+  - 30 天内未登录
+  must_not_add:
+  - 不要虚构限时优惠或折扣
+  - 不要编造新功能之外的特性
+  expected_behavior: none
+- id: v30_qa_https_explain
+  scenario: 问答
+  ambiguity_level: clear
+  original: '用大白话向非技术背景的运营同事解释 HTTPS 为什么比 HTTP 安全，要求：
+
+    包含握手、证书、加密三个要点，每个要点不超过 3 句话，总长度 200 字以内，只使用确定的技术事实。
+
+    '
+  must_preserve:
+  - 握手
+  - 证书
+  - 加密
+  - 200 字
+  must_not_add:
+  - 不要虚构具体加密算法数据
+  - 不要加入密码学历史背景
+  expected_behavior: none
+- id: v30_data_ab_test
+  scenario: 数据分析
+  ambiguity_level: clear
+  original: '我们要把支付页的新按钮方案与旧方案做 A/B 测试，帮我设计实验方案，包含：
+
+    1) 主指标和护栏指标；2) 最小样本量估算方法；3) 实验时长；4) 结束时的判定规则。
+
+    背景：每日下单用户约 2 万，预计转化率从 2% 提升到 2.4%，显著性水平 0.05，检验功效 0.8。
+
+    输出按这四点组织，直接给出计算过程。
+
+    '
+  must_preserve:
+  - 2 万
+  - 2%
+  - 2.4%
+  - '0.05'
+  must_not_add:
+  - 不要虚构具体业务系统名称
+  - 不要要求提供历史实验数据
+  expected_behavior: none
+- id: v30_translate_privacy_policy
+  scenario: 翻译
+  ambiguity_level: clear
+  original: '把下面这段隐私政策摘要翻译成英文，使用正式法律语言，专有名词「个人信息保护法」保留原文含义加英文简称，
+
+    不得增删任何意思：
+
+    「我们仅在本政策所述目的范围内收集和使用个人信息，除法律另有规定外，未经您的同意不会向第三方提供。」
+
+    '
+  must_preserve:
+  - 个人信息保护法
+  - 未经您的同意不会向第三方提供
+  - 增删
+  must_not_add:
+  - 不要虚构公司名称或联系方式
+  - 不要添加豁免条款说明
+  expected_behavior: none
+- id: v30_creative_slogan
+  scenario: 创意
+  ambiguity_level: clear
+  original: '为一款面向考研学生的英语背单词 App「背词营」写 3 句 slogan，每句 8-12 个字。
+
+    卖点：艾宾浩斯记忆法、每天 10 分钟、真题例句。语气活泼，避免「第一」「最强」等夸大词，不做押韵要求。
+
+    '
+  must_preserve:
+  - 背词营
+  - 艾宾浩斯
+  - 10 分钟
+  - 真题例句
+  must_not_add:
+  - 不要虚构下载量或用户数
+  - 不要添加价格信息
+  expected_behavior: none
+- id: v30_code_algorithm_optimize
+  scenario: 编程
+  ambiguity_level: medium
+  original: "帮我优化这段 Python 代码，处理 10 万条记录时太慢了，看看哪里可以改进：\n```python\ndef process(records):\n\
+    \    result = []\n    for r in records:\n        item = [x for x in records if\
+    \ x[\"id\"] == r[\"id\"]]\n        result.append(len(item))\n    return result\n\
+    ```\n希望至少说明复杂度问题并给出改进思路。\n"
+  must_preserve:
+  - 10 万条
+  - id
+  - 复杂度
+  must_not_add:
+  - 不要虚构输入数据的具体结构字段
+  - 不要要求补充运行硬件配置
+  expected_behavior: light
+- id: v30_code_api_design
+  scenario: 编程
+  ambiguity_level: medium
+  original: '给我们的待办事项应用设计一个创建任务的 REST API，后端是 Node.js + Express。
+
+    需要一个简单的接口定义，最好包含请求与响应示例。
+
+    '
+  must_preserve:
+  - REST
+  - Node.js
+  - Express
+  - 接口定义
+  must_not_add:
+  - 不要虚构认证方式
+  - 不要要求补充数据库选型说明
+  expected_behavior: light
+- id: v30_office_followup_email
+  scenario: 办公写作
+  ambiguity_level: medium
+  original: '上午跟供应商开完会，他们答应下周给第一批报价，但没给具体时间。帮我写封跟进邮件催一下，
+
+    顺便确认一下他们负责对接的联系人是否还是王经理。
+
+    '
+  must_preserve:
+  - 供应商
+  - 报价
+  - 王经理
+  must_not_add:
+  - 不要虚构合同金额
+  - 不要添加威胁性措辞
+  expected_behavior: light
+- id: v30_qa_cloud_costs
+  scenario: 问答
+  ambiguity_level: medium
+  original: '我们云服务器成本每月 3 万左右，最近涨得厉害，帮我分析下可能的原因并给出降本建议。
+
+    目前主要用按量付费的 ECS 和 RDS。
+
+    '
+  must_preserve:
+  - 3 万
+  - ECS
+  - RDS
+  - 按量付费
+  must_not_add:
+  - 不要虚构具体账单明细
+  - 不要推荐迁移到其他云厂商
+  expected_behavior: light
+- id: v30_data_funnel_analysis
+  scenario: 数据分析
+  ambiguity_level: medium
+  original: '下面是注册到首单的漏斗数据：访问 10000，注册 3000，完成支付 900，首单 600。
+
+    帮我分析漏斗，看看主要流失在哪一步，并给出优化建议。
+
+    '
+  must_preserve:
+  - '10000'
+  - '3000'
+  - '900'
+  - '600'
+  must_not_add:
+  - 不要虚构行业基准转化率
+  - 不要添加具体文案修改建议
+  expected_behavior: light
+- id: v30_translate_support_ticket
+  scenario: 翻译
+  ambiguity_level: medium
+  original: '把下面这段英文客服工单翻译成中文，方便我们本地同事处理：
+
+    "Customer reports that the firmware update on device X-200 failed twice and the
+    device now shows a red LED.
+
+    They ask whether a replacement is covered by the 1-year warranty."
+
+    '
+  must_preserve:
+  - X-200
+  - firmware
+  - red LED
+  - 1-year warranty
+  must_not_add:
+  - 不要虚构客户联系方式
+  - 不要添加处理时限承诺
+  expected_behavior: light
+- id: v30_creative_wechat_post
+  scenario: 创意
+  ambiguity_level: medium
+  original: '我们的智能门锁新品下月上市，卖点是 3D 人脸识别、防猫眼撬锁、续航 12 个月。
+
+    帮我写一条发布预告文案，最好能有点吸引力。
+
+    '
+  must_preserve:
+  - 3D 人脸识别
+  - 防猫眼撬锁
+  - 12 个月
+  - 预告
+  must_not_add:
+  - 不要虚构评测数据
+  - 不要添加预售价格
+  expected_behavior: light
+- id: v30_code_refactor_goal
+  scenario: 编程
+  ambiguity_level: severe
+  original: '帮我把这段代码优化一下，线上有点问题。
+
+    '
+  must_preserve:
+  - 代码
+  - 优化
+  - 线上
+  must_not_add:
+  - 不要虚构线上问题的具体表现
+  - 不要假设代码语言
+  expected_behavior: clarify
+- id: v30_office_write_plan
+  scenario: 办公写作
+  ambiguity_level: severe
+  original: '帮我写个方案。
+
+    '
+  must_preserve:
+  - 方案
+  - 写个方案
+  must_not_add:
+  - 不要虚构主题
+  - 不要假设是活动方案
+  expected_behavior: clarify
+- id: v30_office_announcement
+  scenario: 办公写作
+  ambiguity_level: severe
+  original: '帮我写一份通知。
+
+    '
+  must_preserve:
+  - 写一份
+  - 通知
+  must_not_add:
+  - 不要虚构通知对象和事项
+  - 不要假设是放假通知
+  expected_behavior: clarify
+- id: v30_qa_wrong_premise
+  scenario: 问答
+  ambiguity_level: severe
+  original: '为什么我明明把列表清空了，程序还是报错说列表有值？
+
+    '
+  must_preserve:
+  - 列表
+  - 清空
+  - 报错
+  must_not_add:
+  - 不要虚构代码片段
+  - 不要假设语言和上下文
+  expected_behavior: clarify
+- id: v30_data_write_report
+  scenario: 数据分析
+  ambiguity_level: severe
+  original: '帮我写一份数据分析报告，要专业的。
+
+    '
+  must_preserve:
+  - 数据分析报告
+  - 专业的
+  must_not_add:
+  - 不要虚构数据来源
+  - 不要假设分析主题
+  expected_behavior: clarify
+- id: v30_translate_two_versions
+  scenario: 翻译
+  ambiguity_level: severe
+  original: '把这段话翻译成中文，分别给普通读者和专业人士两个版本。
+
+    '
+  must_preserve:
+  - 中文
+  - 两个版本
+  must_not_add:
+  - 不要虚构原文
+  - 不要假设原文语言
+  expected_behavior: clarify
+- id: v30_creative_product_name
+  scenario: 创意
+  ambiguity_level: severe
+  original: '给我们的产品起个名字。
+
+    '
+  must_preserve:
+  - 产品
+  - 名字
+  must_not_add:
+  - 不要虚构产品功能
+  - 不要假设目标市场
+  expected_behavior: clarify

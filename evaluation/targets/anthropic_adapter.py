@@ -21,6 +21,8 @@ class AnthropicAdapter(TargetAdapter):
         self.model = target_cfg.get("model") or ""
         self.temperature = float(target_cfg.get("temperature", 0.7))
         self.max_tokens = int(target_cfg.get("max_tokens", 2048))
+        # 推理型部署（如 glm-5.2）思考段常超 120s，默认放宽到 300s；可用 target.timeout_s 覆盖
+        self.timeout_s = int(target_cfg.get("timeout_s", 300))
         self._api_key = api_key
 
     def _resolve_api_key(self) -> str:
@@ -59,7 +61,7 @@ class AnthropicAdapter(TargetAdapter):
             },
         )
         try:
-            with urllib.request.urlopen(req, timeout=120) as resp:
+            with urllib.request.urlopen(req, timeout=self.timeout_s) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")[:200]

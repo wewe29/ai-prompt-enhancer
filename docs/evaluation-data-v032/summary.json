@@ -1,0 +1,961 @@
+{
+  "dimensions": {
+    "accuracy": {
+      "n": 222,
+      "mean": 0.47
+    },
+    "completeness": {
+      "n": 222,
+      "mean": 0.85
+    },
+    "relevance": {
+      "n": 222,
+      "mean": 0.56
+    },
+    "clarity": {
+      "n": 222,
+      "mean": 0.35
+    },
+    "novelty": {
+      "n": 222,
+      "mean": 0.18
+    }
+  },
+  "by_target": {
+    "plan_doubao": {
+      "accuracy": {
+        "n": 60,
+        "mean": 0.6
+      },
+      "completeness": {
+        "n": 60,
+        "mean": 0.67
+      },
+      "relevance": {
+        "n": 60,
+        "mean": 0.63
+      },
+      "clarity": {
+        "n": 60,
+        "mean": 0.42
+      },
+      "novelty": {
+        "n": 60,
+        "mean": 0.08
+      }
+    },
+    "plan_glm": {
+      "accuracy": {
+        "n": 54,
+        "mean": 0.24
+      },
+      "completeness": {
+        "n": 54,
+        "mean": 0.95
+      },
+      "relevance": {
+        "n": 54,
+        "mean": 0.5
+      },
+      "clarity": {
+        "n": 54,
+        "mean": 0.34
+      },
+      "novelty": {
+        "n": 54,
+        "mean": 0.25
+      }
+    },
+    "plan_doubao_pro": {
+      "accuracy": {
+        "n": 60,
+        "mean": 0.69
+      },
+      "completeness": {
+        "n": 60,
+        "mean": 0.92
+      },
+      "relevance": {
+        "n": 60,
+        "mean": 0.6
+      },
+      "clarity": {
+        "n": 60,
+        "mean": 0.38
+      },
+      "novelty": {
+        "n": 60,
+        "mean": 0.15
+      }
+    },
+    "plan_glm_5_2": {
+      "accuracy": {
+        "n": 48,
+        "mean": 0.26
+      },
+      "completeness": {
+        "n": 48,
+        "mean": 0.88
+      },
+      "relevance": {
+        "n": 48,
+        "mean": 0.51
+      },
+      "clarity": {
+        "n": 48,
+        "mean": 0.24
+      },
+      "novelty": {
+        "n": 48,
+        "mean": 0.25
+      }
+    }
+  },
+  "by_scenario": {
+    "编程": {
+      "accuracy": {
+        "n": 44,
+        "mean": 0.41
+      },
+      "completeness": {
+        "n": 44,
+        "mean": 0.69
+      },
+      "relevance": {
+        "n": 44,
+        "mean": 0.33
+      },
+      "clarity": {
+        "n": 44,
+        "mean": 0.32
+      },
+      "novelty": {
+        "n": 44,
+        "mean": 0.14
+      }
+    },
+    "办公写作": {
+      "accuracy": {
+        "n": 47,
+        "mean": 0.7
+      },
+      "completeness": {
+        "n": 47,
+        "mean": 0.92
+      },
+      "relevance": {
+        "n": 47,
+        "mean": 0.8
+      },
+      "clarity": {
+        "n": 47,
+        "mean": 0.33
+      },
+      "novelty": {
+        "n": 47,
+        "mean": 0.06
+      }
+    },
+    "问答": {
+      "accuracy": {
+        "n": 32,
+        "mean": 0.08
+      },
+      "completeness": {
+        "n": 32,
+        "mean": 1.27
+      },
+      "relevance": {
+        "n": 32,
+        "mean": 0.24
+      },
+      "clarity": {
+        "n": 32,
+        "mean": 0.36
+      },
+      "novelty": {
+        "n": 32,
+        "mean": 0.35
+      }
+    },
+    "数据分析": {
+      "accuracy": {
+        "n": 29,
+        "mean": 0.9
+      },
+      "completeness": {
+        "n": 29,
+        "mean": 0.78
+      },
+      "relevance": {
+        "n": 29,
+        "mean": 0.56
+      },
+      "clarity": {
+        "n": 29,
+        "mean": 0.59
+      },
+      "novelty": {
+        "n": 29,
+        "mean": 0.25
+      }
+    },
+    "翻译": {
+      "accuracy": {
+        "n": 35,
+        "mean": 0.25
+      },
+      "completeness": {
+        "n": 35,
+        "mean": 0.43
+      },
+      "relevance": {
+        "n": 35,
+        "mean": 0.3
+      },
+      "clarity": {
+        "n": 35,
+        "mean": 0.28
+      },
+      "novelty": {
+        "n": 35,
+        "mean": -0.1
+      }
+    },
+    "创意": {
+      "accuracy": {
+        "n": 35,
+        "mean": 0.44
+      },
+      "completeness": {
+        "n": 35,
+        "mean": 1.06
+      },
+      "relevance": {
+        "n": 35,
+        "mean": 1.1
+      },
+      "clarity": {
+        "n": 35,
+        "mean": 0.27
+      },
+      "novelty": {
+        "n": 35,
+        "mean": 0.44
+      }
+    }
+  },
+  "by_persona": {},
+  "by_prompt_judge": {
+    "编程": {
+      "structure": {
+        "n": 12,
+        "mean": 7.67
+      },
+      "constraint_retention": {
+        "n": 12,
+        "mean": 9.67
+      },
+      "info_gain": {
+        "n": 12,
+        "mean": 7.17
+      },
+      "over_enhancement": {
+        "n": 12,
+        "mean": 2.83
+      }
+    },
+    "办公写作": {
+      "structure": {
+        "n": 12,
+        "mean": 7.67
+      },
+      "constraint_retention": {
+        "n": 12,
+        "mean": 9.67
+      },
+      "info_gain": {
+        "n": 12,
+        "mean": 5.67
+      },
+      "over_enhancement": {
+        "n": 12,
+        "mean": 3.83
+      }
+    },
+    "问答": {
+      "structure": {
+        "n": 9,
+        "mean": 7.56
+      },
+      "constraint_retention": {
+        "n": 9,
+        "mean": 9.44
+      },
+      "info_gain": {
+        "n": 9,
+        "mean": 7.0
+      },
+      "over_enhancement": {
+        "n": 9,
+        "mean": 3.67
+      }
+    },
+    "数据分析": {
+      "structure": {
+        "n": 9,
+        "mean": 7.89
+      },
+      "constraint_retention": {
+        "n": 9,
+        "mean": 9.44
+      },
+      "info_gain": {
+        "n": 9,
+        "mean": 7.33
+      },
+      "over_enhancement": {
+        "n": 9,
+        "mean": 3.33
+      }
+    },
+    "翻译": {
+      "structure": {
+        "n": 9,
+        "mean": 6.67
+      },
+      "constraint_retention": {
+        "n": 9,
+        "mean": 9.0
+      },
+      "info_gain": {
+        "n": 9,
+        "mean": 5.78
+      },
+      "over_enhancement": {
+        "n": 9,
+        "mean": 2.33
+      }
+    },
+    "创意": {
+      "structure": {
+        "n": 9,
+        "mean": 6.67
+      },
+      "constraint_retention": {
+        "n": 9,
+        "mean": 9.22
+      },
+      "info_gain": {
+        "n": 9,
+        "mean": 4.89
+      },
+      "over_enhancement": {
+        "n": 9,
+        "mean": 4.22
+      }
+    }
+  },
+  "by_magnitude": {
+    "improve": {
+      "minor": 97,
+      "moderate": 38,
+      "major": 8
+    },
+    "regress": {
+      "minor": 33,
+      "moderate": 7,
+      "major": 1
+    }
+  },
+  "by_control": {
+    "enhanced_vs_padded": {
+      "编程": {
+        "accuracy": {
+          "n": 44,
+          "mean": 0.2
+        },
+        "completeness": {
+          "n": 44,
+          "mean": -0.2
+        },
+        "relevance": {
+          "n": 44,
+          "mean": 0.09
+        },
+        "clarity": {
+          "n": 44,
+          "mean": -0.08
+        },
+        "novelty": {
+          "n": 44,
+          "mean": 0.03
+        }
+      },
+      "办公写作": {
+        "accuracy": {
+          "n": 47,
+          "mean": 0.46
+        },
+        "completeness": {
+          "n": 47,
+          "mean": 0.12
+        },
+        "relevance": {
+          "n": 47,
+          "mean": 0.99
+        },
+        "clarity": {
+          "n": 47,
+          "mean": 0.25
+        },
+        "novelty": {
+          "n": 47,
+          "mean": -0.29
+        }
+      },
+      "问答": {
+        "accuracy": {
+          "n": 32,
+          "mean": 0.43
+        },
+        "completeness": {
+          "n": 32,
+          "mean": 0.38
+        },
+        "relevance": {
+          "n": 32,
+          "mean": 0.39
+        },
+        "clarity": {
+          "n": 32,
+          "mean": 0.5
+        },
+        "novelty": {
+          "n": 32,
+          "mean": 0.33
+        }
+      },
+      "数据分析": {
+        "accuracy": {
+          "n": 29,
+          "mean": 0.88
+        },
+        "completeness": {
+          "n": 29,
+          "mean": -0.41
+        },
+        "relevance": {
+          "n": 29,
+          "mean": 0.34
+        },
+        "clarity": {
+          "n": 29,
+          "mean": 0.39
+        },
+        "novelty": {
+          "n": 29,
+          "mean": 0.18
+        }
+      },
+      "翻译": {
+        "accuracy": {
+          "n": 35,
+          "mean": 0.42
+        },
+        "completeness": {
+          "n": 35,
+          "mean": -0.01
+        },
+        "relevance": {
+          "n": 35,
+          "mean": 0.76
+        },
+        "clarity": {
+          "n": 35,
+          "mean": 0.33
+        },
+        "novelty": {
+          "n": 35,
+          "mean": -0.12
+        }
+      },
+      "创意": {
+        "accuracy": {
+          "n": 35,
+          "mean": 0.63
+        },
+        "completeness": {
+          "n": 35,
+          "mean": 0.34
+        },
+        "relevance": {
+          "n": 35,
+          "mean": 1.26
+        },
+        "clarity": {
+          "n": 35,
+          "mean": 0.21
+        },
+        "novelty": {
+          "n": 35,
+          "mean": 0.87
+        }
+      }
+    },
+    "padded_vs_original": {
+      "编程": {
+        "accuracy": {
+          "n": 44,
+          "mean": -0.22
+        },
+        "completeness": {
+          "n": 44,
+          "mean": -0.9
+        },
+        "relevance": {
+          "n": 44,
+          "mean": -0.23
+        },
+        "clarity": {
+          "n": 44,
+          "mean": -0.39
+        },
+        "novelty": {
+          "n": 44,
+          "mean": -0.18
+        }
+      },
+      "办公写作": {
+        "accuracy": {
+          "n": 47,
+          "mean": -0.5
+        },
+        "completeness": {
+          "n": 47,
+          "mean": -1.17
+        },
+        "relevance": {
+          "n": 47,
+          "mean": -0.54
+        },
+        "clarity": {
+          "n": 47,
+          "mean": -0.33
+        },
+        "novelty": {
+          "n": 47,
+          "mean": -0.31
+        }
+      },
+      "问答": {
+        "accuracy": {
+          "n": 32,
+          "mean": 0.19
+        },
+        "completeness": {
+          "n": 32,
+          "mean": -0.57
+        },
+        "relevance": {
+          "n": 32,
+          "mean": 0.1
+        },
+        "clarity": {
+          "n": 32,
+          "mean": -0.15
+        },
+        "novelty": {
+          "n": 32,
+          "mean": -0.09
+        }
+      },
+      "数据分析": {
+        "accuracy": {
+          "n": 29,
+          "mean": -0.1
+        },
+        "completeness": {
+          "n": 29,
+          "mean": -1.06
+        },
+        "relevance": {
+          "n": 29,
+          "mean": -0.46
+        },
+        "clarity": {
+          "n": 29,
+          "mean": -0.46
+        },
+        "novelty": {
+          "n": 29,
+          "mean": -0.03
+        }
+      },
+      "翻译": {
+        "accuracy": {
+          "n": 35,
+          "mean": 0.15
+        },
+        "completeness": {
+          "n": 35,
+          "mean": -0.43
+        },
+        "relevance": {
+          "n": 35,
+          "mean": 0.11
+        },
+        "clarity": {
+          "n": 35,
+          "mean": -0.14
+        },
+        "novelty": {
+          "n": 35,
+          "mean": -0.11
+        }
+      },
+      "创意": {
+        "accuracy": {
+          "n": 35,
+          "mean": -0.37
+        },
+        "completeness": {
+          "n": 35,
+          "mean": -1.05
+        },
+        "relevance": {
+          "n": 35,
+          "mean": -0.42
+        },
+        "clarity": {
+          "n": 35,
+          "mean": -0.3
+        },
+        "novelty": {
+          "n": 35,
+          "mean": 0.1
+        }
+      }
+    },
+    "pad_ratio": 4.63
+  },
+  "by_ambiguity": {
+    "clear": {
+      "n": 75,
+      "wins": 33,
+      "ties": 19,
+      "losses": 23,
+      "dims": {
+        "accuracy": {
+          "n": 75,
+          "mean": 0.24
+        },
+        "completeness": {
+          "n": 75,
+          "mean": 0.29
+        },
+        "relevance": {
+          "n": 75,
+          "mean": 0.14
+        },
+        "clarity": {
+          "n": 75,
+          "mean": 0.05
+        },
+        "novelty": {
+          "n": 75,
+          "mean": -0.14
+        }
+      }
+    },
+    "medium": {
+      "n": 75,
+      "wins": 50,
+      "ties": 14,
+      "losses": 11,
+      "dims": {
+        "accuracy": {
+          "n": 75,
+          "mean": 0.5
+        },
+        "completeness": {
+          "n": 75,
+          "mean": 0.24
+        },
+        "relevance": {
+          "n": 75,
+          "mean": 0.25
+        },
+        "clarity": {
+          "n": 75,
+          "mean": 0.33
+        },
+        "novelty": {
+          "n": 75,
+          "mean": 0.14
+        }
+      }
+    },
+    "severe": {
+      "n": 72,
+      "wins": 60,
+      "ties": 5,
+      "losses": 7,
+      "dims": {
+        "accuracy": {
+          "n": 72,
+          "mean": 0.67
+        },
+        "completeness": {
+          "n": 72,
+          "mean": 2.07
+        },
+        "relevance": {
+          "n": 72,
+          "mean": 1.32
+        },
+        "clarity": {
+          "n": 72,
+          "mean": 0.69
+        },
+        "novelty": {
+          "n": 72,
+          "mean": 0.54
+        }
+      }
+    }
+  },
+  "control": {
+    "c_minus_b": {
+      "accuracy": {
+        "n": 222,
+        "mean": 0.48
+      },
+      "completeness": {
+        "n": 222,
+        "mean": 0.04
+      },
+      "relevance": {
+        "n": 222,
+        "mean": 0.64
+      },
+      "clarity": {
+        "n": 222,
+        "mean": 0.25
+      },
+      "novelty": {
+        "n": 222,
+        "mean": 0.13
+      }
+    },
+    "b_minus_a": {
+      "accuracy": {
+        "n": 222,
+        "mean": -0.17
+      },
+      "completeness": {
+        "n": 222,
+        "mean": -0.88
+      },
+      "relevance": {
+        "n": 222,
+        "mean": -0.25
+      },
+      "clarity": {
+        "n": 222,
+        "mean": -0.3
+      },
+      "novelty": {
+        "n": 222,
+        "mean": -0.12
+      }
+    },
+    "by_ambiguity": {
+      "clear": {
+        "c_minus_b": {
+          "accuracy": {
+            "n": 75,
+            "mean": 0.28
+          },
+          "completeness": {
+            "n": 75,
+            "mean": 0.22
+          },
+          "relevance": {
+            "n": 75,
+            "mean": 0.5
+          },
+          "clarity": {
+            "n": 75,
+            "mean": 0.3
+          },
+          "novelty": {
+            "n": 75,
+            "mean": -0.06
+          }
+        },
+        "b_minus_a": {
+          "accuracy": {
+            "n": 75,
+            "mean": 0.08
+          },
+          "completeness": {
+            "n": 75,
+            "mean": 0.05
+          },
+          "relevance": {
+            "n": 75,
+            "mean": 0.25
+          },
+          "clarity": {
+            "n": 75,
+            "mean": 0.2
+          },
+          "novelty": {
+            "n": 75,
+            "mean": 0.02
+          }
+        }
+      },
+      "severe": {
+        "c_minus_b": {
+          "accuracy": {
+            "n": 72,
+            "mean": 0.67
+          },
+          "completeness": {
+            "n": 72,
+            "mean": 0.3
+          },
+          "relevance": {
+            "n": 72,
+            "mean": 1.1
+          },
+          "clarity": {
+            "n": 72,
+            "mean": 0.18
+          },
+          "novelty": {
+            "n": 72,
+            "mean": 0.35
+          }
+        },
+        "b_minus_a": {
+          "accuracy": {
+            "n": 72,
+            "mean": -0.52
+          },
+          "completeness": {
+            "n": 72,
+            "mean": -2.11
+          },
+          "relevance": {
+            "n": 72,
+            "mean": -1.07
+          },
+          "clarity": {
+            "n": 72,
+            "mean": -0.93
+          },
+          "novelty": {
+            "n": 72,
+            "mean": -0.5
+          }
+        }
+      },
+      "medium": {
+        "c_minus_b": {
+          "accuracy": {
+            "n": 75,
+            "mean": 0.5
+          },
+          "completeness": {
+            "n": 75,
+            "mean": -0.4
+          },
+          "relevance": {
+            "n": 75,
+            "mean": 0.36
+          },
+          "clarity": {
+            "n": 75,
+            "mean": 0.26
+          },
+          "novelty": {
+            "n": 75,
+            "mean": 0.12
+          }
+        },
+        "b_minus_a": {
+          "accuracy": {
+            "n": 75,
+            "mean": -0.09
+          },
+          "completeness": {
+            "n": 75,
+            "mean": -0.63
+          },
+          "relevance": {
+            "n": 75,
+            "mean": 0.02
+          },
+          "clarity": {
+            "n": 75,
+            "mean": -0.19
+          },
+          "novelty": {
+            "n": 75,
+            "mean": 0.1
+          }
+        }
+      }
+    }
+  },
+  "cost": {
+    "orig_chars_mean": 97.9,
+    "enh_chars_mean": 196.2,
+    "orig_tokens_mean": 54.8,
+    "enh_tokens_mean": 109.4,
+    "pad_ratio": 4.63,
+    "quality_gain_per_1k_tokens": 8.81
+  },
+  "summary": {
+    "total": 222,
+    "improved": 59,
+    "improved_pct": 26.6,
+    "wins": 143,
+    "ties": 38,
+    "losses": 41,
+    "win_rate_ci": [
+      0.5792,
+      0.7042
+    ],
+    "binomial_p": 0.0,
+    "regression_failure_rate": 0.3559,
+    "regression_worse_rate": 0.1847,
+    "delivery": {
+      "complete": 60,
+      "partial": 0,
+      "fallback": 0,
+      "hard_failure": 0
+    },
+    "delivery_rate": 1.0,
+    "judge_agreement": {
+      "winner_agreement": 0.6757,
+      "n": 222,
+      "dim_corr": {
+        "accuracy": 0.495,
+        "completeness": 0.495,
+        "relevance": 0.495,
+        "clarity": 0.495,
+        "novelty": 0.495
+      }
+    },
+    "gate": {
+      "pass": false,
+      "reasons": [
+        "双裁判一致率 68% 低于 70%"
+      ]
+    }
+  }
+}

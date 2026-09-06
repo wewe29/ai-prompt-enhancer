@@ -121,7 +121,7 @@ targets:
     model: doubao-seed-2.0-mini
     api_key_env: ARK_PLAN_API_KEY
     temperature: 0.7
-    max_tokens: 4096
+    max_tokens: 8192   # 4096 会被推理型部署的思考段耗尽导致正文为空（v0.3.0 因此丢失 12 组对比）
 
   plan_glm:
     enabled: true
@@ -130,7 +130,7 @@ targets:
     model: glm-5.2
     api_key_env: ARK_PLAN_API_KEY
     temperature: 0.7
-    max_tokens: 4096
+    max_tokens: 8192   # 4096 会被推理型部署的思考段耗尽导致正文为空（v0.3.0 因此丢失对比）
 
   plan_doubao_pro:
     enabled: true
@@ -139,7 +139,7 @@ targets:
     model: doubao-seed-2-0-pro-260215
     api_key_env: ARK_PLAN_API_KEY
     temperature: 0.7
-    max_tokens: 4096
+    max_tokens: 8192   # 4096 会被推理型部署的思考段耗尽导致正文为空（v0.3.0 因此丢失对比）
 
   plan_glm_5_2:
     enabled: true
@@ -148,7 +148,7 @@ targets:
     model: glm-5-2-260617
     api_key_env: ARK_PLAN_API_KEY
     temperature: 0.7
-    max_tokens: 4096
+    max_tokens: 8192   # 4096 会被推理型部署的思考段耗尽导致正文为空（v0.3.0 因此丢失对比）
 
   plan_deepseek:
     enabled: false                # 与裁判/增强器同模型部署，§6.5 解耦要求剔除，不作为评测目标
@@ -157,7 +157,7 @@ targets:
     model: deepseek-v4-flash
     api_key_env: ARK_PLAN_API_KEY
     temperature: 0.7
-    max_tokens: 4096
+    max_tokens: 8192   # 4096 会被推理型部署的思考段耗尽导致正文为空（v0.3.0 因此丢失对比）
 
   # 火山方舟 API 直连目标（OpenAI 兼容接口，替代网页版抓取）
   # 密钥从环境变量 ARK_API_KEY 读取（api_key_env），不会写入本文件
