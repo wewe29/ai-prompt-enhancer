@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import os
 import random
 import re
 from typing import Any
@@ -35,13 +36,21 @@ PROMPT_JUDGE_SYSTEM_PROMPT = """你是提示词质量评测裁判。请对"增�
 PROMPT_JUDGE_DIMS = ["structure", "constraint_retention", "info_gain", "over_enhancement"]
 
 
+JUDGE_PROMPT_VERSION = "judge-v2"
+
+
 def _judge_system_prompt(include_novelty: bool) -> str:
-    """构建 A/B 对比裁判系统提示词；include_novelty=False 时去掉新颖度维度。"""
+    """构建 A/B 对比裁判系统提示词（v2：反长度/格式偏好）；include_novelty=False 时去掉新颖度维度。
+
+    v2 修订依据：docs/PromptCraft-v0.3.2-评测报告.md §五——v1 裁判存在系统性长度/结构偏好
+    （48 个人工盲评单元中 17 个人工平局被 v1 判非平局，其中 14 个偏向更长的回答）。
+    规则要点：排版与篇幅本身不计分；冗余计入相关性扣分；两份回答都能正确完成任务必须判平。
+    """
     dim_lines = [
-        "- 准确性：事实、数据、代码、措辞是否正确、无幻觉",
-        "- 完整性：是否覆盖任务的全部显式要求与隐含需求",
-        "- 相关性：是否紧扣任务目标、无离题与冗余",
-        "- 清晰度：结构、组织、语言是否易读",
+        "- 准确性：事实、数据、代码、逻辑与措辞是否正确、无编造。回答中出现编造内容或明确错误的，本维度不得高于 4 分。",
+        "- 完整性：是否覆盖任务的全部显式要求与必要的隐含需求。只统计任务要求的内容；回答自行添加的、任务未要求的内容不计入完整性。",
+        "- 相关性：是否紧扣任务目标。未被要求的展开、模板化章节、泛泛而谈的建议都算冗余，冗余越多扣分越多。",
+        "- 清晰度：在正确完成任务的前提下是否易读、可直接执行。排版装饰（标题、列表、表格、加粗）本身不计分。",
     ]
     if include_novelty:
         dim_lines.append("- 新颖度(novelty)：是否有新意、不落俗套(创意类任务尤其重要;结构化任务给 5 分为中性)")
@@ -50,10 +59,15 @@ def _judge_system_prompt(include_novelty: bool) -> str:
         side += ',"novelty":1'
     side += "}"
     return (
-        "你是公正的提示词评测裁判。同一任务分别使用\"提示词A\"和\"提示词B\"得到回答A与回答B。\n"
+        "你是公正的回答质量评测裁判。同一任务分别使用\"提示词A\"和\"提示词B\"得到回答A与回答B。\n"
         "请分别对两个回答按各维度各打 1-10 分（整数）：\n"
         + "\n".join(dim_lines)
-        + "\n要求：先对每个回答独立评分，再综合比较；A/B 的先后顺序不代表质量高低。\n"
+        + "\n\n评分锚点（适用于每个维度）：\n"
+        "1-3 = 未能完成任务或存在明显错误；4-6 = 部分完成任务或有多处瑕疵；7-8 = 正确完成任务；9-10 = 正确完成任务且无冗余、无瑕疵。\n\n"
+        "强制规则：\n"
+        "1. 只依据「哪个回答能让用户的当前任务被正确完成」评分。回答的长度、篇幅、分点数量、格式丰富度本身不代表质量：短而准确的回答不因简短扣分，长而散乱的回答不因详尽加分。\n"
+        "2. 两份回答都能正确完成任务时必须判 tie；只有当一方存在正确性错误、任务要求遗漏或可能误导用户时，才判另一方胜出。\n"
+        "3. 先对每个回答独立评分，再综合比较；A/B 的先后顺序不代表质量高低；也不允许在存在真实差距时刻意打平。\n"
         + f"只输出一个 JSON 对象，不要输出任何其他内容，格式：\n"
         + f'{{"a":{side},"b":{side},"winner":"a|b|tie","reason":"一句话理由"}}'
     )
@@ -84,6 +98,18 @@ def judge_pair(
     dims = DIMENSIONS if include_novelty else DIMENSIONS_BASE
     jcfg = cfg.get("judge", {})
     model = judge_model or jcfg.get("model", "deepseek-chat")
+    # 第二裁判可走独立端点与密钥（second_base_url / second_api_key_env），避免主裁判端点的模型级限流
+    second_call = judge_model is not None and judge_model != jcfg.get("model")
+    base_url = (
+        (jcfg.get("second_base_url") or jcfg.get("base_url") or cfg["enhancer"]["base_url"])
+        if second_call
+        else (jcfg.get("base_url") or cfg["enhancer"]["base_url"])
+    ).rstrip("/")
+    call_key = api_key
+    if second_call:
+        env_name = str(jcfg.get("second_api_key_env") or "").strip()
+        if env_name and os.environ.get(env_name, "").strip():
+            call_key = os.environ[env_name].strip()
     swapped = bool(jcfg.get("randomize_order", True)) and random.random() < 0.5
     prompt_a, answer_a, prompt_b, answer_b = _assign_labels(
         sample, original_output, enhanced_output, swapped
@@ -100,10 +126,7 @@ def judge_pair(
         "stream": False,
         "response_format": {"type": "json_object"},
     }
-    client = openai.OpenAI(
-        api_key=api_key,
-        base_url=(cfg.get("judge", {}).get("base_url") or cfg["enhancer"]["base_url"]).rstrip("/"),
-    )
+    client = openai.OpenAI(api_key=call_key, base_url=base_url)
 
     parsed: dict[str, Any] | None = None
     last_error: Exception | None = None

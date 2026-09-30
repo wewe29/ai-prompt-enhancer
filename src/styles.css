@@ -214,6 +214,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .delivery-badge { display: inline-flex; height: 18px; align-items: center; padding: 0 7px; border-radius: 9px; color: #85312f; background: var(--danger-soft); font-size: 9px; font-weight: 650; }
 .icon-danger { position: absolute; top: 50%; right: 18px; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; transform: translateY(-50%); color: var(--muted); background: transparent; border: 1px solid transparent; border-radius: 4px; }
 .icon-danger:hover { color: var(--danger); background: var(--danger-soft); border-color: #eec9c7; }
+.icon-pin { position: absolute; top: 50%; right: 54px; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; transform: translateY(-50%); color: var(--muted); background: transparent; border: 1px solid transparent; border-radius: 4px; }
+.icon-pin:hover { color: var(--accent); background: var(--accent-soft); }
+.icon-pin.active { color: var(--accent); }
+.history-list article.pinned { background: var(--accent-soft); }
 .empty-state { min-height: 440px; display: grid; place-content: center; justify-items: center; color: var(--muted); }
 .empty-state h2 { margin: 12px 0 4px; color: #3b4845; font-size: 15px; }
 .empty-state p { margin: 0; font-size: 11px; }

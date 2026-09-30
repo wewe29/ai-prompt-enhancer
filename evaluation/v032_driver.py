@@ -224,6 +224,8 @@ def cmd_rebuild(args: argparse.Namespace) -> int:
     import report as report_mod
     import yaml
 
+    import judge as judge_mod
+
     cfg = R.load_config(args.config)
     samples_def = yaml.safe_load((EVAL_ROOT / (args.samples or cfg.get("samples"))).read_text(encoding="utf-8"))
     targets = [t for t, tc in (cfg.get("targets") or {}).items() if tc.get("enabled")]
@@ -321,6 +323,7 @@ def cmd_rebuild(args: argparse.Namespace) -> int:
         "repeats": repeats,
         "regression_mode": False,
         "human_review_count": int(args.human_review_count or 0),
+        "judge_version": judge_mod.JUDGE_PROMPT_VERSION,
         "rebuild_from_cache": True,
     }
     payload = {"meta": meta, "samples": out_samples}
@@ -401,6 +404,86 @@ def cmd_judge_fill(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_rejudge(args: argparse.Namespace) -> int:
+    """对本机缓存中的已生成数据用当前裁判规则逐条重判（不触发任何生成调用）。
+
+    与 judge-fill 的区别：rejudge 面向"规则换版"——旧裁判结果整体迁出缓存后，
+    用当前 judge.py 规则对全部已生成 rep 重新打分；同时补齐 sample 的
+    enhanced_text（judge-fill 曾遗漏，导致裁判消息中提示词 B 为空）。
+    """
+    import run_eval as R
+    import yaml
+
+    cfg = R.load_config(args.config)
+    api_key = R.resolve_api_key(cfg)
+    judge_key = R.resolve_judge_key(cfg, api_key)
+    if args.max_cost is not None:
+        cfg["run"]["max_cost_usd"] = args.max_cost
+    jcfg = cfg.get("judge", {})
+    cross_check = bool(jcfg.get("cross_check")) and bool(jcfg.get("second_model"))
+    second_model = jcfg.get("second_model", "")
+
+    sample_ids = set()
+    sample_defs: dict[str, dict[str, Any]] = {}
+    for sd in yaml.safe_load((EVAL_ROOT / args.samples).read_text(encoding="utf-8"))["samples"]:
+        sample_ids.add(sd["id"])
+        sample_defs[sd["id"]] = sd
+    targets = [
+        t for t, tc in (cfg.get("targets") or {}).items()
+        if tc.get("enabled") and (not args.target or t in args.target)
+    ]
+
+    import judge as judge_mod
+
+    print(f"[rejudge] 规则版本 {judge_mod.JUDGE_PROMPT_VERSION}｜目标 {targets}")
+    todo: list[tuple[str, str, int]] = []
+    for path in sorted(R.CACHE_DIR.glob("infer_*.json")):
+        stem = path.stem[len("infer_"):]
+        m = re.search(r"_rep(\d+)$", stem)
+        if not m:
+            continue
+        rep = int(m.group(1))
+        variant_m = re.search(r"_(original|enhanced|padded)$", stem[:m.start()])
+        if not variant_m or variant_m.group(1) != "original":
+            continue
+        head = stem[:variant_m.start()]
+        for t in targets:
+            if head.endswith("_" + t):
+                sid = head[: -len(t) - 1]
+                if sid not in sample_ids:
+                    break
+                if R.load_cache("judge", sid, t, f"_rep{rep}") is not None:
+                    break
+                variants = {}
+                for v in ("original", "enhanced", "padded"):
+                    c = R.load_cache("infer", sid, t, f"{v}_rep{rep}")
+                    variants[v] = (c or {}).get("output") or ""
+                if variants["original"] and variants["enhanced"]:
+                    todo.append((sid, t, rep))
+                break
+    print(f"[rejudge] 待重判单元：{len(todo)}")
+    done = failed = 0
+    for sid, tid, rep in todo:
+        result: dict[str, Any] = {}
+        for v in ("original", "enhanced", "padded"):
+            result[f"{v}_output"] = (R.load_cache("infer", sid, tid, f"{v}_rep{rep}") or {}).get("output", "")
+        sample = dict(sample_defs.get(sid, {"id": sid, "original": ""}))
+        sample["enhanced_text"] = (R.load_cache("enhance", sid) or {}).get("primary_prompt", "")
+        try:
+            R._judge_variants(sample, tid, result, cfg, judge_key, False, cross_check, second_model, True)
+            R.save_cache("judge", sid, tid, f"_rep{rep}",
+                         {k: result.get(k) for k in ("judge", "judge2", "judge_control", "judge_padded_vs_orig")})
+            if result.get("judge") is not None:
+                done += 1
+            else:
+                failed += 1
+        except Exception as exc:
+            failed += 1
+            print(f"[rejudge] {sid} × {tid} rep{rep} 失败：{str(exc)[:120]}")
+    print(f"[rejudge] 完成 {done}｜失败 {failed}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="v0.3.2 可信评测执行辅助")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -440,6 +523,13 @@ def main() -> int:
     p_jf.add_argument("--config", default=None, help="config.yaml 路径")
     p_jf.add_argument("--max-cost", type=float, default=None, help="覆盖预算（美元）")
     p_jf.set_defaults(fn=cmd_judge_fill)
+
+    p_rj = sub.add_parser("rejudge", help="用当前裁判规则对缓存中已生成数据逐条重判（不触发生成）")
+    p_rj.add_argument("--samples", default="samples_v30.yaml", help="样本 YAML（限定样本范围）")
+    p_rj.add_argument("--config", default=None, help="config.yaml 路径")
+    p_rj.add_argument("--target", action="extend", nargs="+", help="只处理指定目标")
+    p_rj.add_argument("--max-cost", type=float, default=None, help="覆盖预算（美元）")
+    p_rj.set_defaults(fn=cmd_rejudge)
 
     args = parser.parse_args()
     return args.fn(args)

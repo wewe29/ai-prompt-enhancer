@@ -137,7 +137,10 @@ pub struct ProviderConfig {
     pub output_price: f64,
     #[serde(default = "default_models")]
     pub models: Vec<String>,
-    #[serde(default, skip_serializing)]
+    /// `skip_deserializing`：导入的数据包**永远不能**改写本机 API Key。
+    /// 仅有 `skip_serializing` 只能挡住导出方向，攻击者仍可在 provider.json 里
+    /// 植入 `apiKey` 字段，经 `import_data` → `save_provider_config` 写入真实凭据管理器。
+    #[serde(default, skip_serializing, skip_deserializing)]
     pub api_key: Option<String>,
 }
 
@@ -202,6 +205,9 @@ pub struct HistoryRecord {
     pub enhancement_level: Option<String>,
     #[serde(default, rename = "promptVersion")]
     pub prompt_version: Option<String>,
+    /// 置顶标记：置顶记录永不被 90 天时间清理与容量清理删除。
+    #[serde(default)]
+    pub pinned: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -214,9 +220,21 @@ pub struct AppSettings {
     pub custom_target_url: String,
     #[serde(default = "default_warning_limit")]
     pub monthly_warning_limit: f64,
+    #[serde(default)]
     pub monthly_limit: f64,
+    #[serde(default = "default_max_history_mb")]
+    pub max_history_mb: i64,
     #[serde(default)]
     pub profile_rules: serde_json::Value,
+}
+
+/// 历史容量上限的默认/回落值（MB）。
+pub fn default_history_mb() -> i64 {
+    64
+}
+
+fn default_max_history_mb() -> i64 {
+    default_history_mb()
 }
 
 impl Default for AppSettings {
@@ -227,6 +245,7 @@ impl Default for AppSettings {
             custom_target_url: String::new(),
             monthly_warning_limit: 8.0,
             monthly_limit: 10.0,
+            max_history_mb: default_history_mb(),
             profile_rules: serde_json::Value::Array(Vec::new()),
         }
     }

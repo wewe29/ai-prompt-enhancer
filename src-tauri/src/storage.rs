@@ -1,4 +1,4 @@
-use crate::models::{AppSettings, HistoryRecord, ProviderConfig};
+use crate::models::{AppSettings, HistoryRecord, ProviderConfig, default_history_mb};
 use chrono::{Duration, Utc};
 use keyring::Entry;
 use rusqlite::{Connection, params};
@@ -176,10 +176,32 @@ impl Storage {
             .lock()
             .map_err(|_| "数据库锁已损坏".to_string())?;
         connection.execute(
-            "INSERT INTO history(id,title,original,enhanced,model,target,created_at,delivery_status,enhancement_level,prompt_version)
-             VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
-            params![record.id, record.title, record.original, record.enhanced, record.model, record.target, record.created_at, record.delivery_status, record.enhancement_level, record.prompt_version],
+            "INSERT INTO history(id,title,original,enhanced,model,target,created_at,delivery_status,enhancement_level,prompt_version,pinned)
+             VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)
+             ON CONFLICT(id) DO UPDATE SET title=excluded.title,original=excluded.original,enhanced=excluded.enhanced,
+               model=excluded.model,target=excluded.target,created_at=excluded.created_at,
+               delivery_status=excluded.delivery_status,enhancement_level=excluded.enhancement_level,
+               prompt_version=excluded.prompt_version,pinned=excluded.pinned",
+            params![record.id, record.title, record.original, record.enhanced, record.model, record.target, record.created_at, record.delivery_status, record.enhancement_level, record.prompt_version, record.pinned],
         ).map_err(|error| format!("无法保存历史记录：{error}"))?;
+        Ok(())
+    }
+
+    /// 切换置顶状态。置顶记录永不被时间清理与容量清理删除。
+    pub fn set_history_pinned(&self, id: &str, pinned: bool) -> Result<(), String> {
+        let connection = self
+            .connection
+            .lock()
+            .map_err(|_| "数据库锁已损坏".to_string())?;
+        let changed = connection
+            .execute(
+                "UPDATE history SET pinned=?2 WHERE id=?1",
+                params![id, pinned],
+            )
+            .map_err(|error| format!("无法更新置顶状态：{error}"))?;
+        if changed == 0 {
+            return Err("记录不存在".into());
+        }
         Ok(())
     }
 
@@ -191,9 +213,9 @@ impl Storage {
         let pattern = format!("%{}%", query.unwrap_or_default());
         let mut statement = connection
             .prepare(
-                "SELECT id,title,original,enhanced,created_at,model,target,delivery_status,enhancement_level,prompt_version FROM history
+                "SELECT id,title,original,enhanced,created_at,model,target,delivery_status,enhancement_level,prompt_version,pinned FROM history
              WHERE (?1 = '%%' OR title LIKE ?1 OR original LIKE ?1 OR enhanced LIKE ?1)
-             ORDER BY created_at DESC LIMIT 500",
+             ORDER BY pinned DESC, created_at DESC LIMIT 500",
             )
             .map_err(|error| error.to_string())?;
         let rows = statement
@@ -209,6 +231,7 @@ impl Storage {
                     delivery_status: row.get(7)?,
                     enhancement_level: row.get(8)?,
                     prompt_version: row.get(9)?,
+                    pinned: row.get::<_, i64>(10)? != 0,
                 })
             })
             .map_err(|error| error.to_string())?;
@@ -381,9 +404,18 @@ impl Storage {
             return Err("导入包版本或产品标识不兼容".into());
         }
         let history: Vec<HistoryRecord> = read_archive_json(&mut archive, "history.json")?;
-        let settings: AppSettings = read_archive_json(&mut archive, "settings.json")?;
-        let provider: ProviderConfig = read_archive_json(&mut archive, "provider.json")?;
+        let mut settings: AppSettings = read_archive_json(&mut archive, "settings.json")?;
+        let mut provider: ProviderConfig = read_archive_json(&mut archive, "provider.json")?;
         drop(archive);
+
+        // 导入包是外部不可信输入，绝不允许其改写本机凭据。
+        // 纵深防御：即使 ProviderConfig 已加 skip_deserializing，这里再显式清空一次，
+        // 防止将来有人误删该 serde 属性后重新打开凭据投毒路径。
+        provider.api_key = None;
+        // 同样不让导入包把容量上限设成 0/负数导致容量清理失效。
+        if settings.max_history_mb <= 0 {
+            settings.max_history_mb = default_history_mb();
+        }
 
         let mut imported = 0;
         for mut record in history.into_iter().take(5_000) {
@@ -439,8 +471,20 @@ impl Storage {
                 .execute("DELETE FROM usage_records WHERE created_at < ?1", [&cutoff])
                 .map_err(|error| error.to_string())?;
         }
-        self.enforce_history_capacity(MAX_HISTORY_CONTENT_BYTES)?;
+        self.enforce_history_capacity(self.configured_history_limit())?;
         Ok(())
+    }
+
+    /// 容量上限来自用户设置（MB），并夹在 1..=1024 之间防止误设 0 或超大值。
+    /// 设置读取失败时回落到默认 64 MB，绝不因为读取失败而跳过容量清理。
+    fn configured_history_limit(&self) -> i64 {
+        let fallback = MAX_HISTORY_CONTENT_BYTES;
+        let settings = self.app_settings().unwrap_or_default();
+        let mb = settings.max_history_mb;
+        if mb <= 0 {
+            return fallback;
+        }
+        mb.min(1024) * 1024 * 1024
     }
 
     /// 历史文本内容总量超过上限时，按最旧未置顶优先分批删除，直到达标或只剩置顶记录。
@@ -454,7 +498,10 @@ impl Storage {
         loop {
             let total: i64 = connection
                 .query_row(
-                    "SELECT COALESCE(SUM(LENGTH(title) + LENGTH(original) + LENGTH(enhanced)), 0) FROM history",
+                    // SQLite 的 LENGTH() 对 TEXT 返回**字符数**而非字节数。
+                    // 强制转 BLOB 后再取长度，才能得到与 MAX_HISTORY_CONTENT_BYTES
+                    // 一致的字节语义（中文 UTF-8 为 3 字节/字，否则实际占用约为名义值的 3 倍）。
+                    "SELECT COALESCE(SUM(LENGTH(CAST(title AS BLOB)) + LENGTH(CAST(original AS BLOB)) + LENGTH(CAST(enhanced AS BLOB))), 0) FROM history",
                     [],
                     |row| row.get(0),
                 )
@@ -522,12 +569,70 @@ fn get_or_create_database_key(credential_service: &str) -> Result<String, String
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::{ops::Deref, path::PathBuf};
 
-    /// 每个测试使用独立临时目录与独立凭据服务名，绝不触碰真实的 PromptCraft 凭据。
-    fn test_storage() -> Storage {
+    /// 测试沙箱守卫：持有独立临时目录与独立凭据服务名，并在 Drop 时清理二者。
+    ///
+    /// 早期实现只在创建时保证隔离、从不清理，导致每跑一次 `cargo test` 就往**真实**
+    /// Windows 凭据管理器里追加 `PromptCraftTest-<uuid>` 条目、并在 `%TEMP%` 留下目录。
+    /// 实测一度积累 73 个测试库密钥 + 7 个测试 API Key + 18 个目录。
+    /// 合法的 provider.json（无 apiKey 字段），供导入类测试复用。
+    const VALID_PROVIDER: &str = r#"{"baseUrl":"https://api.deepseek.com","hasApiKey":false,"defaultModel":"deepseek-chat","v4FlashModelId":"deepseek-v4-flash","inputPrice":0.001,"outputPrice":0.002}"#;
+
+    /// 合法的 settings.json 最小集。
+    const VALID_SETTINGS: &str = r#"{"clearClipboard":false}"#;
+
+    struct TestSandbox {
+        storage: Storage,
+        dir: PathBuf,
+    }
+
+    impl Deref for TestSandbox {
+        type Target = Storage;
+        fn deref(&self) -> &Storage {
+            &self.storage
+        }
+    }
+
+    impl Drop for TestSandbox {
+        fn drop(&mut self) {
+            // 提前释放 SQLite 连接，让 Windows 能真正删除临时目录里的 .db/-wal/-shm
+            self.storage.connection = Mutex::new(Connection::open_in_memory().expect("in-memory"));
+            let _ = fs::remove_dir_all(&self.dir);
+            // 用**进程级全局锁**把凭据删除串行化：Windows 凭据管理器在并发删改时
+            // 会静默失败（keyring 既不重试也不报错），实测串行跑 12 个 storage 测试
+            // delta=0，而默认并行跑每次残留 1~3 条。串行化 + 退避重试后归零。
+            let _guard = test_credential_lock().lock();
+            delete_test_credential(&self.storage.credential_service, API_KEY_ACCOUNT);
+            delete_test_credential(&self.storage.credential_service, DB_KEY_ACCOUNT);
+        }
+    }
+
+    fn test_credential_lock() -> &'static Mutex<()> {
+        static LOCK: Mutex<()> = Mutex::new(());
+        &LOCK
+    }
+
+    /// 删除单个测试凭据，退避重试以对抗凭据管理器的瞬时占用。
+    fn delete_test_credential(service: &str, account: &str) {
+        for attempt in 0..8 {
+            let Ok(entry) = Entry::new(service, account) else {
+                return;
+            };
+            match entry.delete_credential() {
+                Ok(()) | Err(keyring::Error::NoEntry) => return,
+                Err(_) => std::thread::sleep(std::time::Duration::from_millis(10 * (attempt + 1))),
+            }
+        }
+    }
+
+    /// 每个测试使用独立临时目录与独立凭据服务名，绝不触碰真实的 PromptCraft 凭据；
+    /// 目录与凭据条目由 `TestSandbox` 在测试结束时自动清理。
+    fn test_storage() -> TestSandbox {
         let dir = std::env::temp_dir().join(format!("PromptCraft-test-{}", uuid::Uuid::new_v4()));
         let service = format!("PromptCraftTest-{}", uuid::Uuid::new_v4());
-        Storage::open(&dir, &service).expect("open test storage")
+        let storage = Storage::open(&dir, &service).expect("open test storage");
+        TestSandbox { storage, dir }
     }
 
     fn record(id: &str, enhanced: &str, age_days: u64) -> HistoryRecord {
@@ -542,6 +647,7 @@ mod tests {
             delivery_status: None,
             enhancement_level: None,
             prompt_version: None,
+            pinned: false,
         }
     }
 
@@ -582,34 +688,144 @@ mod tests {
         storage
             .record_usage("deepseek-chat", 10, 20, 0.001, 5, "success", None)
             .unwrap();
-        storage.save_app_settings(&AppSettings::default()).unwrap();
+        // 关键：写入**非默认**设置再清空。原实现存的是 AppSettings::default()，
+        // 而 default 的 profile_rules 本身就是空数组，导致"设置已清空"断言恒真。
+        storage
+            .save_app_settings(&AppSettings {
+                clear_clipboard: true,
+                profile_enabled: false,
+                custom_target_url: "https://example.com".into(),
+                monthly_warning_limit: 3.5,
+                monthly_limit: 7.25,
+                max_history_mb: 128,
+                profile_rules: json!([{"id": "r1", "kind": "goal"}]),
+            })
+            .unwrap();
         storage.clear_all_data().unwrap();
         assert!(storage.list_history(None).unwrap().is_empty());
+        // 清空后应回落到默认值：所有非默认字段都必须变回默认，
+        // 否则说明 app_settings 行没被删除。
         let settings = storage.app_settings().unwrap();
+        assert!(!settings.clear_clipboard, "clear_clipboard 应回落为 false");
+        assert!(
+            settings.custom_target_url.is_empty(),
+            "custom_target_url 应被清空"
+        );
+        assert_eq!(settings.monthly_warning_limit, 8.0);
+        assert_eq!(settings.monthly_limit, 10.0);
+        assert_eq!(settings.max_history_mb, default_history_mb());
         assert!(
             settings
                 .profile_rules
                 .as_array()
                 .map(|items| items.is_empty())
-                .unwrap_or(true)
+                .unwrap_or(true),
+            "profile_rules 应回落为空"
         );
-        // 凭据已从 Windows 凭据管理器删除
-        assert!(storage.api_key().is_err());
+        // 凭据已从 Windows 凭据管理器删除（加锁读取，避免与并发测试的删除竞争）
+        assert!({
+            let _guard = test_credential_lock().lock();
+            storage.api_key().is_err()
+        });
+    }
+
+    #[test]
+    fn import_never_plants_api_key_into_credential_store() {
+        // 回归测试（凭据投毒）：攻击者在 provider.json 里植入 apiKey 字段。
+        // 该字段曾经能被反序列化进 ProviderConfig，再经 save_provider_config
+        // 写入真实 Windows 凭据管理器，把用户的 Key 偷换成攻击者的。
+        // 现在必须被彻底忽略。
+        let storage = test_storage();
+        // 先给沙箱写入一个"用户自己的 Key"，导入后必须原样保留。
+        //
+        // 凭据的**写入**同样要加锁：Windows 凭据管理器在多个测试并发删改时会
+        // 静默失败，只在 Drop 里给删除加锁是不够的——别的测试的删除可能正好
+        // 落在本测试的 set 与 get 之间，导致 api_key() 读不到刚写入的值。
+        // 这会让本用例在并行运行时约 3/4 概率假失败。
+        {
+            let _guard = test_credential_lock().lock();
+            storage
+                .save_provider_config(&ProviderConfig {
+                    api_key: Some("sk-users-own-key-000001".into()),
+                    ..Default::default()
+                })
+                .unwrap();
+            assert!(storage.api_key().is_ok(), "写入用户 Key 后应可读回");
+        }
+
+        let provider = r#"{"baseUrl":"https://api.deepseek.com","hasApiKey":true,"defaultModel":"deepseek-chat","v4FlashModelId":"deepseek-v4-flash","inputPrice":0.001,"outputPrice":0.002,"apiKey":"sk-attacker-planted-key-000001"}"#;
+        let path =
+            std::env::temp_dir().join(format!("PromptCraft-poison-{}", uuid::Uuid::new_v4()));
+        write_archive(
+            &path,
+            &[
+                ("manifest.json", manifest_json()),
+                ("history.json", b"[]".to_vec()),
+                ("settings.json", VALID_SETTINGS.as_bytes().to_vec()),
+                ("provider.json", provider.as_bytes().to_vec()),
+            ],
+        );
+        // 导入与后续读取同样整体加锁（import_data 内部会写凭据配置）
+        let stored_key = {
+            let _guard = test_credential_lock().lock();
+            storage.import_data(&path).unwrap();
+
+            // 关键断言：凭据管理器里的 Key 未被导入包改写
+            storage.api_key().expect("用户原有 Key 应当保留")
+        };
+        assert_eq!(
+            stored_key, "sk-users-own-key-000001",
+            "导入包不得改写本机 API Key"
+        );
+        assert!(
+            !stored_key.contains("attacker"),
+            "攻击者 Key 不得进入凭据管理器"
+        );
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn import_cannot_disable_history_capacity_limit() {
+        // 导入包不得把容量上限设成 0/负数，否则容量清理永久失效
+        let storage = test_storage();
+        let settings = r#"{"clearClipboard":false,"monthlyLimit":10,"maxHistoryMb":0}"#;
+        let path = std::env::temp_dir().join(format!("PromptCraft-cap-{}", uuid::Uuid::new_v4()));
+        write_archive(
+            &path,
+            &[
+                ("manifest.json", manifest_json()),
+                ("history.json", b"[]".to_vec()),
+                ("settings.json", settings.as_bytes().to_vec()),
+                ("provider.json", VALID_PROVIDER.as_bytes().to_vec()),
+            ],
+        );
+        storage.import_data(&path).unwrap();
+        assert_eq!(
+            storage.app_settings().unwrap().max_history_mb,
+            default_history_mb(),
+            "非法的 0 应被回落为默认值"
+        );
+        let _ = fs::remove_file(&path);
     }
 
     #[test]
     fn export_and_stored_config_never_contain_api_key() {
         let storage = test_storage();
-        storage
-            .save_provider_config(&ProviderConfig {
-                api_key: Some("sk-secret-test-key-123456".into()),
-                ..Default::default()
-            })
-            .unwrap();
-        // 数据库内的供应商配置不含 Key 明文
-        let stored = storage.provider_config().unwrap();
-        assert!(stored.api_key.is_none());
-        assert!(stored.has_api_key);
+        // 同 import_never_plants_*：凭据写入与紧随其后的读取必须整体加锁，
+        // 否则并发测试的凭据删除会落在 set 与 get 之间，造成假失败。
+        {
+            let _guard = test_credential_lock().lock();
+            storage
+                .save_provider_config(&ProviderConfig {
+                    api_key: Some("sk-secret-test-key-123456".into()),
+                    ..Default::default()
+                })
+                .unwrap();
+            // 数据库内的供应商配置不含 Key 明文
+            let stored = storage.provider_config().unwrap();
+            assert!(stored.api_key.is_none());
+            assert!(stored.has_api_key);
+        }
         // 导出包同样不含 Key 明文
         let path =
             std::env::temp_dir().join(format!("PromptCraft-export-{}.zip", uuid::Uuid::new_v4()));
@@ -767,15 +983,121 @@ mod tests {
                 .save_history(&record(&format!("p{index}"), &payload, index as u64))
                 .unwrap();
         }
-        {
-            let connection = storage.connection.lock().unwrap();
-            connection
-                .execute("UPDATE history SET pinned=1", [])
+        // 走**公开 API** 置顶，而不是裸 SQL。
+        // 原实现用 `UPDATE history SET pinned=1` 直接改库，绕过了所有生产入口，
+        // 于是"置顶受保护"这条需求在真实使用中根本无法被触发（D-2）。
+        for index in 0..3 {
+            storage
+                .set_history_pinned(&format!("p{index}"), true)
                 .unwrap();
         }
         let deleted = storage.enforce_history_capacity(1).unwrap();
         assert_eq!(deleted, 0);
-        assert_eq!(storage.list_history(None).unwrap().len(), 3);
+        let remaining = storage.list_history(None).unwrap();
+        assert_eq!(remaining.len(), 3);
+        assert!(
+            remaining.iter().all(|item| item.pinned),
+            "三条记录都应仍处于置顶状态"
+        );
+    }
+
+    #[test]
+    fn pinned_flag_survives_roundtrip_and_sorts_first() {
+        // 置顶必须能从 save → list 完整往返，并在列表中排在最前
+        let storage = test_storage();
+        let mut older = record("older", "旧", 5);
+        older.title = "旧记录".into();
+        let mut newer = record("newer", "新", 0);
+        newer.title = "新记录".into();
+        storage.save_history(&older).unwrap();
+        storage.save_history(&newer).unwrap();
+        storage.set_history_pinned("older", true).unwrap();
+
+        let listed = storage.list_history(None).unwrap();
+        assert_eq!(listed[0].id, "older", "置顶记录应排最前");
+        assert!(listed[0].pinned);
+        assert!(!listed[1].pinned);
+
+        // 取消置顶后应恢复时间倒序
+        storage.set_history_pinned("older", false).unwrap();
+        let listed = storage.list_history(None).unwrap();
+        assert_eq!(listed[0].id, "newer");
+        assert!(!listed[0].pinned);
+
+        // 对不存在的记录应报错，而不是静默成功
+        assert!(storage.set_history_pinned("nope", true).is_err());
+    }
+
+    #[test]
+    fn history_capacity_limit_follows_user_setting() {
+        // 需求"按配置清理"：上限必须来自 AppSettings，而不是硬编码常量
+        let storage = test_storage();
+        let payload = "x".repeat(200_000);
+        for index in 0..4 {
+            storage
+                .save_history(&record(&format!("c{index}"), &payload, index as u64))
+                .unwrap();
+        }
+        // 把上限设为 1 MB：housekeeping 走设置值，应把约 0.8MB 的 4 条清到达标
+        let mut settings = AppSettings::default();
+        settings.max_history_mb = 1;
+        storage.save_app_settings(&settings).unwrap();
+        assert_eq!(storage.configured_history_limit(), 1024 * 1024);
+        storage.housekeeping().unwrap();
+        let remaining = storage.list_history(None).unwrap();
+        let total: usize = remaining
+            .iter()
+            .map(|item| item.title.len() + item.original.len() + item.enhanced.len())
+            .sum();
+        assert!(total <= 1024 * 1024, "清理后应回到设置上限内，实际 {total}");
+
+        // 非法值（0/负数）必须回落到默认值，而不是让清理永久失效
+        settings.max_history_mb = 0;
+        storage.save_app_settings(&settings).unwrap();
+        assert_eq!(
+            storage.configured_history_limit(),
+            MAX_HISTORY_CONTENT_BYTES
+        );
+        settings.max_history_mb = -5;
+        storage.save_app_settings(&settings).unwrap();
+        assert_eq!(
+            storage.configured_history_limit(),
+            MAX_HISTORY_CONTENT_BYTES
+        );
+    }
+
+    #[test]
+    fn capacity_measurement_uses_bytes_not_characters() {
+        // SQLite 的 LENGTH() 对 TEXT 返回字符数；常量语义是字节数。
+        // 中文内容下两者差约 3 倍，必须确认按字节计量。
+        let storage = test_storage();
+        let chinese = "中".repeat(100_000); // 100k 字符 = 300k 字节
+        let mut item = record("cn", &chinese, 0);
+        item.original = "中".repeat(10_000); // 10k 字符 = 30k 字节
+        storage.save_history(&item).unwrap();
+
+        let connection = storage.connection.lock().unwrap();
+        let chars: i64 = connection
+            .query_row(
+                "SELECT COALESCE(SUM(LENGTH(title) + LENGTH(original) + LENGTH(enhanced)), 0) FROM history",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let bytes: i64 = connection
+            .query_row(
+                "SELECT COALESCE(SUM(LENGTH(CAST(title AS BLOB)) + LENGTH(CAST(original AS BLOB)) + LENGTH(CAST(enhanced AS BLOB))), 0) FROM history",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        // 字符数约 110k，字节数约 330k，实际应按后者判定
+        assert!(chars < 200_000, "字符数口径 = {chars}");
+        assert!(bytes > 300_000, "字节数口径 = {bytes}");
+        assert!(
+            bytes > chars * 2,
+            "中文内容下字节口径应显著大于字符口径（{bytes} vs {chars}）"
+        );
     }
 
     #[test]

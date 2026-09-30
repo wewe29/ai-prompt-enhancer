@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  applyChangeDecisionSafe, applySuggestionToText, cancelEnhancement, clearAllData, copyAndOpen, deleteHistoryRecord, extractAttachment,
-  getLocalSettings, getProviderConfig, listHistoryRecords, normalizeResult, pickAttachments,
-  pushUndoSnapshot, rebuildAfterKeepEssential, saveHistoryRecord, saveLocalSettings, saveProviderConfig, startEnhancement,
+  applyChangeDecisionSafe, applySuggestionToText, cancelEnhancement, clearAllData, copyAndOpen, deleteHistoryRecord, extractAttachment, getLocalSettings, getProviderConfig, listHistoryRecords, normalizeResult, pickAttachments,
+  pushUndoSnapshot, rebuildAfterKeepEssential, saveHistoryRecord, saveLocalSettings, saveProviderConfig, setHistoryPinned, startEnhancement,
   targetModels, validateProvider,
 } from "./lib";
 import type {
@@ -74,6 +73,7 @@ export default function App() {
   const [clearClipboard, setClearClipboard] = useState(false);
   const [monthlyWarningLimit, setMonthlyWarningLimit] = useState(8);
   const [monthlyLimit, setMonthlyLimit] = useState(10);
+  const [maxHistoryMb, setMaxHistoryMb] = useState(64);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [activeCandidate, setActiveCandidate] = useState(1);
   const generationRef = useRef(0);
@@ -85,13 +85,13 @@ export default function App() {
       setModel(models.includes(config.defaultModel) ? config.defaultModel : models[0]);
     }).catch(() => undefined);
     listHistoryRecords().then(setHistory).catch(() => undefined);
-    getLocalSettings({ clearClipboard: false, profileEnabled: true, customTargetUrl: "", monthlyWarningLimit: 8, monthlyLimit: 10, profileRules: defaultRules }).then((settings) => {
-      setClearClipboard(settings.clearClipboard); setProfileEnabled(settings.profileEnabled); setCustomTargetUrl(settings.customTargetUrl); setMonthlyWarningLimit(settings.monthlyWarningLimit); setMonthlyLimit(settings.monthlyLimit); setRules(settings.profileRules); setSettingsLoaded(true);
+    getLocalSettings({ clearClipboard: false, profileEnabled: true, customTargetUrl: "", monthlyWarningLimit: 8, monthlyLimit: 10, maxHistoryMb: 64, profileRules: defaultRules }).then((settings) => {
+      setClearClipboard(settings.clearClipboard); setProfileEnabled(settings.profileEnabled); setCustomTargetUrl(settings.customTargetUrl); setMonthlyWarningLimit(settings.monthlyWarningLimit); setMonthlyLimit(settings.monthlyLimit); setMaxHistoryMb(settings.maxHistoryMb ?? 64); setRules(settings.profileRules); setSettingsLoaded(true);
     }).catch(() => setSettingsLoaded(true));
   }, []);
   useEffect(() => {
-    if (settingsLoaded) saveLocalSettings({ clearClipboard, profileEnabled, customTargetUrl, monthlyWarningLimit, monthlyLimit, profileRules: rules }).catch(() => undefined);
-  }, [settingsLoaded, clearClipboard, profileEnabled, customTargetUrl, monthlyWarningLimit, monthlyLimit, rules]);
+    if (settingsLoaded) saveLocalSettings({ clearClipboard, profileEnabled, customTargetUrl, monthlyWarningLimit, monthlyLimit, maxHistoryMb, profileRules: rules }).catch(() => undefined);
+  }, [settingsLoaded, clearClipboard, profileEnabled, customTargetUrl, monthlyWarningLimit, monthlyLimit, maxHistoryMb, rules]);
 
   const totalChars = context.length + attachments.reduce((sum, item) => sum + item.chars, 0);
   const selectedTarget = targetModels.find((item) => item.id === target) ?? targetModels[0];
@@ -303,9 +303,9 @@ export default function App() {
   };
 
   const mainContent = useMemo(() => {
-    if (view === "history") return <HistoryView items={history} onRestore={(item) => { setOriginal(item.original); setOutput(item.enhanced); setModel(item.model); setTarget(item.target); setState("ready"); setView("enhance"); }} onDelete={(id) => { setHistory((items) => items.filter((item) => item.id !== id)); deleteHistoryRecord(id).catch(() => undefined); }} />;
+    if (view === "history") return <HistoryView items={history} onRestore={(item) => { setOriginal(item.original); setOutput(item.enhanced); setModel(item.model); setTarget(item.target); setState("ready"); setView("enhance"); }} onDelete={(id) => { setHistory((items) => items.filter((item) => item.id !== id)); deleteHistoryRecord(id).catch(() => undefined); }} onTogglePin={(id, pinned) => { setHistory((items) => items.map((item) => (item.id === id ? { ...item, pinned } : item))); setHistoryPinned(id, pinned).catch(() => undefined); }} />;
     if (view === "profile") return <ProfileView rules={rules} setRules={setRules} enabled={profileEnabled} setEnabled={setProfileEnabled} />;
-    if (view === "settings") return <SettingsView provider={provider} setProvider={setProvider} apiKeyDraft={apiKeyDraft} setApiKeyDraft={setApiKeyDraft} saveProvider={saveProvider} saving={savingProvider} message={providerMessage} clearClipboard={clearClipboard} setClearClipboard={setClearClipboard} monthlyWarningLimit={monthlyWarningLimit} setMonthlyWarningLimit={setMonthlyWarningLimit} monthlyLimit={monthlyLimit} setMonthlyLimit={setMonthlyLimit} onClearData={async () => { await clearAllData(); setHistory([]); setRules(defaultRules); setProfileEnabled(true); setCustomTargetUrl(""); setClearClipboard(false); setMonthlyWarningLimit(8); setMonthlyLimit(10); setProvider(defaultProvider); }} />;
+    if (view === "settings") return <SettingsView provider={provider} setProvider={setProvider} apiKeyDraft={apiKeyDraft} setApiKeyDraft={setApiKeyDraft} saveProvider={saveProvider} saving={savingProvider} message={providerMessage} clearClipboard={clearClipboard} setClearClipboard={setClearClipboard} monthlyWarningLimit={monthlyWarningLimit} setMonthlyWarningLimit={setMonthlyWarningLimit} monthlyLimit={monthlyLimit} setMonthlyLimit={setMonthlyLimit} maxHistoryMb={maxHistoryMb} setMaxHistoryMb={setMaxHistoryMb} onClearData={async () => { await clearAllData(); setHistory([]); setRules(defaultRules); setProfileEnabled(true); setCustomTargetUrl(""); setClearClipboard(false); setMonthlyWarningLimit(8); setMonthlyLimit(10); setMaxHistoryMb(64); setProvider(defaultProvider); }} />;
     return null;
   }, [view, history, rules, profileEnabled, provider, apiKeyDraft, savingProvider, providerMessage, clearClipboard, monthlyWarningLimit, monthlyLimit]);
 

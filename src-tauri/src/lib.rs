@@ -161,6 +161,11 @@ fn delete_history(id: String, state: State<'_, AppState>) -> Result<(), String> 
 }
 
 #[tauri::command]
+fn set_history_pinned(id: String, pinned: bool, state: State<'_, AppState>) -> Result<(), String> {
+    state.storage.set_history_pinned(&id, pinned)
+}
+
+#[tauri::command]
 fn get_app_settings(state: State<'_, AppState>) -> Result<AppSettings, String> {
     state.storage.app_settings()
 }
@@ -233,6 +238,7 @@ pub fn run() {
             save_history,
             list_history,
             delete_history,
+            set_history_pinned,
             get_app_settings,
             save_app_settings,
             clear_all_data,

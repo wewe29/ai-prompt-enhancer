@@ -154,6 +154,12 @@ export async function deleteHistoryRecord(id: string): Promise<void> {
   localStorage.setItem("promptcraft.history", JSON.stringify(existing.filter((item) => item.id !== id)));
 }
 
+export async function setHistoryPinned(id: string, pinned: boolean): Promise<void> {
+  if (isTauri) return command("set_history_pinned", { id, pinned });
+  const existing = await listHistoryRecords();
+  localStorage.setItem("promptcraft.history", JSON.stringify(existing.map((item) => (item.id === id ? { ...item, pinned } : item))));
+}
+
 export async function getLocalSettings(defaults: LocalSettings): Promise<LocalSettings> {
   if (isTauri) {
     const stored = await command<LocalSettings>("get_app_settings");

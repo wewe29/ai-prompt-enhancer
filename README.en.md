@@ -18,6 +18,22 @@ This is the author's first public open-source release. The codebase, UI and docu
 
 Prefer filing an issue on GitHub so other users can see and verify it. You can also email [3986351310@qq.com](mailto:3986351310@qq.com). When sending feedback, please remove any API keys, passwords, proprietary source, or other sensitive material.
 
+**Enhancement-capability verification (v0.3.5, 60 samples on the DeepSeek-V4.1-Flash base model)**: after switching the base model to V4.1-Flash, all 60 three-tier samples were re-run and **all 60 level judgements were correct** — all 20 severely ambiguous samples were **turned into clarifications** (listing what is missing plus a temporary plan built on explicitly stated assumptions, without inventing facts); 17 moderately ambiguous samples received light completion and 3 were judged to need no change; of the 20 clear samples, **11 were returned unchanged**, with only light formatting applied. Zero cases of instruction overreach. The takeaway: **the enhancer knows when it should not act.** If you have already spelled out the goal, background, constraints and output format, just use your original prompt.
+
+> Enhancement and review were performed by two *different* models (not self-scoring), but **no human blind review was carried out**. Treat this as an indication, not a human judgement, and do not compare it directly with the v0.3.2 conclusions (both the base model and the review method changed). See [docs/PromptCraft-增强能力验证报告-v0.3.5.md](docs/PromptCraft-增强能力验证报告-v0.3.5.md) and the review rules [docs/PromptCraft-增强器评审规则-单模型版.md](docs/PromptCraft-增强器评审规则-单模型版.md) (both Chinese).
+
+## v0.3.4 / v0.3.5 security and data-reliability hardening
+
+These two iterations hardened four attack surfaces — import, credentials, attachments and local data — based on the empirical findings of a single-model code review (see [docs/PromptCraft-v0.3.4-评审报告.md](docs/PromptCraft-v0.3.4-评审报告.md), Chinese):
+
+- **An imported data package can never overwrite your API key.** The `apiKey` field inside `provider.json` is now explicitly ignored during deserialization and cleared again inside the import flow. Previously, a ZIP from an untrusted source could silently replace your DeepSeek key with an attacker's (reproduced in testing, now fixed), redirecting both your prompt content and your billing.
+- **Pinning actually works.** Pinned records are **never** removed by the 90-day retention sweep or by capacity cleanup (the history page has a pin button; pinned items sort first and are highlighted).
+- **The history capacity limit is configurable.** The settings page adds "History capacity limit (MB)" (default 64 MB, range 1–1024). Once exceeded, the **oldest unpinned** records are removed one by one until the limit is met.
+- **ZIP import hardened**: path traversal blocked, file count and total size limited, per-entry uncompressed hard cap of 8 MB (zip-bomb defence).
+- **Attachments fail safely**: empty, oversized, corrupt PDF/DOCX and binary-disguised-as-text files all produce an error instead of a crash. Attachments are read in place and **never create temporary files**.
+- **Error messages never leak credentials**: server-echoed content passes through credential redaction, so your API key cannot appear in any error text.
+- **Tests no longer pollute your credential store**: tests use isolated temp directories and credential service names and clean up afterwards (previously every `cargo test` run appended a batch of `PromptCraftTest-*` entries to the Windows credential manager).
+
 ## Features
 
 - Custom model list (configured on the settings page, selected from a dropdown on the enhancer page).
@@ -31,6 +47,7 @@ Prefer filing an issue on GitHub so other users can see and verify it. You can a
 - Enhancement-level judgement (no meaningful change / light enhancement / clarification needed) plus task-aware pre-send quick check.
 - Result view shows a delivery badge, user-provided facts, risk flags with required protection, and switchable prompt candidates (1-3).
 - Change list supports per-item or batch accept / reject; partial deliveries list missing fields; clarification shows current and remaining rounds.
+- History records support **pinning** (pinned items are never auto-cleaned) and a **configurable capacity limit**.
 - Delivery-degradation guarantee: on a structurally invalid model response, fall back to partial delivery or the original prompt so input is never lost.
 - Local text extraction from TXT, code, text-layer PDF and DOCX attachments.
 - API key stored in the Windows credential manager.

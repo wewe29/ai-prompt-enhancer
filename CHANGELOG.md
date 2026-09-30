@@ -2,6 +2,21 @@
 
 本项目遵循语义化版本。发布日期使用 `YYYY-MM-DD`。
 
+## [0.3.5] - 2026-09-30
+
+### v0.3.4 评审发现的缺陷修复
+
+依据 `docs/PromptCraft-v0.3.4-评审报告.md`（单模型评审，事实层均可复现）修复：
+
+- **【阻断】ZIP 导入凭据投毒**：`ProviderConfig.api_key` 原只有 `skip_serializing`，仅挡导出方向。攻击者在 `provider.json` 植入 `apiKey` 字段即可经 `import_data` → `save_provider_config` 改写真实 Windows 凭据管理器（评审中已实测复现：攻击者 Key 被写入并可读回）。现补 `skip_deserializing`，并在 `import_data` 内显式 `provider.api_key = None` 双保险。回归测试 `import_never_plants_api_key_into_credential_store` 验证用户原有 Key 不被改写。
+- **【高】置顶功能生产不可达**：`HistoryRecord` 无 `pinned` 字段、全仓库无任何 tauri command 或前端入口可置顶，容量清理的置顶保护实际从未被触发，旧测试用裸 SQL 置位因而"虚假通过"。现贯通全链路：`HistoryRecord.pinned` + `set_history_pinned` 存储方法 + `set_history_pinned` Tauri 命令 + 历史页置顶按钮（置顶记录排最前、带高亮）。测试改用公开 API 而非裸 SQL。
+- **【高】测试污染真实凭据管理器**：`test_storage()` 只在创建时隔离、从不清理，每跑一次 `cargo test` 就往用户真实凭据管理器追加 `PromptCraftTest-*` 条目并留下临时目录（实测一度累积 162 条）。现由 `TestSandbox` 在 `Drop` 中串行化清理（Windows 凭据管理器在并发删改时会静默失败，故用进程级锁 + 退避重试）。实测连续 4 次运行凭据增量均为 0。
+- **【中】错误码缺超时分类**：`is_timeout()` 与 `is_connect()` 此前都归入 `NETWORK_FAILED`，用量记录无法区分两类成因。新增 `error_code_for_transport`，区分 `TIMEOUT` 与 `NETWORK_UNREACHABLE`。
+- **【中】清空测试恒真断言**：原测试存入 `AppSettings::default()`（其 `profile_rules` 本就是空数组）后再断言为空，删除逻辑失效时同样会通过。现存入全字段非默认的设置，逐字段断言回落，并补 `max_history_mb`。
+- **【中】容量上限不可配置**：需求要求"按配置清理"，此前 `MAX_HISTORY_CONTENT_BYTES` 为硬编码常量。现新增 `AppSettings.max_history_mb`（默认 64 MB，夹取 1..=1024，非法值回落默认），设置页新增"历史容量上限（MB）"输入项；同步修正设置页长期显示的、早已失效的"最大 500 MB"文案。导入包不得把该值设为 0/负数使其失效。
+- **【中低】容量计量口径错误**：`enforce_history_capacity` 用 SQLite `LENGTH()`，对 TEXT 返回**字符数**而非字节数，与常量声明的字节语义不符（中文下实际占用可达名义值约 3 倍）。改用 `LENGTH(CAST(x AS BLOB))`，并补中文样本的对照测试。
+- **【低】测试计数修正**：v0.3.4 的 CHANGELOG 与提交信息称"24 个安全测试"，实测为 23 个。
+
 ## [0.3.4] - 2026-09-06
 
 ### 安全与数据可靠性加固
@@ -12,7 +27,7 @@
 - **错误信息防泄露**：`map_http_error` 的服务端详情统一过凭据遮蔽，API Key 不可能出现在任何错误提示中；数据库内供应商配置与导出包不含 Key 明文（Key 仅存 Windows 凭据管理器），补齐测试验证。
 - **凭据遮蔽不误删原文**：测试固定「只替换凭据值本身、前后文逐字保留」与「纯文本原文逐字通过」两个行为；附件始终只作为参考资料（仅进入 user message 附件段，绝不进入 system 指令），测试断言。
 - **附件安全失败**：空文件、超大（>10 MB）、损坏 PDF、损坏/缺正文 DOCX、二进制伪装文本均安全报错；附件为原地读取，**不产生任何临时文件**（测试验证处理前后目录一致），无清理失败面。
-- **稳定错误码**：AUTH_FAILED / BALANCE_INSUFFICIENT / MODEL_NOT_FOUND / RATE_LIMITED / NETWORK_FAILED / STREAM_INTERRUPTED / STRUCTURE_* / USER_CANCELLED 映射测试固化。
+- **稳定错误码**：AUTH_FAILED / BALANCE_INSUFFICIENT / MODEL_NOT_FOUND / RATE_LIMITED / NETWORK_FAILED / STREAM_INTERRUPTED / STRUCTURE_* / USER_CANCELLED 映射测试固化。（本版本实际新增 23 个测试，非提交信息所称的 24 个；传输层错误码未区分超时，见 [0.3.5] 修复。）
 - **storage 可测试化重构**：新增 `Storage::open(目录, 凭据服务名)`，测试使用独立 `PromptCraftTest-*` 服务名与临时目录，绝不触碰真实 PromptCraft 凭据。
 - 事实相关红线保持：不联网核验；数字、真实事件与具体事实以用户提供的内容为准。
 

@@ -110,6 +110,8 @@ export interface HistoryRecord {
   deliveryStatus?: "complete" | "partial" | "fallback";
   enhancementLevel?: string;
   promptVersion?: string;
+  /** 置顶记录永不被 90 天时间清理与容量清理删除 */
+  pinned?: boolean;
 }
 
 export interface LocalSettings {
@@ -118,6 +120,8 @@ export interface LocalSettings {
   customTargetUrl: string;
   monthlyWarningLimit: number;
   monthlyLimit: number;
+  /** 历史记录文本容量上限（MB），超出后按最旧未置顶逐条清理 */
+  maxHistoryMb?: number;
   profileRules: ProfileRule[];
 }
 
