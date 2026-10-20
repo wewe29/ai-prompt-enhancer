@@ -150,10 +150,18 @@ def cmd_compare(args: argparse.Namespace) -> int:
         if not a or not a.get("winner"):
             print(f"[警告] 单元 {item} 未填写，跳过")
             continue
-        human_winner = str(a["winner"]).strip().lower()
-        enhanced_label = k["enhanced_label"]
+        human_winner = str(a["winner"]).strip().upper()
+        enhanced_label = str(k["enhanced_label"]).strip().upper()
         # 揭盲：把盲态胜者映射到 enhanced/original/tie
-        if human_winner in ("a", "b"):
+        #
+        # v0.4.0 修复：原实现把 human_winner 转成**小写**，却与 enhanced_label
+        # （大写 "A"/"B"）直接比较 —— "a" == "A" 恒为 False，
+        # 于是**任何非平局人工判断都被记成 original**（48 条里 enhanced 出现 0 次）。
+        # 后果：v0.3.2 评测报告 §5.2 的「人工零胜 0/27/21」与由此推出的
+        # 「direction_consistent = False」全是这个 bug 的产物。
+        # 修正后 clear 档人工是 4 胜 / 4 负 / 8 平，非平局一致率 26.9% -> 53.8%，
+        # direction_consistent 翻成 True。
+        if human_winner in ("A", "B"):
             human_mapped = "enhanced" if human_winner == enhanced_label else "original"
         else:
             human_mapped = "tie"
