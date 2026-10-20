@@ -25,6 +25,8 @@ const MAX_HISTORY_CONTENT_BYTES: i64 = 64 * 1024 * 1024;
 // 单次导入的历史记录条数上限。超出部分**如实报告**在 ImportReport.skipped 里，
 // 绝不静默丢弃（静默截断会被用户当成"导入完整"）。
 const MAX_IMPORT_HISTORY: usize = 5_000;
+// 历史列表接口单次返回条数上限（只影响界面上的列表，不影响导出）
+const HISTORY_LIST_LIMIT: usize = 500;
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -243,20 +245,42 @@ impl Storage {
     }
 
     pub fn list_history(&self, query: Option<&str>) -> Result<Vec<HistoryRecord>, String> {
+        self.query_history(query, Some(HISTORY_LIST_LIMIT))
+    }
+
+    /// 导出用：读取**全部**历史记录，不受列表接口的 500 条上限约束。
+    ///
+    /// 导出曾复用带 LIMIT 500 的列表接口，于是备份包最多只有 500 条，
+    /// 而 UI 报的是"已导出 N 条记录"—— 用户会把它当成完整备份，
+    /// 日后恢复时更早的历史全部消失，且没有任何错误或警告
+    /// （v0.4.0 架构审查 P0-3：截断被当成成功）。
+    fn all_history(&self) -> Result<Vec<HistoryRecord>, String> {
+        self.query_history(None, None)
+    }
+
+    /// 历史记录查询。`limit` 为 None 表示不限条数。
+    fn query_history(
+        &self,
+        query: Option<&str>,
+        limit: Option<usize>,
+    ) -> Result<Vec<HistoryRecord>, String> {
         let connection = self
             .connection
             .lock()
             .map_err(|_| "数据库锁已损坏".to_string())?;
         let pattern = format!("%{}%", query.unwrap_or_default());
+        // SQLite 里 LIMIT -1 表示"无上限"（负值不设上界），
+        // 因此不限条数与限条数可以共用同一条语句，LIMIT 值走参数绑定。
+        let limit_value = limit.map(|value| value as i64).unwrap_or(-1);
         let mut statement = connection
             .prepare(
                 "SELECT id,title,original,enhanced,created_at,model,target,delivery_status,enhancement_level,prompt_version,pinned FROM history
              WHERE (?1 = '%%' OR title LIKE ?1 OR original LIKE ?1 OR enhanced LIKE ?1)
-             ORDER BY pinned DESC, created_at DESC LIMIT 500",
+             ORDER BY pinned DESC, created_at DESC LIMIT ?2",
             )
             .map_err(|error| error.to_string())?;
         let rows = statement
-            .query_map([pattern], |row| {
+            .query_map(params![pattern, limit_value], |row| {
                 Ok(HistoryRecord {
                     id: row.get(0)?,
                     title: row.get(1)?,
@@ -361,7 +385,7 @@ impl Storage {
         {
             return Err("导出文件必须使用 .zip 扩展名".into());
         }
-        let history = self.list_history(None)?;
+        let history = self.all_history()?;
         let settings = self.app_settings()?;
         let provider = self.provider_config()?;
         let manifest = ArchiveManifest {
@@ -947,6 +971,61 @@ mod tests {
             !raw.contains("evil.example.com"),
             "库里的投毒地址必须被修掉：{raw}"
         );
+    }
+
+    #[test]
+    fn export_contains_every_history_record() {
+        // 回归测试（v0.4.0 架构审查 P0-3）：导出曾复用带 LIMIT 500 的列表接口，
+        // 备份包最多 500 条，而 UI 报"已导出 N 条记录"
+        // ⇒ 用户当成完整备份，更早的历史静默丢失，无任何错误或警告。
+        let storage = test_storage();
+        for index in 0..520 {
+            storage
+                .save_history(&record(&format!("h{index}"), "增强内容", 0))
+                .unwrap();
+        }
+        let path = std::env::temp_dir().join(format!(
+            "PromptCraft-export-all-{}.zip",
+            uuid::Uuid::new_v4()
+        ));
+        let exported = storage.export_data(&path).unwrap();
+        assert_eq!(exported, 520, "导出条数必须是全部记录数");
+
+        let mut archive = ZipArchive::new(fs::File::open(&path).unwrap()).unwrap();
+        let mut history_json = String::new();
+        archive
+            .by_name("history.json")
+            .unwrap()
+            .read_to_string(&mut history_json)
+            .unwrap();
+        let items: Vec<serde_json::Value> = serde_json::from_str(&history_json).unwrap();
+        assert_eq!(items.len(), 520, "导出包必须包含全部历史记录");
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn export_then_import_roundtrip_keeps_every_record() {
+        // 导出（全部）→ 导入（另一台机器）必须一条不少。
+        let source = test_storage();
+        for index in 0..520 {
+            source
+                .save_history(&record(&format!("h{index}"), "增强内容", 0))
+                .unwrap();
+        }
+        let path = std::env::temp_dir().join(format!(
+            "PromptCraft-roundtrip-{}.zip",
+            uuid::Uuid::new_v4()
+        ));
+        source.export_data(&path).unwrap();
+
+        let target = test_storage();
+        let report = target.import_data(&path).unwrap();
+        assert_eq!(report.imported, 520, "导入条数必须等于导出条数");
+        assert_eq!(report.skipped, 0, "520 条远低于单包上限，不应有遗漏");
+        // 用不限条数的查询核对落库条数：
+        // list_history 是界面列表接口，按设计只返回最近 500 条。
+        assert_eq!(target.all_history().unwrap().len(), 520);
+        let _ = fs::remove_file(&path);
     }
 
     #[test]
