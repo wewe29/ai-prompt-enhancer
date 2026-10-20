@@ -205,20 +205,37 @@ v0.3.2 用的是 `deepseek-chat` + v2.0 系统提示词；v0.3.5 换成 `deepsee
 
 ## 六、复现方式
 
+> ⚠️ **本节的脚本在 2026-10-20 被重建。** 原脚本随 F 盘丢失（架构审查 P0-4），
+> 现版本是按本报告的指标口径**重新实现**的——**不是找回原件**。
+> 口径自洽性由 `evaluation/test_v040_measurement.py`（27 例离线，0 次 API 调用）钉住，
+> 其中一条用例用本报告 §3.2 的组合分布反推，复算出 clear 20/11/55%、medium 18/6/33%。
+>
+> **原始 API 响应与人工作答均已丢失**，下面这些命令是**重跑再生**的入口，
+> 不是「把当时的原始数据取出来」。证据索引见 `docs/evaluation-data-v040/`。
+
 ```powershell
 cd D:\workspace\1-projects\ai-prompt-enhancer
 
-# 档位稳定性（60 条 × 3 次）
+# 档位稳定性（60 条 × 3 次 = 180 次调用）
 py -3 evaluation\verify_stability.py --repeats 3
 
 # 增强能力验证（60 条单次 + 五维机械判定）
 py -3 evaluation\verify_enhance.py
 
-# severe 盲评包
-py -3 evaluation\v040_severe_blind.py --build
-py -3 evaluation\_parse_blind_answers.py      # 解析人工填写的 sheet
-py -3 evaluation\v040_severe_blind.py --merge  # 揭盲汇总
-py -3 evaluation\_aggregate_blind_by_scenario.py
+# severe 盲评：导出 → 人工评审 → 解析 → 按场景汇总
+py -3 evaluation\v040_severe_blind.py export --raw evaluation\results\v035_enhance_raw.json --outdir evaluation\results\blind_v040
+#    （评审者在 blind_packet.md 上填写 blind_answers.json）
+py -3 evaluation\_parse_blind_answers.py --answers evaluation\results\blind_v040\blind_answers.json --key evaluation\results\blind_v040\blind_key.json
+py -3 evaluation\_aggregate_blind_by_scenario.py --scored evaluation\results\blind_v040\scored.json
+
+# 一键重跑全部（约 440 次 API 调用）
+pwsh -File docs\evaluation-data-v040\regenerate.ps1
 ```
 
-产物（均在 `evaluation/results/`，已被 .gitignore 忽略）：`v035_enhance_raw.json`、`v035_deterministic.json`、`v040_stability_raw*.json`、`v040_stability_summary*.json`、`v040_severe_blind_*.json`。
+**产物位置**：`evaluation/results/stability/<时间戳>__m-<模型>__t<温度>__r<次数>__<哈希>/`。
+新脚本的产物名与目录名**编码自身身份**（模型/温度/提示词版本/样本集哈希/重复次数），
+`--resume` 前会做身份一致性闸，身份不同直接拒绝续跑——不会像旧脚本那样静默覆盖、
+把新旧结果混进同一份产物（机制见 `evaluation/run_identity.py`）。
+
+> 旧版把这些产物写在 `evaluation/results/` 且被 `.gitignore` 排除，导致 v0.4.0
+> 的结论无法复核。清单 D7/D8 正在闭环这件事：被报告引用的产物必须有入库路径。
