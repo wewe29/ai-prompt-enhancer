@@ -86,13 +86,21 @@ def _delivery_payload():
 
 def test_aggregate_delivery_status_counts():
     agg = report_mod._aggregate(_delivery_payload())
+    # 清单 A4：unknown 桶必须显式存在（否则"未知状态"无处安放，
+    # 下一条数据来了就被当成 complete）。
     assert agg["summary"]["delivery"] == {
-        "complete": 1, "partial": 1, "fallback": 1, "hard_failure": 1,
+        "complete": 1, "partial": 1, "fallback": 1, "hard_failure": 1, "unknown": 0,
     }
     assert agg["summary"]["delivery_rate"] == pytest.approx(0.75)
 
 
-def test_aggregate_delivery_legacy_defaults_complete():
+def test_aggregate_delivery_missing_status_is_unknown_not_complete():
+    """清单 A4 + R1：**缺** delivery_status 是缺数据，不是「完整交付」。
+
+    v0.3.x 的口径是缺状态默认 complete（`enhanced.get("delivery_status", "complete")`），
+    那样一条残缺记录会被算成完整交付、有效率被抬高。
+    v0.4.0 改为：缺状态/未知状态进 unknown 桶，且有效交付率**不可判定**。
+    """
     payload = {
         "meta": {},
         "samples": [
@@ -102,9 +110,11 @@ def test_aggregate_delivery_legacy_defaults_complete():
     }
     agg = report_mod._aggregate(payload)
     assert agg["summary"]["delivery"] == {
-        "complete": 1, "partial": 0, "fallback": 0, "hard_failure": 1,
+        "complete": 0, "partial": 0, "fallback": 0, "hard_failure": 1, "unknown": 1,
     }
-    assert agg["summary"]["delivery_rate"] == pytest.approx(0.5)
+    assert agg["summary"]["delivery_rate"] is None, (
+        "存在未知交付状态时有效交付率不可判定，不得给出数字"
+    )
 
 
 def test_aggregate_delivery_all_fail_zero_rate():
@@ -117,15 +127,17 @@ def test_aggregate_delivery_all_fail_zero_rate():
     }
     agg = report_mod._aggregate(payload)
     assert agg["summary"]["delivery"]["hard_failure"] == 2
+    # 两次都是真失败 ⇒ 0.0 是**测出来的** 0.0，与"没测到"不同，保留数字。
     assert agg["summary"]["delivery_rate"] == 0.0
 
 
 def test_aggregate_delivery_empty_no_samples():
+    """清单 A8：零样本时有效交付率是 None（不可判定），不是 0.0。"""
     agg = report_mod._aggregate({"meta": {}, "samples": []})
     assert agg["summary"]["delivery"] == {
-        "complete": 0, "partial": 0, "fallback": 0, "hard_failure": 0,
+        "complete": 0, "partial": 0, "fallback": 0, "hard_failure": 0, "unknown": 0,
     }
-    assert agg["summary"]["delivery_rate"] == 0.0
+    assert agg["summary"]["delivery_rate"] is None
 
 
 def test_markdown_delivery_section(tmp_path):

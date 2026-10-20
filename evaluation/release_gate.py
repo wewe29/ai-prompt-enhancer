@@ -72,13 +72,25 @@ def compute_gates(summary_in: dict[str, Any]) -> list[dict[str, Any]]:
             "pass": bool(pre.get("pass")),
         })
 
-    effective = float(summary.get("delivery_rate", 0.0))
-    gates.append({
-        "name": "总有效率 ≥ 95%",
-        "value": f"{effective:.1%}",
-        "threshold": "95%",
-        "pass": effective >= 0.95,
-    })
+    # v0.4.0 失败伪装清单 A4 / A8：delivery_rate 缺失（键不存在或值为 None）
+    # = **不可判定** ⇒ FAIL。绝不回落成 0.0 ——
+    # 0.0 会被读成"有效率 0%"，也就是"测过了，全失败"；缺数据不是这个意思。
+    raw_effective = summary.get("delivery_rate")
+    if raw_effective is None:
+        gates.append({
+            "name": "总有效率 ≥ 95%",
+            "value": "不可判定（缺交付数据或存在未知交付状态）",
+            "threshold": "95%",
+            "pass": False,
+        })
+    else:
+        effective = float(raw_effective)
+        gates.append({
+            "name": "总有效率 ≥ 95%",
+            "value": f"{effective:.1%}",
+            "threshold": "95%",
+            "pass": effective >= 0.95,
+        })
 
     control = summary.get("control") or {}
     amb_control = control.get("by_ambiguity") or {}

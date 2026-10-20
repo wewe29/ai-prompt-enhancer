@@ -77,6 +77,24 @@ def classify_magnitude(mean_delta: float) -> str:
     return f"tie-{magnitude}"
 
 
+def _has_judge(judge: Any) -> bool:
+    """裁判结果是否存在且非空。
+
+    缺裁判（judge 缺失或为空）= **judge_failed**：它**留在比较分母里**
+    （清单 A6），只是没有胜负可记。
+    """
+    return bool(judge)
+
+
+def _pct_or_unknown(value: float | None) -> str:
+    """比率渲染：缺失时写「不可判定」，绝不写 0.0%。
+
+    清单 A8：0 个样本与"比率真的是 0"在报告里必须可区分 ——
+    渲染成 0.0% 会让读者以为"测过了，结果是 0"。
+    """
+    return "不可判定" if value is None else f"{value:.1f}%"
+
+
 def generate(results_dir: Path, data: dict[str, Any]) -> Path:
     """生成全部输出文件，返回报告目录。"""
     results_dir.mkdir(parents=True, exist_ok=True)
@@ -177,40 +195,67 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
     amb_ctrl_cmb: dict[str, dict[str, list[float]]] = {}
     amb_ctrl_bma: dict[str, dict[str, list[float]]] = {}
 
-    delivery_counts: dict[str, int] = {"complete": 0, "partial": 0, "fallback": 0, "hard_failure": 0}
+    # v0.4.0 失败伪装清单 A4 / A5（交付状态）：
+    # - A4：未知或缺失的 delivery_status 必须进**独立的 unknown 桶**，
+    #   绝不归入 complete —— "完整交付"恰恰是缺失数据最容易被读成的那句话。
+    # - A5：每个样本都必须进分母；失败样本计 hard_failure，
+    #   分母固定为样本总数 —— 否则"失败越多、比率越好看"。
+    delivery_counts: dict[str, int] = {
+        "complete": 0,
+        "partial": 0,
+        "fallback": 0,
+        "hard_failure": 0,
+        "unknown": 0,
+    }
     delivery_total = 0
+    # A7：裁判给了胜负但没给维度分的样本数（缺维度分 ⇒ 不进幅度分类）
+    missing_deltas = 0
 
-    # v0.4.0 失败伪装清单 A6：比较样本的分母必须显式化。
-    # 此前 `if not judge: continue` 让裁判失败的样本静默退出分母 ⇒
-    # 样本流失越多，胜率/一致率/变差率越好看（"失败得越彻底，指标越漂亮"）。
+    # v0.4.0 失败伪装清单 A6：比较样本的分母必须显式化，且**失败样本留在分母里**。
+    # 此前裁判失败的样本被 continue 掉、静默退出分母 ⇒ 样本流失越多，
+    # 胜率/一致率/变差率越好看（"失败得越彻底，指标越漂亮"）。
     # 现在同时记录：应有（expected）/ 已尝试（attempted）/ 已裁判（judged），
-    # 以及被排除的数量与原因。分母流失由 release_gate 判 FAIL。
+    # 以及被排除的数量与原因；total = 进入比较的样本总数（**含裁判失败的**），
+    # 于是裁判失败会让比率变难看，而不是变好看。分母流失由 release_gate 判 FAIL。
     agg_meta = data.get("meta") or {}
     target_slots = list(agg_meta.get("targets") or [])
     expected_total = 0
     attempted_total = 0
+    # A6：裁判**成功**的槽位数。与 total（进入比较的总数）不是一回事：
+    # total 用来做分母（保守），judged_total 用来算裁判成功率。
+    judged_total = 0
     excluded_counts: dict[str, int] = {"no_result": 0, "judge_failed": 0}
 
     for sample in data.get("samples", []):
         scenario = sample.get("scenario", "未分类")
         persona = sample.get("persona")
         enhanced = sample.get("enhanced")
-        if isinstance(enhanced, dict) and enhanced:
-            delivery_total += 1
-            if enhanced.get("error"):
-                delivery_counts["hard_failure"] += 1
+        # A5：分母固定为样本总数 —— 每个样本都算一次交付尝试，
+        # 失败（缺结果 / 空结果 / 显式报错）计 hard_failure 而不是退出分母。
+        delivery_total += 1
+        if not isinstance(enhanced, dict) or not enhanced or enhanced.get("error"):
+            delivery_counts["hard_failure"] += 1
+        else:
+            status = enhanced.get("delivery_status")
+            if status in ("complete", "partial", "fallback"):
+                delivery_counts[status] += 1
             else:
-                status = enhanced.get("delivery_status", "complete")
-                delivery_counts[status if status in delivery_counts else "complete"] += 1
+                # A4：未知/缺失状态进 unknown 桶，**不归 complete**
+                delivery_counts["unknown"] += 1
         results = sample.get("results") or {}
         expected_total += max(len(target_slots), len(results))
         attempted_total += len(results)
         for target_id, result in results.items():
             judge = result.get("judge")
-            if not judge:
+            # A6：进入比较的样本**一律**计入分母（total）。
+            # 裁判失败不再是"静默 continue 掉"：它留在分母里、只是没有胜负，
+            # 于是"裁判失败得越多、比率越好看"这件事被堵死
+            # （此前 wins/ties/losses 都在存活子集上算）。
+            total += 1
+            if not _has_judge(judge):
                 excluded_counts["judge_failed"] += 1
                 continue
-            total += 1
+            judged_total += 1
             original, enhanced = judge["original"], judge["enhanced"]
             deltas = judge.get("deltas", {})
             orig_text = sample.get("original") or ""
@@ -248,9 +293,17 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
             wins += winner == "enhanced"
             losses += winner == "original"
             ties += winner == "tie"
-            mean_delta = (sum(deltas.values()) / len(deltas)) if deltas else 0.0
-            magnitude = classify_magnitude(mean_delta).split("-", 1)[1]
-            if winner == "enhanced":
+            # A7：裁判没给维度分时 mean_delta 是 **None**，不是 0.0。
+            # 0.0 会让"没测到四维"变成"四维平均为 0"，还被 classify_magnitude
+            # 归进 minor 桶 —— 缺数据被当成"改动很小"。
+            mean_delta = (sum(deltas.values()) / len(deltas)) if deltas else None
+            magnitude = (
+                classify_magnitude(mean_delta).split("-", 1)[1] if mean_delta is not None else None
+            )
+            if magnitude is None:
+                # 没有维度分 ⇒ 该样本**不进**幅度分类，但缺口必须留痕（R2）
+                missing_deltas += 1
+            elif winner == "enhanced":
                 by_magnitude["improve"][magnitude] += 1
             elif winner == "original":
                 by_magnitude["regress"][magnitude] += 1
@@ -299,39 +352,55 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
         return {"n": n, "mean": round(sum(series) / n, 2)}
 
     summary: dict[str, Any] = {
+        # A6：total = **进入比较的样本总数**（含裁判失败的那些）。
+        # 它是胜率/变差率的分母 —— 裁判失败越多，比率越难看，而不是越好看。
         "total": total,
         "comparison": {
-            # 应有多少 / 实有多少（清单 A6、缺失语义约定 R4）
+            # 应有多少 / 实有多少 / 裁判成功多少（清单 A6、缺失语义约定 R2/R4）
             "expected_total": expected_total,
             "attempted_total": attempted_total,
-            "judged_total": total,
+            "judged_total": judged_total,
             "excluded": excluded_counts,
-            "coverage_rate": round(total / expected_total, 4) if expected_total else None,
+            # coverage_rate = 裁判成功率（已裁判 / 应有）；
+            # attempt_rate = 实际跑起来率（已尝试 / 应有）。
+            "coverage_rate": round(judged_total / expected_total, 4) if expected_total else None,
+            "attempt_rate": round(attempted_total / expected_total, 4) if expected_total else None,
             "win_rate_of_expected": win_rate_of_expected,
+            # A7：有胜负但没有维度分的样本数（缺口留痕，不进幅度分类）
+            "missing_deltas": missing_deltas,
         },
         "improved": improved,
-        "improved_pct": round(100.0 * improved / total, 1) if total else 0.0,
+        # A8：零样本时这些比率是 **None**（不可判定），不是 0.0 ——
+        # 0.0 与"比率真的是 0"在产物里无法区分。
+        "improved_pct": round(100.0 * improved / total, 1) if total else None,
         "wins": wins,
         "ties": ties,
         "losses": losses,
         "win_rate_ci": [round(v, 4) for v in wilson_ci(wins, total)],
         "binomial_p": round(binomial_one_sided(wins, losses), 4),
-        "regression_failure_rate": round((ties + losses) / total, 4) if total else 0.0,
-        "regression_worse_rate": round(losses / total, 4) if total else 0.0,
+        "regression_failure_rate": round((ties + losses) / total, 4) if total else None,
+        "regression_worse_rate": round(losses / total, 4) if total else None,
         "delivery": delivery_counts,
-        "delivery_rate": round(
-            (delivery_total - delivery_counts["hard_failure"]) / delivery_total, 4
-        ) if delivery_total else 0.0,
+        # A4：只要有未知/缺失的交付状态，有效交付率就**不可判定**（None）。
+        # A8：零样本同样是 None。
+        "delivery_rate": (
+            round((delivery_total - delivery_counts["hard_failure"]) / delivery_total, 4)
+            if delivery_total and not delivery_counts["unknown"]
+            else None
+        ),
     }
     if agreement_winners:
+        # A9：某个维度没有样本时，该维度**不出现在** dim_corr 里 ——
+        # "未测量该维度"与"该维度相关性为 0"必须可区分。
+        dim_corr: dict[str, float] = {}
+        for dim, vals in agreement_rhos.items():
+            if not vals:
+                continue
+            dim_corr[dim] = round(sum(vals) / len(vals), 4)
         summary["judge_agreement"] = {
             "winner_agreement": round(sum(agreement_winners) / len(agreement_winners), 4),
             "n": len(agreement_winners),
-            "dim_corr": {
-                dim: round(sum(vals) / len(vals), 4) if vals else 0.0
-                for dim, vals in agreement_rhos.items()
-                if vals
-            },
+            "dim_corr": dim_corr,
         }
 
     cost: dict[str, Any] = {}
@@ -395,8 +464,12 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
 
     # ---- v0.3.0 结论门槛（规格 §6.6）----
     gate_reasons: list[str] = []
-    eff_rate = summary.get("delivery_rate", 0.0)
-    if eff_rate < 0.90:
+    eff_rate = summary.get("delivery_rate")
+    if eff_rate is None:
+        # A4 / A8：交付率不可判定（缺交付数据，或存在未知交付状态）⇒ 直接阻断。
+        # 绝不回落成 0.0 —— 那是"有效率为 0%"，读起来像"测过了，全失败"。
+        gate_reasons.append("有效样本率不可判定（缺交付数据或存在未知交付状态）")
+    elif eff_rate < 0.90:
         gate_reasons.append(f"有效样本率 {eff_rate:.0%} 低于 90%")
     major_scenarios = ("编程", "办公写作", "问答", "数据分析", "翻译", "创意")
     scenario_ns = {
@@ -465,12 +538,21 @@ def _render_markdown(data: dict[str, Any]) -> str:
         excl = comparison.get("excluded") or {}
         excl_txt = "、".join(f"{k}={v}" for k, v in excl.items() if v) or "无"
         lines.append(
-            f"- 有效对比样本：**{summary['total']}** 组"
-            f"（应有 {comparison['expected_total']} 组 / 已尝试 {comparison['attempted_total']} 组 / 已排除：{excl_txt}）"
+            f"- 进入比较的样本：**{summary['total']}** 组"
+            f"（应有 {comparison['expected_total']} 组 / 已尝试 {comparison['attempted_total']} 组"
+            f" / 已裁判 {comparison.get('judged_total', '未记录')} 组 / 已排除：{excl_txt}）"
         )
+        if comparison.get("missing_deltas"):
+            lines.append(
+                f"- 其中 **{comparison['missing_deltas']}** 组有胜负但缺维度分"
+                f"（未计入改进幅度分类）"
+            )
     else:
-        lines.append(f"- 有效对比样本：**{summary['total']}** 组（分母未记录 ⇒ 不可判定）")
-    lines.append(f"- 增强后更优（任一维度 +{IMPROVE_THRESHOLD} 分）：**{summary['improved']}** 组（{summary['improved_pct']}%）")
+        lines.append(f"- 进入比较的样本：**{summary['total']}** 组（分母未记录 ⇒ 不可判定）")
+    lines.append(
+        f"- 增强后更优（任一维度 +{IMPROVE_THRESHOLD} 分）：**{summary['improved']}** 组"
+        f"（{_pct_or_unknown(summary['improved_pct'])}）"
+    )
     win_line = f"- 胜负关系：胜（增强更优）**{summary['wins']}** / 平 **{summary['ties']}** / 负（原始更优）**{summary['losses']}**"
     if summary["total"] > 0:
         ci = summary.get("win_rate_ci", (0.0, 0.0))
@@ -482,8 +564,13 @@ def _render_markdown(data: dict[str, Any]) -> str:
             win_line += "（样本数较少，结论仅供参考）"
     lines.append(win_line + "\n")
     if meta.get("regression_mode"):
-        lines.append(f"- 回归失败率：**{100.0 * summary.get('regression_failure_rate', 0.0):.1f}%**（未获实质改进的比例）")
-        lines.append(f"- 变差率：**{100.0 * summary.get('regression_worse_rate', 0.0):.1f}%**")
+        lines.append(
+            f"- 回归失败率：**{_pct_or_unknown(100.0 * summary['regression_failure_rate'] if summary.get('regression_failure_rate') is not None else None)}**"
+            f"（未获实质改进的比例）"
+        )
+        lines.append(
+            f"- 变差率：**{_pct_or_unknown(100.0 * summary['regression_worse_rate'] if summary.get('regression_worse_rate') is not None else None)}**"
+        )
         regressed = [s["id"] for s in data.get("samples", []) if _sample_has_loss(s)]
         if regressed:
             lines.append("- 回归失败样本（增强后反而更差）：")
@@ -492,8 +579,13 @@ def _render_markdown(data: dict[str, Any]) -> str:
         lines.append("")
     ja = summary.get("judge_agreement")
     if ja:
+        # A9：某维度没有样本时**不显示 ρ=0.00** ——
+        # 那是"未测量该维度"被渲染成"该维度相关性为 0"。
+        corr_map = ja.get("dim_corr") or {}
         dim_corr = "；".join(
-            f"{DIMENSION_LABELS[d]} ρ={ja['dim_corr'].get(d, 0.0):.2f}" for d in DIMENSION_ORDER
+            f"{DIMENSION_LABELS[d]} "
+            + (f"ρ={corr_map[d]:.2f}" if d in corr_map else "ρ=未测量（该维度无样本）")
+            for d in DIMENSION_ORDER
         )
         lines.append(
             f"- 裁判一致性：双裁判胜者一致率 **{100.0 * ja['winner_agreement']:.1f}%**"
@@ -516,7 +608,11 @@ def _render_markdown(data: dict[str, Any]) -> str:
         lines.append(f"| 部分交付（partial） | {delivery.get('partial', 0)} |")
         lines.append(f"| 原文回退（fallback） | {delivery.get('fallback', 0)} |")
         lines.append(f"| 增强失败（hard_failure） | {delivery.get('hard_failure', 0)} |")
-        lines.append(f"| **有效率**（非 hard_failure 占比） | **{100.0 * summary.get('delivery_rate', 0.0):.1f}%** |")
+        lines.append(f"| 状态未知/缺失（unknown） | {delivery.get('unknown', 0)} |")
+        lines.append(
+            f"| **有效率**（非 hard_failure 占比） | **"
+            f"{_pct_or_unknown(100.0 * summary['delivery_rate'] if summary.get('delivery_rate') is not None else None)}** |"
+        )
         lines.append("")
 
     cost = agg.get("cost") or {}

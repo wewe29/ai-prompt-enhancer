@@ -653,7 +653,7 @@
     "quality_gain_per_1k_tokens": 35.71
   },
   "summary": {
-    "total": 45,
+    "total": 60,
     "comparison": {
       "expected_total": 60,
       "attempted_total": 60,
@@ -662,16 +662,19 @@
         "no_result": 0,
         "judge_failed": 15
       },
-      "coverage_rate": 0.75
+      "coverage_rate": 0.75,
+      "attempt_rate": 1.0,
+      "win_rate_of_expected": 0.75,
+      "missing_deltas": 0
     },
     "improved": 45,
-    "improved_pct": 100.0,
+    "improved_pct": 75.0,
     "wins": 45,
     "ties": 0,
     "losses": 0,
     "win_rate_ci": [
-      0.9213,
-      1.0
+      0.6277,
+      0.8422
     ],
     "binomial_p": 0.0,
     "regression_failure_rate": 0.0,
@@ -680,7 +683,8 @@
       "complete": 60,
       "partial": 0,
       "fallback": 0,
-      "hard_failure": 0
+      "hard_failure": 0,
+      "unknown": 0
     },
     "delivery_rate": 1.0,
     "judge_agreement": {

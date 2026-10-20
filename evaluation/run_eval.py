@@ -56,6 +56,14 @@ def _rep_key(repeats: int, rep: int) -> str:
     return "" if int(repeats) <= 1 else f"_rep{rep}"
 
 
+def _pct_or_unknown(value: float | None) -> str:
+    """比率打印：缺失时写「不可判定」，绝不写 0.0%（清单 A8）。
+
+    0 个样本与"比率真的是 0"在终端输出里同样必须可区分。
+    """
+    return "不可判定" if value is None else f"{value:.1f}%"
+
+
 def resolve_control_group(cfg: dict[str, Any], no_control_group: bool) -> bool:
     """控制组开关：默认开启（config run.control_group，缺省 true），--no-control-group 覆盖为关闭。"""
     if no_control_group:
@@ -534,9 +542,14 @@ def main() -> int:
     agg = report_mod._aggregate(payload)
     s = agg["summary"]
     print("\n================ 评测完成 ================")
-    print(f"有效对比：{s['total']} 组 | 增强更优：{s['improved']}（{s['improved_pct']}%）| 胜/平/负：{s['wins']}/{s['ties']}/{s['losses']}")
+    print(f"进入比较：{s['total']} 组 | 增强更优：{s['improved']}（{_pct_or_unknown(s['improved_pct'])}）| 胜/平/负：{s['wins']}/{s['ties']}/{s['losses']}")
     if regression_mode:
-        print(f"回归失败率：{100.0 * s.get('regression_failure_rate', 0.0):.1f}% | 变差率：{100.0 * s.get('regression_worse_rate', 0.0):.1f}%")
+        reg_fail = s.get("regression_failure_rate")
+        worse = s.get("regression_worse_rate")
+        print(
+            f"回归失败率：{_pct_or_unknown(100.0 * reg_fail if reg_fail is not None else None)}"
+            f" | 变差率：{_pct_or_unknown(100.0 * worse if worse is not None else None)}"
+        )
     print("各维度平均 Delta：", {d: agg['dimensions'][d]['mean'] for d in ("accuracy", "completeness", "relevance", "clarity")})
     print(f"预估成本：${meta['estimated_cost']:.4f}")
     print(f"报告目录：{out_dir}")
@@ -640,7 +653,7 @@ def run_manual_answers(args: argparse.Namespace, cfg: dict[str, Any], samples: l
     agg = report_mod._aggregate(payload)
     s = agg["summary"]
     print("\n================ 人工答案评测完成 ================")
-    print(f"填写组合：{filled} 组 | 裁判完成：{judged} 组 | 增强更优：{s['improved']}（{s['improved_pct']}%）| 胜/平/负：{s['wins']}/{s['ties']}/{s['losses']}")
+    print(f"填写组合：{filled} 组 | 裁判完成：{judged} 组 | 增强更优：{s['improved']}（{_pct_or_unknown(s['improved_pct'])}）| 胜/平/负：{s['wins']}/{s['ties']}/{s['losses']}")
     print(f"报告目录：{out_dir}")
     print(f"  - report.md / report.html / summary.json / raw/")
     return 0

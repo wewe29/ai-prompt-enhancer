@@ -662,7 +662,10 @@
         "no_result": 0,
         "judge_failed": 0
       },
-      "coverage_rate": 1.0
+      "coverage_rate": 1.0,
+      "attempt_rate": 1.0,
+      "win_rate_of_expected": 1.0,
+      "missing_deltas": 0
     },
     "improved": 60,
     "improved_pct": 100.0,
@@ -680,7 +683,8 @@
       "complete": 60,
       "partial": 0,
       "fallback": 0,
-      "hard_failure": 0
+      "hard_failure": 0,
+      "unknown": 0
     },
     "delivery_rate": 1.0,
     "judge_agreement": {
