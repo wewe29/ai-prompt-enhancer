@@ -47,11 +47,13 @@ v0.4.0 的范围：
 
 ### 2.1 测量条件与线上一致
 
-| 位置 | 值 |
-|---|---|
-| `src-tauri/src/provider.rs` | `"temperature": 0.35` ← **产品实际值，本轮要改的就是它** |
-| `evaluation/verify_stability.py` | `TEMPERATURE = 0.35` |
-| 底模 | `deepseek-flash`（DeepSeek-V4.1-Flash） |
+> ⚠️ **2026-10-20 更新**：温度已改为 0.1 并收进**单一来源** `src-tauri/src/provider.rs` 的 `ENHANCEMENT_TEMPERATURE`，评测侧 `config.yaml` / `config.py` / `enhancer.py` / `verify_enhance.py` 由 `evaluation/test_temperature_consistency.py` 逐处断言一致（commit `feaf830`）。下表的 0.35 是**改之前**的基线，仅供追溯。
+
+| 位置 | 值（改前） | 值（现状） |
+|---|---|---|
+| `src-tauri/src/provider.rs` | `"temperature": 0.35` | **`ENHANCEMENT_TEMPERATURE: f64 = 0.1`**（单一来源） |
+| `evaluation/verify_stability.py` | `TEMPERATURE = 0.35` | `--temperature` 参数，**默认 0.35**（保持与原实验同条件，便于与历史数字对账） |
+| 底模 | `deepseek-flash`（DeepSeek-V4.1-Flash） | 同 |
 
 除温度实验外，其余实验数据均在此条件下取得，**可直接外推到线上行为**。
 

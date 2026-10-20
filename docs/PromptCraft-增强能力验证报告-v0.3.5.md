@@ -179,7 +179,7 @@
 
 ```powershell
 # 前置：环境变量 DEEPSEEK_API_KEY 已设置
-cd F:\ai-prompt-enhancer
+cd D:\workspace\1-projects\ai-prompt-enhancer
 
 # 全量 60 条（约 10 分钟，成本约 $0.12）
 py -3 evaluation\verify_enhance.py
