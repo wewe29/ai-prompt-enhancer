@@ -163,8 +163,15 @@ struct ProbeSandbox {
 impl ProbeSandbox {
     fn new() -> Self {
         let dir = std::env::temp_dir().join(format!("PromptCraft-probe-{}", uuid::Uuid::new_v4()));
-        let service = format!("PromptCraftProbe-{}", uuid::Uuid::new_v4());
-        Self { dir, service }
+        // 凭据服务名用**固定名**而不是每次生成 UUID。
+        //
+        // 原因：探针进程一旦被中断（崩溃 / 被杀），`Drop` 不会执行 ⇒ 凭据条目泄漏。
+        // 用 UUID 命名时，每次中断都留下一条永久残留 —— 实测一次会话崩溃就在
+        // 用户真实的 Windows 凭据管理器里堆了 92 条 `PromptCraftProbe-*`。
+        // 固定名让**下一次运行覆盖上一次**，最多泄漏 1 条，且清理逻辑照常生效。
+        // 固定名依然与生产的 `deepseek-api-key.PromptCraft` 完全隔离。
+        const SERVICE: &str = "PromptCraftProbe";
+        Self { dir, service: SERVICE.to_string() }
     }
 
     fn open_storage(&self) -> Storage {
