@@ -156,7 +156,53 @@ def test_control_aggregation_empty_when_absent():
     bc = report_mod._aggregate(_cost_payload())["by_control"]
     assert bc["enhanced_vs_padded"] == {}
     assert bc["padded_vs_original"] == {}
-    assert bc["pad_ratio"] == 0.0
+    # v0.4.0 失败伪装清单 A2：控制组的 pad_ratio 与主统计同语义 ——
+    # 无比值样本时必须是 None，**不能是 0.0**（0.0 会被读成"膨胀完美"）。
+    assert bc["pad_ratio"] is None, "控制组 pad_ratio 必须是 None，不是 0.0"
+
+
+def test_control_pad_ratio_none_and_cost_pad_ratio_none_are_consistent():
+    """A2 的验收条件：两处 pad_ratio 的缺失语义必须一致且均为 None。"""
+    payload = _control_payload()
+    payload["samples"][0]["original"] = ""   # 原文为空 ⇒ 两处都没有比值样本
+    agg = report_mod._aggregate(payload)
+    assert agg["cost"]["pad_ratio"] is None
+    assert agg["by_control"]["pad_ratio"] is None
+
+
+def test_markdown_renders_control_pad_ratio_as_undeterminable(tmp_path):
+    """A3：控制组表格里缺失的填充比必须显示"不可判定"，不能渲染成 0.00×。"""
+    payload = _control_payload()
+    payload["samples"][0]["original"] = ""
+    report_mod.generate(tmp_path, payload)
+    md = (tmp_path / "report.md").read_text(encoding="utf-8")
+    assert "长度控制组" in md
+    assert "0.00×" not in md, "缺数据不得渲染成 0.00×（读者会读成『没有膨胀』）"
+    assert "不可判定" in md
+
+
+def test_comparison_denominator_is_recorded():
+    """A6：应有 / 实有 / 排除数与原因必须同时落进产物。"""
+    payload = _cost_payload()
+    payload["samples"][0]["results"]["t1"]["judge"] = None   # 1 条裁判失败
+    agg = report_mod._aggregate(payload)
+    comparison = agg["summary"]["comparison"]
+    assert comparison["expected_total"] == 2
+    assert comparison["attempted_total"] == 2
+    assert comparison["judged_total"] == 1
+    assert comparison["excluded"]["judge_failed"] == 1
+    assert comparison["coverage_rate"] == 0.5
+
+
+def test_markdown_shows_expected_and_actual_denominator(tmp_path):
+    """A6 / R4：报告里必须同时出现"应有"与"实有"。"""
+    payload = _cost_payload()
+    payload["samples"][0]["results"]["t1"]["judge"] = None
+    report_mod.generate(tmp_path, payload)
+    md = (tmp_path / "report.md").read_text(encoding="utf-8")
+    assert "应有 2 组" in md
+    assert "已尝试 2 组" in md
+    assert "judge_failed=1" in md
 
 
 # ---- Markdown 渲染 ----

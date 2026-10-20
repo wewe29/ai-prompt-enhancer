@@ -180,6 +180,17 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
     delivery_counts: dict[str, int] = {"complete": 0, "partial": 0, "fallback": 0, "hard_failure": 0}
     delivery_total = 0
 
+    # v0.4.0 失败伪装清单 A6：比较样本的分母必须显式化。
+    # 此前 `if not judge: continue` 让裁判失败的样本静默退出分母 ⇒
+    # 样本流失越多，胜率/一致率/变差率越好看（"失败得越彻底，指标越漂亮"）。
+    # 现在同时记录：应有（expected）/ 已尝试（attempted）/ 已裁判（judged），
+    # 以及被排除的数量与原因。分母流失由 release_gate 判 FAIL。
+    agg_meta = data.get("meta") or {}
+    target_slots = list(agg_meta.get("targets") or [])
+    expected_total = 0
+    attempted_total = 0
+    excluded_counts: dict[str, int] = {"no_result": 0, "judge_failed": 0}
+
     for sample in data.get("samples", []):
         scenario = sample.get("scenario", "未分类")
         persona = sample.get("persona")
@@ -191,9 +202,13 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
             else:
                 status = enhanced.get("delivery_status", "complete")
                 delivery_counts[status if status in delivery_counts else "complete"] += 1
-        for target_id, result in (sample.get("results") or {}).items():
+        results = sample.get("results") or {}
+        expected_total += max(len(target_slots), len(results))
+        attempted_total += len(results)
+        for target_id, result in results.items():
             judge = result.get("judge")
             if not judge:
+                excluded_counts["judge_failed"] += 1
                 continue
             total += 1
             original, enhanced = judge["original"], judge["enhanced"]
@@ -270,6 +285,13 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
             for dim in PROMPT_JUDGE_DIMS:
                 by_prompt_judge.setdefault(scenario, {}).setdefault(dim, []).append(float(pj.get(dim, 0)))
 
+    # 应有但连尝试都没有的槽位（目标站点登录失败等导致整段被跳过）
+    excluded_counts["no_result"] = max(0, expected_total - attempted_total)
+
+    # 保守口径：把流失的比较算作"没赢"。与 judged 子集口径并列，
+    # 让读者看到"样本流失越多、比率越好看"这件事本身（A6 的核心后果）。
+    win_rate_of_expected = round(wins / expected_total, 4) if expected_total else None
+
     def stat(series: list[float]) -> dict[str, float]:
         n = len(series)
         if not n:
@@ -278,6 +300,15 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
 
     summary: dict[str, Any] = {
         "total": total,
+        "comparison": {
+            # 应有多少 / 实有多少（清单 A6、缺失语义约定 R4）
+            "expected_total": expected_total,
+            "attempted_total": attempted_total,
+            "judged_total": total,
+            "excluded": excluded_counts,
+            "coverage_rate": round(total / expected_total, 4) if expected_total else None,
+            "win_rate_of_expected": win_rate_of_expected,
+        },
         "improved": improved,
         "improved_pct": round(100.0 * improved / total, 1) if total else 0.0,
         "wins": wins,
@@ -333,7 +364,11 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
         "padded_vs_original": {
             sc: {dim: stat(vals) for dim, vals in dims.items()} for sc, dims in ctrl_padded_vs_orig.items()
         },
-        "pad_ratio": round(sum(ctrl_ratios) / len(ctrl_ratios), 2) if ctrl_ratios else 0.0,
+        # v0.4.0 失败伪装清单 A2：这是 `else 0.0` 的**第二份拷贝**。
+        # A1 已把 cost.pad_ratio 改成 None，这里必须同样改成 None ——
+        # 两处缺失语义不一致时，任何一处漏改都会留下放行缺口
+        # （主统计说"没测到"，控制组说"膨胀完美"）。
+        "pad_ratio": round(sum(ctrl_ratios) / len(ctrl_ratios), 2) if ctrl_ratios else None,
     }
 
     def dim_mean_map(series: dict[str, list[float]]) -> dict[str, dict[str, float]]:
@@ -424,7 +459,17 @@ def _render_markdown(data: dict[str, Any]) -> str:
     if gate and not gate.get("pass"):
         reasons = "；".join(gate.get("reasons", []))
         lines.append(f"> ⚠️ **本轮结果不可用于产品结论**：{reasons}\n")
-    lines.append(f"- 有效对比样本：**{summary['total']}** 组")
+    # 清单 A6 / 缺失语义约定 R4：分母显式化 —— "应有多少"与"实有多少"必须同时出现。
+    comparison = summary.get("comparison") or {}
+    if comparison.get("expected_total") is not None:
+        excl = comparison.get("excluded") or {}
+        excl_txt = "、".join(f"{k}={v}" for k, v in excl.items() if v) or "无"
+        lines.append(
+            f"- 有效对比样本：**{summary['total']}** 组"
+            f"（应有 {comparison['expected_total']} 组 / 已尝试 {comparison['attempted_total']} 组 / 已排除：{excl_txt}）"
+        )
+    else:
+        lines.append(f"- 有效对比样本：**{summary['total']}** 组（分母未记录 ⇒ 不可判定）")
     lines.append(f"- 增强后更优（任一维度 +{IMPROVE_THRESHOLD} 分）：**{summary['improved']}** 组（{summary['improved_pct']}%）")
     win_line = f"- 胜负关系：胜（增强更优）**{summary['wins']}** / 平 **{summary['ties']}** / 负（原始更优）**{summary['losses']}**"
     if summary["total"] > 0:
@@ -586,11 +631,15 @@ def _render_markdown(data: dict[str, Any]) -> str:
         lines.append("## 长度控制组\n")
         lines.append("| 场景 | enhanced−padded 四维 delta 均分 | padded−original 四维 delta 均分 | 平均填充比(增强长度/原文长度) |")
         lines.append("|---|---|---|---|")
+        # v0.4.0 失败伪装清单 A3：缺失的填充比必须显示"不可判定"，
+        # 不能渲染成 0.00× —— 读者会理解成"没有膨胀"而不是"没测到"。
+        ctrl_pad = by_control.get("pad_ratio")
+        ctrl_pad_cell = "不可判定" if ctrl_pad is None else f"{ctrl_pad:.2f}×"
         scenarios = sorted(set(by_control.get("enhanced_vs_padded", {})) | set(by_control.get("padded_vs_original", {})))
         for scenario in scenarios:
             m1 = _mean_of_dims(by_control.get("enhanced_vs_padded", {}).get(scenario, {}))
             m2 = _mean_of_dims(by_control.get("padded_vs_original", {}).get(scenario, {}))
-            lines.append(f"| {scenario} | {m1:+.2f} | {m2:+.2f} | {by_control.get('pad_ratio', 0.0):.2f}× |")
+            lines.append(f"| {scenario} | {m1:+.2f} | {m2:+.2f} | {ctrl_pad_cell} |")
         lines.append("")
         lines.append("> 提示：若 enhanced−padded ≈ 0 且 padded−original > 0,说明增益主要来自加字而非改写\n")
 

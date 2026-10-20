@@ -1,0 +1,738 @@
+{
+  "dimensions": {
+    "accuracy": {
+      "n": 60,
+      "mean": 2.0
+    },
+    "completeness": {
+      "n": 60,
+      "mean": 2.0
+    },
+    "relevance": {
+      "n": 60,
+      "mean": 2.0
+    },
+    "clarity": {
+      "n": 60,
+      "mean": 2.0
+    },
+    "novelty": {
+      "n": 0,
+      "mean": 0.0
+    }
+  },
+  "by_target": {
+    "t1": {
+      "accuracy": {
+        "n": 60,
+        "mean": 2.0
+      },
+      "completeness": {
+        "n": 60,
+        "mean": 2.0
+      },
+      "relevance": {
+        "n": 60,
+        "mean": 2.0
+      },
+      "clarity": {
+        "n": 60,
+        "mean": 2.0
+      },
+      "novelty": {
+        "n": 0,
+        "mean": 0.0
+      }
+    }
+  },
+  "by_scenario": {
+    "编程": {
+      "accuracy": {
+        "n": 10,
+        "mean": 2.0
+      },
+      "completeness": {
+        "n": 10,
+        "mean": 2.0
+      },
+      "relevance": {
+        "n": 10,
+        "mean": 2.0
+      },
+      "clarity": {
+        "n": 10,
+        "mean": 2.0
+      },
+      "novelty": {
+        "n": 0,
+        "mean": 0.0
+      }
+    },
+    "办公写作": {
+      "accuracy": {
+        "n": 10,
+        "mean": 2.0
+      },
+      "completeness": {
+        "n": 10,
+        "mean": 2.0
+      },
+      "relevance": {
+        "n": 10,
+        "mean": 2.0
+      },
+      "clarity": {
+        "n": 10,
+        "mean": 2.0
+      },
+      "novelty": {
+        "n": 0,
+        "mean": 0.0
+      }
+    },
+    "问答": {
+      "accuracy": {
+        "n": 10,
+        "mean": 2.0
+      },
+      "completeness": {
+        "n": 10,
+        "mean": 2.0
+      },
+      "relevance": {
+        "n": 10,
+        "mean": 2.0
+      },
+      "clarity": {
+        "n": 10,
+        "mean": 2.0
+      },
+      "novelty": {
+        "n": 0,
+        "mean": 0.0
+      }
+    },
+    "数据分析": {
+      "accuracy": {
+        "n": 10,
+        "mean": 2.0
+      },
+      "completeness": {
+        "n": 10,
+        "mean": 2.0
+      },
+      "relevance": {
+        "n": 10,
+        "mean": 2.0
+      },
+      "clarity": {
+        "n": 10,
+        "mean": 2.0
+      },
+      "novelty": {
+        "n": 0,
+        "mean": 0.0
+      }
+    },
+    "翻译": {
+      "accuracy": {
+        "n": 10,
+        "mean": 2.0
+      },
+      "completeness": {
+        "n": 10,
+        "mean": 2.0
+      },
+      "relevance": {
+        "n": 10,
+        "mean": 2.0
+      },
+      "clarity": {
+        "n": 10,
+        "mean": 2.0
+      },
+      "novelty": {
+        "n": 0,
+        "mean": 0.0
+      }
+    },
+    "创意": {
+      "accuracy": {
+        "n": 10,
+        "mean": 2.0
+      },
+      "completeness": {
+        "n": 10,
+        "mean": 2.0
+      },
+      "relevance": {
+        "n": 10,
+        "mean": 2.0
+      },
+      "clarity": {
+        "n": 10,
+        "mean": 2.0
+      },
+      "novelty": {
+        "n": 0,
+        "mean": 0.0
+      }
+    }
+  },
+  "by_persona": {},
+  "by_prompt_judge": {},
+  "by_magnitude": {
+    "improve": {
+      "minor": 0,
+      "moderate": 60,
+      "major": 0
+    },
+    "regress": {
+      "minor": 0,
+      "moderate": 0,
+      "major": 0
+    }
+  },
+  "by_control": {
+    "enhanced_vs_padded": {
+      "编程": {
+        "accuracy": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "completeness": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "relevance": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "clarity": {
+          "n": 10,
+          "mean": 2.0
+        }
+      },
+      "办公写作": {
+        "accuracy": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "completeness": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "relevance": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "clarity": {
+          "n": 10,
+          "mean": 2.0
+        }
+      },
+      "问答": {
+        "accuracy": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "completeness": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "relevance": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "clarity": {
+          "n": 10,
+          "mean": 2.0
+        }
+      },
+      "数据分析": {
+        "accuracy": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "completeness": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "relevance": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "clarity": {
+          "n": 10,
+          "mean": 2.0
+        }
+      },
+      "翻译": {
+        "accuracy": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "completeness": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "relevance": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "clarity": {
+          "n": 10,
+          "mean": 2.0
+        }
+      },
+      "创意": {
+        "accuracy": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "completeness": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "relevance": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "clarity": {
+          "n": 10,
+          "mean": 2.0
+        }
+      }
+    },
+    "padded_vs_original": {
+      "编程": {
+        "accuracy": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "completeness": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "relevance": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "clarity": {
+          "n": 10,
+          "mean": 2.0
+        }
+      },
+      "办公写作": {
+        "accuracy": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "completeness": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "relevance": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "clarity": {
+          "n": 10,
+          "mean": 2.0
+        }
+      },
+      "问答": {
+        "accuracy": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "completeness": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "relevance": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "clarity": {
+          "n": 10,
+          "mean": 2.0
+        }
+      },
+      "数据分析": {
+        "accuracy": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "completeness": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "relevance": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "clarity": {
+          "n": 10,
+          "mean": 2.0
+        }
+      },
+      "翻译": {
+        "accuracy": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "completeness": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "relevance": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "clarity": {
+          "n": 10,
+          "mean": 2.0
+        }
+      },
+      "创意": {
+        "accuracy": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "completeness": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "relevance": {
+          "n": 10,
+          "mean": 2.0
+        },
+        "clarity": {
+          "n": 10,
+          "mean": 2.0
+        }
+      }
+    },
+    "pad_ratio": 2.0
+  },
+  "by_ambiguity": {
+    "clear": {
+      "n": 20,
+      "wins": 20,
+      "ties": 0,
+      "losses": 0,
+      "dims": {
+        "accuracy": {
+          "n": 20,
+          "mean": 2.0
+        },
+        "completeness": {
+          "n": 20,
+          "mean": 2.0
+        },
+        "relevance": {
+          "n": 20,
+          "mean": 2.0
+        },
+        "clarity": {
+          "n": 20,
+          "mean": 2.0
+        }
+      }
+    },
+    "medium": {
+      "n": 20,
+      "wins": 20,
+      "ties": 0,
+      "losses": 0,
+      "dims": {
+        "accuracy": {
+          "n": 20,
+          "mean": 2.0
+        },
+        "completeness": {
+          "n": 20,
+          "mean": 2.0
+        },
+        "relevance": {
+          "n": 20,
+          "mean": 2.0
+        },
+        "clarity": {
+          "n": 20,
+          "mean": 2.0
+        }
+      }
+    },
+    "severe": {
+      "n": 20,
+      "wins": 20,
+      "ties": 0,
+      "losses": 0,
+      "dims": {
+        "accuracy": {
+          "n": 20,
+          "mean": 2.0
+        },
+        "completeness": {
+          "n": 20,
+          "mean": 2.0
+        },
+        "relevance": {
+          "n": 20,
+          "mean": 2.0
+        },
+        "clarity": {
+          "n": 20,
+          "mean": 2.0
+        }
+      }
+    }
+  },
+  "control": {
+    "c_minus_b": {
+      "accuracy": {
+        "n": 60,
+        "mean": 2.0
+      },
+      "completeness": {
+        "n": 60,
+        "mean": 2.0
+      },
+      "relevance": {
+        "n": 60,
+        "mean": 2.0
+      },
+      "clarity": {
+        "n": 60,
+        "mean": 2.0
+      }
+    },
+    "b_minus_a": {
+      "accuracy": {
+        "n": 60,
+        "mean": 2.0
+      },
+      "completeness": {
+        "n": 60,
+        "mean": 2.0
+      },
+      "relevance": {
+        "n": 60,
+        "mean": 2.0
+      },
+      "clarity": {
+        "n": 60,
+        "mean": 2.0
+      }
+    },
+    "by_ambiguity": {
+      "medium": {
+        "c_minus_b": {
+          "accuracy": {
+            "n": 20,
+            "mean": 2.0
+          },
+          "completeness": {
+            "n": 20,
+            "mean": 2.0
+          },
+          "relevance": {
+            "n": 20,
+            "mean": 2.0
+          },
+          "clarity": {
+            "n": 20,
+            "mean": 2.0
+          }
+        },
+        "b_minus_a": {
+          "accuracy": {
+            "n": 20,
+            "mean": 2.0
+          },
+          "completeness": {
+            "n": 20,
+            "mean": 2.0
+          },
+          "relevance": {
+            "n": 20,
+            "mean": 2.0
+          },
+          "clarity": {
+            "n": 20,
+            "mean": 2.0
+          }
+        }
+      },
+      "clear": {
+        "c_minus_b": {
+          "accuracy": {
+            "n": 20,
+            "mean": 2.0
+          },
+          "completeness": {
+            "n": 20,
+            "mean": 2.0
+          },
+          "relevance": {
+            "n": 20,
+            "mean": 2.0
+          },
+          "clarity": {
+            "n": 20,
+            "mean": 2.0
+          }
+        },
+        "b_minus_a": {
+          "accuracy": {
+            "n": 20,
+            "mean": 2.0
+          },
+          "completeness": {
+            "n": 20,
+            "mean": 2.0
+          },
+          "relevance": {
+            "n": 20,
+            "mean": 2.0
+          },
+          "clarity": {
+            "n": 20,
+            "mean": 2.0
+          }
+        }
+      },
+      "severe": {
+        "c_minus_b": {
+          "accuracy": {
+            "n": 20,
+            "mean": 2.0
+          },
+          "completeness": {
+            "n": 20,
+            "mean": 2.0
+          },
+          "relevance": {
+            "n": 20,
+            "mean": 2.0
+          },
+          "clarity": {
+            "n": 20,
+            "mean": 2.0
+          }
+        },
+        "b_minus_a": {
+          "accuracy": {
+            "n": 20,
+            "mean": 2.0
+          },
+          "completeness": {
+            "n": 20,
+            "mean": 2.0
+          },
+          "relevance": {
+            "n": 20,
+            "mean": 2.0
+          },
+          "clarity": {
+            "n": 20,
+            "mean": 2.0
+          }
+        }
+      }
+    }
+  },
+  "cost": {
+    "orig_chars_mean": 100.0,
+    "enh_chars_mean": 200.0,
+    "orig_tokens_mean": 56.0,
+    "enh_tokens_mean": 112.0,
+    "pad_ratio": 2.0,
+    "quality_gain_per_1k_tokens": 35.71
+  },
+  "summary": {
+    "total": 60,
+    "comparison": {
+      "expected_total": 60,
+      "attempted_total": 60,
+      "judged_total": 60,
+      "excluded": {
+        "no_result": 0,
+        "judge_failed": 0
+      },
+      "coverage_rate": 1.0
+    },
+    "improved": 60,
+    "improved_pct": 100.0,
+    "wins": 60,
+    "ties": 0,
+    "losses": 0,
+    "win_rate_ci": [
+      0.9398,
+      1.0
+    ],
+    "binomial_p": 0.0,
+    "regression_failure_rate": 0.0,
+    "regression_worse_rate": 0.0,
+    "delivery": {
+      "complete": 60,
+      "partial": 0,
+      "fallback": 0,
+      "hard_failure": 0
+    },
+    "delivery_rate": 1.0,
+    "judge_agreement": {
+      "winner_agreement": 1.0,
+      "n": 60,
+      "dim_corr": {
+        "accuracy": 0.5,
+        "completeness": 0.5,
+        "relevance": 0.5,
+        "clarity": 0.5
+      }
+    },
+    "gate": {
+      "pass": true,
+      "reasons": []
+    }
+  },
+  "v040_gates": {
+    "flip_rate_clear": {
+      "value": 0.22,
+      "n": 40,
+      "runs": 2
+    },
+    "flip_rate_medium": {
+      "value": 0.15,
+      "n": 40,
+      "runs": 2
+    },
+    "light_rate_clear": {
+      "value": 0.55,
+      "n": 40,
+      "runs": 2
+    },
+    "blind_hit_rate_translate": {
+      "value": 0.75,
+      "n": 27,
+      "runs": 2
+    },
+    "blind_hit_rate_severe": {
+      "value": 0.95,
+      "n": 68,
+      "runs": 2
+    },
+    "redundant_question_count": {
+      "value": 0,
+      "n": 61,
+      "runs": 1
+    },
+    "delivery_drift_count": {
+      "value": 0,
+      "n": 360,
+      "runs": 1
+    }
+  }
+}

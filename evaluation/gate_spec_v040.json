@@ -1,0 +1,122 @@
+{
+  "spec_version": "v040.1",
+  "title": "PromptCraft v0.4.0 验收门禁规范（机器可读）",
+  "baseline_commit": "202a686",
+  "branch": "release/v0.4.0",
+  "alpha": 0.05,
+  "power": 0.8,
+  "owner": "效果验证官",
+  "notes": [
+    "本文件只存事实（阈值/基线/噪声模型/状态）。required_n 与 required_runs 由 evaluation/gate_decidability.py 现场推导，不手写，避免与文档漂移。",
+    "噪声模型只有两种：run_to_run（模型决策类，τ 来自实测运行间漂移）与 binomial（人工评审类，τ=0 且必须至少 2 轮独立评审）。",
+    "τ 不可跨门槛套用。41 个百分点是模型档位决策的运行间漂移，不是人工盲评的评审者间漂移。"
+  ],
+  "noise_models": {
+    "run_to_run": {
+      "tau": 0.41,
+      "tau_source": "docs/PromptCraft-v0.4.0-效果验证报告.md §5.2：同一配置两次独立运行给出 30% 与 71%，差 41 个百分点",
+      "tau_caveat": "由 2 个观测估计，只能当量级；它给出的是噪声地板的下界估计（真实方差可能更大）"
+    },
+    "binomial": {
+      "tau": 0.0,
+      "tau_source": "尚无实测的评审者间/轮间方差；docs/PromptCraft-v0.4.0-效果验证报告.md §五.3 自述『1 名评审者、20 条、单轮』",
+      "tau_caveat": "按纯二项处理是乐观的：真实区间被低估。min_runs≥2 用于把轮间方差暴露出来，但轮间方差本身仍需实测后替换本模型"
+    }
+  },
+  "gates": [
+    {
+      "id": "G1",
+      "name": "clear 档 none/light 跨点击翻转率",
+      "metric": "flip_rate_clear",
+      "direction": "<=",
+      "threshold": 0.30,
+      "baseline": 0.55,
+      "noise_model": "run_to_run",
+      "status": "void",
+      "void_reason": "目标值 ≤30% 恰等于同配置两次独立运行中较好的一次（30% vs 71%）；间距 25 个百分点 < 噪声地板 41 个百分点。阈值定在最好那次上 ⇒ 重跑时该门槛约等于掷硬币。",
+      "rebuild_requirement": "用 docs/v040-验收门禁规范.md §4 的交错设计重建基线（两臂同轮交错），并把阈值设在重建基线的单侧上置信界之外，而不是最好一次的值上。"
+    },
+    {
+      "id": "G2",
+      "name": "medium 档 none/light 跨点击翻转率",
+      "metric": "flip_rate_medium",
+      "direction": "<=",
+      "threshold": 0.30,
+      "baseline": 0.33,
+      "noise_model": "run_to_run",
+      "status": "void",
+      "void_reason": "间距仅 3 个百分点，是噪声地板的 1/13。纯二项口径下需要 1494 条提示词才分得开；在 τ=0.41 的运行间噪声下不可判定。",
+      "rebuild_requirement": "同 G1。重建基线时 medium 档的间距必须先被证实为可判（见规范 §4 表）。"
+    },
+    {
+      "id": "G3",
+      "name": "clear 档 light 出现率（防功能死）",
+      "metric": "light_rate_clear",
+      "direction": ">=",
+      "threshold": 0.42,
+      "baseline": 0.52,
+      "noise_model": "run_to_run",
+      "status": "void",
+      "void_reason": "间距 10 个百分点 < 噪声地板 41 个百分点。纯二项口径下需要 154 条提示词；加运行间噪声后不可判定。该门槛本身是对的（v2.3.0 的教训），但当前间距不可判定。",
+      "rebuild_requirement": "同 G1。重建基线时 light 出现率必须与翻转率一起测（双指标联立），否则无法区分『判得更准』与『什么都不做』。"
+    },
+    {
+      "id": "G4",
+      "name": "翻译场景人工盲评命中率",
+      "metric": "blind_hit_rate_translate",
+      "direction": ">=",
+      "threshold": 0.60,
+      "baseline": 0.11,
+      "noise_model": "binomial",
+      "min_runs": 2,
+      "status": "active",
+      "source": "docs/PromptCraft-v0.4.0-效果验证报告.md §4.3：翻译场景 1/9 = 11%"
+    },
+    {
+      "id": "G5",
+      "name": "severe 档整体人工盲评命中率",
+      "metric": "blind_hit_rate_severe",
+      "direction": ">=",
+      "threshold": 0.85,
+      "baseline": 0.733,
+      "noise_model": "binomial",
+      "min_runs": 2,
+      "status": "active",
+      "source": "docs/PromptCraft-v0.4.0-效果验证报告.md §4.2：总体命中率 44/60 = 73.3%"
+    },
+    {
+      "id": "G6",
+      "name": "严重档『问已知信息』条数",
+      "metric": "redundant_question_count",
+      "direction": "<=",
+      "threshold": 0.0,
+      "baseline": 2.0,
+      "noise_model": "binomial",
+      "min_runs": 1,
+      "status": "active",
+      "count_unit": "samples",
+      "certify_rate_max": 0.05,
+      "source": "docs/PromptCraft-v0.4.0-iteration-spec.md §7 门槛 6：现状 2/20 条 0 命中",
+      "note": "这是计数不是比率。0 事件在 n 次试验下的 95% 率上界约为 3/n：n=20 时上界 15%，n≥60 时上界 ≤5% 才谈得上『0 命中』。"
+    },
+    {
+      "id": "G7",
+      "name": "交付状态漂移",
+      "metric": "delivery_drift_count",
+      "direction": "<=",
+      "threshold": 0.0,
+      "baseline": 0.0,
+      "noise_model": "binomial",
+      "min_runs": 1,
+      "status": "active",
+      "count_unit": "samples",
+      "certify_rate_max": 0.05,
+      "source": "docs/PromptCraft-v0.4.0-效果验证报告.md §3.2：360 次运行零漂移"
+    }
+  ],
+  "release_gates": {
+    "note": "发布质量门槛（测量层自身可信度）由 evaluation/release_gate.py 判定，不在本文件内。",
+    "denominator_coverage_min": 0.95,
+    "denominator_note": "应有（expected）/ 实有（judged）比较数之比低于此值 ⇒ FAIL（分母流失直接 FAIL，不允许『不可判定』第三种输出）"
+  }
+}

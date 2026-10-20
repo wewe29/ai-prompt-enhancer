@@ -124,8 +124,24 @@ docs/evaluation-data-v040/
 ├── README.md                    本文件
 ├── manifest.json                三次实验的机器可读索引
 ├── regenerate.ps1               一键重跑
-└── conclusions/
-    ├── stability_v040.json      档位稳定性的报告声称值
-    ├── severe_blind_v040.json   severe 盲评的报告声称值
-    └── vote_v040.json           投票实测的报告声称值
+├── conclusions/
+│   ├── stability_v040.json      档位稳定性的报告声称值
+│   ├── severe_blind_v040.json   severe 盲评的报告声称值
+│   └── vote_v040.json           投票实测的报告声称值
+└── fixtures/
+    ├── summary_pass.json                    一切齐备 ⇒ 门禁 PASS
+    ├── summary_missing_cost.json           无比值样本 ⇒ 膨胀比门槛 FAIL
+    ├── summary_denominator_lost.json       15/60 裁判失败 ⇒ 分母门槛 FAIL
+    ├── summary_single_run.json              runs=1 ⇒ 轮次门槛 FAIL
+    └── summary_v040_gates_missing.json      效果门槛无数据 ⇒ 全部 FAIL
 ```
+
+> `fixtures/` 里的 5 个 summary **全部由 `evaluation/report.py` 的 `_aggregate()` 真实聚合产出**
+> （生成脚本 `evaluation/_make_v040_fixtures.py`，0 次 API 调用），**不是手搓的假数据**。
+>
+> 它们是门禁的行为级回归夹具：
+> `python evaluation/check_gate_behavior.py` 逐个跑一遍，判定结果必须与期望一致，
+> 退出码非 0 = 门禁行为已漂移。
+>
+> 门禁规范见 `docs/v040-验收门禁规范.md`；判定入口
+> `python evaluation/release_gate.py --summary <summary.json>`（退出码 0=PASS，1=FAIL）。
