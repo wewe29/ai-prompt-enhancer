@@ -1,4 +1,8 @@
 mod attachments;
+/// WP0 静态断言（P0-4）：`provider.rs` 的温度注释不得越界。
+/// 只在测试构建里存在，运行入口是 tools\probe-p0-baseline.ps1。
+#[cfg(test)]
+mod claims;
 mod models;
 mod prompts;
 mod provider;
