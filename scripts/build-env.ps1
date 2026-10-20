@@ -66,11 +66,37 @@ function Resolve-OpenSslEnv {
   }
 
   $includeDir = Join-Path $found "include"
+  # 库目录候选：OpenSSL-Win64 的 MSVC 静态库在 lib\VC\x64\MD 下，
+  # 而 libsqlite3-sys 的 build.rs 回落路径用的是 $OPENSSL_DIR/lib ——
+  # 有的安装里 lib\ 存在但**是空的**（只装了头文件和运行库），那就必然链接失败。
   $libCandidates = @(
     (Join-Path $found "lib\VC\x64\MD"),
+    (Join-Path $found "lib\x64"),
+    (Join-Path $found "lib64"),
     (Join-Path $found "lib")
   )
-  $libDir = $libCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+  # 命中判定：**目录里有真正的 libcrypto.lib 才算命中**。
+  # 原实现只 Test-Path 目录本身，于是一个"存在但空"的 lib\ 会被判为命中，
+  # 探测全部通过、真正链接时才炸 LNK1181 —— 正是本项目一直在消灭的
+  # "第 1 类检查（存在）通过、第 2 类检查（真能用）失败"。
+  $libDir = $null
+  foreach ($candidate in $libCandidates) {
+    $cryptoLib = [IO.Path]::Combine($candidate, "libcrypto.lib")
+    $hasLib = $false
+    try { $hasLib = Test-Path -LiteralPath $cryptoLib } catch { $hasLib = $false }
+    if ($hasLib) {
+      $libDir = $candidate
+      $probed += "$candidate  =>  OK（含 libcrypto.lib）"
+      break
+    }
+    $dirExists = $false
+    try { $dirExists = Test-Path -LiteralPath $candidate } catch { $dirExists = $false }
+    if ($dirExists) {
+      $probed += "$candidate  =>  目录存在但缺 libcrypto.lib（只有运行库，没有开发库）"
+    }
+  }
+  # $libDir 保持 $null 时，调用方的 OPENSSL_LIB_DIR 校验会带着探测清单报缺库，
+  # 而不是把错误推迟到链接阶段。
   return @{ Dir = $found; IncludeDir = $includeDir; LibDir = $libDir; Probed = $probed }
 }
 

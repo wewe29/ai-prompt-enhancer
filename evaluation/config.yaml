@@ -10,7 +10,10 @@ enhancer:
   model: deepseek-v4-flash          # 增强器模型（与火山 plan_deepseek 目标同模型但不同部署，可报告自偏风险）
   verbosity: standard               # concise | standard | deep | custom
   custom_instructions: ""           # 自定义增强要求（可选）
-  temperature: 0.35                 # 与 PromptCraft 后端一致
+  temperature: 0.1                  # 与 PromptCraft 后端一致（src-tauri/src/provider.rs 的实际值）
+                                     # v0.4.0：原为 0.35，注释却声称"与后端一致"。
+                                     # 一旦产品调温而这里不动，run_eval / bench_* 的全部结论
+                                     # 就建立在与线上不同的温度上，且配置看起来完全可信。
 
 # 按场景的生成温度（场景关键字 → 温度）；样本自带 temperature 字段优先
 scenario_temperatures:

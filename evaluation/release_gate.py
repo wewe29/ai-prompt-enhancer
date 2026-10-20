@@ -32,6 +32,29 @@ def compute_gates(summary_in: dict[str, Any]) -> list[dict[str, Any]]:
     summary = _nested(summary_in)
     gates: list[dict[str, Any]] = []
 
+    # v0.4.0 代码审查 H3：report.py 会算出 summary["gate"]（含 4 条 gate_reasons：
+    # 有效率<90%、主要场景样本<8、双裁判一致率<70%、**人工校准样本<有效比较的 20%**）
+    # 并在 report.md 里打印"⚠️ 本轮结果不可用于产品结论"。但本函数此前完全不读它，
+    # 自己重算 6 条且不含人工校准与场景样本量。
+    # 结果：同一份 summary.json 可以同时出现"不可用于产品结论"和"全部硬门槛通过"。
+    # 现在把它作为**第一条**门槛，两边不一致时直接 FAIL。
+    pre = summary.get("gate")
+    if not isinstance(pre, dict) or "pass" not in pre:
+        gates.append({
+            "name": "report.py 前置门槛（数据可用性）",
+            "value": "缺失",
+            "threshold": "pass=true",
+            "pass": False,
+        })
+    else:
+        reasons = pre.get("gate_reasons") or pre.get("reasons") or []
+        gates.append({
+            "name": "report.py 前置门槛（数据可用性）",
+            "value": f"{len(reasons)} 条阻断：" + ("；".join(str(r) for r in reasons) if reasons else "无"),
+            "threshold": "0 条阻断",
+            "pass": bool(pre.get("pass")),
+        })
+
     effective = float(summary.get("delivery_rate", 0.0))
     gates.append({
         "name": "总有效率 ≥ 95%",
@@ -69,9 +92,17 @@ def compute_gates(summary_in: dict[str, Any]) -> list[dict[str, Any]]:
         worse = clear.get("losses", 0) / (clear.get("wins", 0) + clear.get("losses", 0))
         gates.append({"name": "清晰提示词明显变差率 ≤ 5%", "value": f"{worse:.1%}", "threshold": "5%", "pass": worse <= 0.05})
 
+    # v0.4.0 代码审查 H2：这里是 6 个门槛里**唯一 fail-open** 的一条。
+    # 原写法 `float(cost.get("pad_ratio", 0.0))` 让 cost 整个缺失时 pad=0.0，
+    # 于是 `0.0 <= 2.0` → PASS。也就是说"没测到膨胀比"被算成"膨胀完美"。
+    # 而它恰好是防"增强器乱加字"的那道闸——缺失时必须判 FAIL，与其余 5 条一致。
     cost = summary.get("cost") or {}
-    pad = float(cost.get("pad_ratio", 0.0))
-    gates.append({"name": "整体平均膨胀比 ≤ 2.0", "value": f"×{pad:.2f}", "threshold": "×2.0", "pass": pad <= 2.0})
+    pad = cost.get("pad_ratio")
+    if pad is None:
+        gates.append({"name": "整体平均膨胀比 ≤ 2.0", "value": "缺失", "threshold": "×2.0", "pass": False})
+    else:
+        pad = float(pad)
+        gates.append({"name": "整体平均膨胀比 ≤ 2.0", "value": f"×{pad:.2f}", "threshold": "×2.0", "pass": pad <= 2.0})
 
     agreement = (summary.get("judge_agreement") or {}).get("winner_agreement")
     if agreement is None:

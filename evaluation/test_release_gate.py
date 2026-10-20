@@ -15,6 +15,10 @@ def _dim(mean: float) -> dict:
 
 def _pass_summary() -> dict:
     return {
+        # v0.4.0 代码审查 H3：compute_gates 现在把 report.py 算出的 summary["gate"]
+        # 作为第一条门槛，不读它就会出现"report.md 说不可用于产品结论、
+        # release_gate 说全部通过"的互相绕过。合成 summary 必须带上它。
+        "gate": {"pass": True, "gate_reasons": []},
         "delivery_rate": 0.97,
         "control": {
             "by_ambiguity": {
@@ -30,6 +34,7 @@ def _pass_summary() -> dict:
 
 def _fail_summary() -> dict:
     return {
+        "gate": {"pass": False, "gate_reasons": ["人工校准样本 0 < 有效比较的 20%"]},
         "delivery_rate": 0.88,
         "control": {"by_ambiguity": {}},
         "by_ambiguity": {},
@@ -41,7 +46,42 @@ def _fail_summary() -> dict:
 def test_pass_summary_all_gates_pass():
     gates = compute_gates(_pass_summary())
     assert all(g["pass"] for g in gates), gates
-    assert len(gates) == 6
+    assert len(gates) == 7          # 6 条原有 + 1 条 report.py 前置门槛
+
+
+def test_missing_report_gate_blocks_release():
+    """H3：summary 缺 report.py 的 gate 字段时必须 FAIL，不能当它不存在就放行。"""
+    s = _pass_summary()
+    s.pop("gate")
+    gates = compute_gates(s)
+    assert gates[0]["pass"] is False
+    assert not all(g["pass"] for g in gates)
+
+
+def test_report_gate_failure_blocks_even_when_metrics_pass():
+    """H3 的核心场景：指标全过，但 report.py 判定"不可用于产品结论"。"""
+    s = _pass_summary()
+    s["gate"] = {"pass": False, "gate_reasons": ["人工校准样本 0 < 有效比较的 20%"]}
+    gates = compute_gates(s)
+    assert gates[0]["pass"] is False
+    assert "人工校准" in gates[0]["value"]
+
+
+def test_missing_cost_fails_bloat_gate():
+    """H2：缺 cost 时膨胀比必须 FAIL。此前 cost.get("pad_ratio", 0.0)
+    会让"没测到"变成"膨胀完美 x0.00 且 PASS"。"""
+    s = _pass_summary()
+    s.pop("cost")
+    gates = compute_gates(s)
+    bloat = [g for g in gates if "膨胀比" in g["name"]][0]
+    assert bloat["pass"] is False
+    assert bloat["value"] == "缺失"
+
+    s2 = _pass_summary()
+    s2["cost"] = {"other": 1}          # cost 存在但没有 pad_ratio
+    gates2 = compute_gates(s2)
+    bloat2 = [g for g in gates2 if "膨胀比" in g["name"]][0]
+    assert bloat2["pass"] is False
 
 
 def test_fail_summary_flags_multiple():

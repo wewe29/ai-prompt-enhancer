@@ -132,28 +132,55 @@ def retention_ok(original: str, enhanced: str) -> bool:
     return bool(key) and key in enhanced
 
 
-def run_offline_regression(samples: list[dict[str, Any]]) -> dict[str, Any]:
-    """对回归样本做确定性模拟，返回保留率与分模式平均膨胀比。"""
-    if not samples:
-        return {"samples": 0, "retention": 0.0, "concise_pad_ratio": 0.0, "standard_pad_ratio": 0.0}
-    retained = 0
-    concise_ratios: list[float] = []
-    standard_ratios: list[float] = []
+def run_detector_selfcheck(samples: list[dict[str, Any]]) -> dict[str, Any]:
+    """**检测器自检**：验证 retention_ok 真的能检出"约束被丢掉"。
+
+    这不是产品指标，但确实该进发布判定 —— 检测器坏了，下游所有保留率数字都无意义。
+
+    ## 为什么重写（v0.4.0 代码审查 H1）
+
+    原实现 `run_offline_regression` 拿 `original` 拼出 `enhanced`（`simulate_enhanced`），
+    再用 `retention_ok(original, enhanced)` 去检它。而 `retention_key_phrase` 同样
+    从 `original` 取关键词 —— **key 必然是 enhanced 的子串，判定恒为真**。
+    实测无论原文是「短」、「帮我写周报。」还是 300 字长文，retention 永远是 1.0。
+
+    更糟的是它打印为「核心约束保留率：100.0%（需 100%）」，与 `check_regression`
+    里那个**真正**的产品指标 `constraint_retention` 同名同门槛，并贡献一个恒过的
+    PASS 项。产品若真的丢掉全部约束，这一行照样打 100%，且照样让 `all_pass` 为真。
+
+    ## 现在的做法
+
+    喂**已知的坏结果**给检测器，看它抓不抓得到：
+      * 阴性对照 1：空结果（约束全丢）
+      * 阴性对照 2：把关键短语从结果里删掉
+      * 阳性对照：原样保留
+    任一对照不符合预期 → 自检失败。
+    """
+    checked = caught_empty = caught_removed = kept_intact = 0
     for s in samples:
         original = s.get("original") or ""
         if not original:
             continue
-        concise = simulate_enhanced(original, "concise")
-        standard = simulate_enhanced(original, "standard")
-        if retention_ok(original, standard) and retention_ok(original, concise):
-            retained += 1
-        concise_ratios.append(len(concise) / len(original))
-        standard_ratios.append(len(standard) / len(original))
+        checked += 1
+        key = retention_key_phrase(original)
+        if not key:
+            # 取不到关键短语的样本，检测器无从谈起——计入未覆盖，不算通过
+            continue
+        if not retention_ok(original, ""):
+            caught_empty += 1
+        if not retention_ok(original, original.replace(key, "", 1)):
+            caught_removed += 1
+        if retention_ok(original, original):
+            kept_intact += 1
+
+    negative = caught_empty + caught_removed
+    selfcheck_ok = checked > 0 and negative == 2 * checked and kept_intact == checked
     return {
-        "samples": len(samples),
-        "retention": round(retained / len(samples), 4),
-        "concise_pad_ratio": round(statistics.mean(concise_ratios), 4),
-        "standard_pad_ratio": round(statistics.mean(standard_ratios), 4),
+        "samples": checked,
+        "caught_empty_result": caught_empty,
+        "caught_removed_phrase": caught_removed,
+        "kept_intact": kept_intact,
+        "selfcheck_ok": selfcheck_ok,
     }
 
 
@@ -179,18 +206,14 @@ def main(argv: list[str] | None = None) -> int:
     with open(path, "r", encoding="utf-8") as fh:
         summary = json.load(fh)
 
-    print("== 离线回归样本确定性校验 ==")
+    print("== 约束保留检测器自检（检验工具本身，不是产品指标）==")
     samples = load_regression_samples(args.samples)
-    offline = run_offline_regression(samples)
-    print(f"  样本数：{offline['samples']} | 核心约束保留率：{_percent(offline['retention'])}（需 100%）")
-    print(f"  concise 平均膨胀比：{offline['concise_pad_ratio']:.2f}×（需 ≤1.5） | "
-          f"standard 平均膨胀比：{offline['standard_pad_ratio']:.2f}×（需 ≤2.0）")
-    offline_pass = (
-        offline["samples"] > 0
-        and offline["retention"] >= 1.0
-        and offline["concise_pad_ratio"] <= 1.5
-        and offline["standard_pad_ratio"] <= 2.0
-    )
+    selfc = run_detector_selfcheck(samples)
+    print(f"  受检样本：{selfc['samples']} | "
+          f"检出「空结果」：{selfc['caught_empty_result']}/{selfc['samples']} | "
+          f"检出「关键短语被删」：{selfc['caught_removed_phrase']}/{selfc['samples']} | "
+          f"正确放行「原样保留」：{selfc['kept_intact']}/{selfc['samples']}")
+    offline_pass = selfc["selfcheck_ok"]
 
     print("\n== 报告门槛判定（规格 §5.1） ==")
     gates = check_regression(summary)
@@ -200,7 +223,7 @@ def main(argv: list[str] | None = None) -> int:
         if not gate["pass"]:
             all_pass = False
         print(f"  [{mark}] {gate['label']}：{_format_gate_value(gate)}（门槛 {_format_gate_value(gate | {'value': gate['threshold']})}）")
-    print(f"  离线确定性校验：{'PASS' if offline_pass else 'FAIL'}")
+    print(f"  检测器自检：{'PASS' if offline_pass else 'FAIL'}")
     all_pass = all_pass and offline_pass
 
     if not all_pass:

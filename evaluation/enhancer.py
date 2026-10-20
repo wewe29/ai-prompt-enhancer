@@ -257,7 +257,7 @@ def enhance(original_text: str, cfg: dict[str, Any], api_key: str, *, target_mod
         attachments=[],
     )
     body = build_request_body(user_message, model=enh.get("model", "deepseek-chat"),
-                              temperature=float(enh.get("temperature", 0.35)))
+                              temperature=float(enh.get("temperature", 0.1)))
     base_url = enh.get("base_url", "https://api.deepseek.com").rstrip("/")
 
     # OpenAI SDK 的 base_url 传根地址即可，SDK 会自行追加 /chat/completions

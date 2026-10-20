@@ -387,7 +387,12 @@ fn build_body_with_instruction(request: &EnhancementRequest, instruction: Option
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_message}
         ],
-        "temperature": 0.35,
+        // v0.4.0：由 0.35 降到 0.1。60 条样本 × 3 次的实测显示，
+        // clear 档 none/light 档位翻转率从 55% 降到 30%（约 2.5 个标准误），
+        // 且 light 出现率未下降（52% -> 57%），不是靠"什么都不做"换来的稳定。
+        // 不再往下降：temp 0.1 -> 0 无进一步改善（差异在噪声内）。
+        // 详见 docs/PromptCraft-v0.4.0-效果验证报告.md。
+        "temperature": 0.1,
         "stream": true,
         "stream_options": {"include_usage": true},
         "response_format": {"type": "json_object"}

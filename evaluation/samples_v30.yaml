@@ -6,6 +6,18 @@
 # must_preserve 中的子串必须在 original 中出现且增强后不得丢失；
 # must_not_add 是增强器不得自行发明/强加的约束。
 # expected_behavior：clear→none|light；medium→light；severe→clarify。
+#
+# 2026-10-01 修订（v0.4.0）：clear 档 7 条去「规格书化」
+#   起因：clear 档 20 条里 10 条带清单式要求、5 条带字数上限、11 条把交付物形态写死，
+#   而 medium/severe 三档完全没有这些标记。同一档内文风不一致，且 clear 档是按
+#   「判据」设计的而非按真实用户写的——v2.2.0 的 none 判据之一是「交付物明确」，
+#   样本却自己把交付物写死了，导致 none/light 边界被样本本身制造出来。
+#   改法：删掉「用户替模型把需求分析做完」的部分（分几段、每段多少字、只指出不要重写），
+#   保留真实的业务事实与技术约束。
+#   **本次只改表达，全部 expected_behavior 保持不变**——标注本身从未被独立复核过
+#   （见 docs/PromptCraft-v0.4.0-效果验证报告.md §五 第 4 条），用一份未校准的
+#   直觉替换另一份未校准的直觉不会提升可信度。标注的重新校准需要实测数据，另行安排。
+#   逐条 diff 见 docs/PromptCraft-样本集改写说明-2026-10-01.md；改写前的版本见 git 历史。
 
 samples:
   # ================= clear（20）=================
@@ -93,8 +105,8 @@ samples:
     scenario: 办公写作
     ambiguity_level: clear
     original: |
-      根据以下会议记录整理一份会议纪要，读者是参会同事，格式要求：标题、时间、参会人、决议、待办事项五个部分。
-      只整理给出的信息，不要补充没有提到的内容。
+      帮我把下面的会议记录整理成会议纪要，参会同事看的。
+      记录里没提到的东西不要自己补。
       会议记录：
       1. 产品经理提出下月 15 日上线新版登录页。
       2. 前端负责人确认可在 10 日内完成，后端需 5 个工作日。
@@ -108,10 +120,9 @@ samples:
     scenario: 办公写作
     ambiguity_level: clear
     original: |
-      写一封给注册用户的产品发布邮件：新版协作工具「轻舟」上线，支持实时多人编辑与任务看板。
-      要求：主题行 + 正文，正文不超过 200 字，语气专业友好，结尾附官网链接 www.qingzhou.example 和「立即体验」按钮文案。
-      收件人是已注册但 30 天内未登录的用户，目的是召回。
-    must_preserve: ["轻舟", "www.qingzhou.example", "立即体验", "30 天内未登录"]
+      我们的协作工具「轻舟」上线了，支持实时多人编辑和任务看板，要发一封产品发布邮件。
+      收件人是注册过但 30 天内没登录过的用户，目的是召回。官网是 www.qingzhou.example。
+    must_preserve: ["轻舟", "www.qingzhou.example", "30 天内没登录"]
     must_not_add: ["不要虚构限时优惠或折扣", "不要编造新功能之外的特性"]
     expected_behavior: none
 
@@ -119,9 +130,8 @@ samples:
     scenario: 办公写作
     ambiguity_level: clear
     original: |
-      为新入职的 Python 后端工程师写一份入职第一周指引文档，包含：环境搭建、代码规范、常用命令、求助对象四部分。
-      项目用 FastAPI + PostgreSQL，代码规范遵循 PEP 8，环境要求 Python 3.11。
-      文档要简洁，每部分不超过 5 条，直接给出可操作内容。
+      给新入职的后端同学写一份第一周的上手文档。
+      项目是 FastAPI + PostgreSQL，代码规范用 PEP 8，环境是 Python 3.11。
     must_preserve: ["FastAPI", "PostgreSQL", "PEP 8", "Python 3.11"]
     must_not_add: ["不要虚构公司内部工具名称", "不要添加入职培训的具体课表"]
     expected_behavior: light
@@ -143,9 +153,8 @@ samples:
     scenario: 问答
     ambiguity_level: clear
     original: |
-      用大白话向非技术背景的运营同事解释 HTTPS 为什么比 HTTP 安全，要求：
-      包含握手、证书、加密三个要点，每个要点不超过 3 句话，总长度 200 字以内，只使用确定的技术事实。
-    must_preserve: ["握手", "证书", "加密", "200 字"]
+      向不懂技术的运营同事讲讲 HTTPS 比 HTTP 安全在哪，要说人话，别堆术语。
+    must_preserve: ["HTTPS", "HTTP"]
     must_not_add: ["不要虚构具体加密算法数据", "不要加入密码学历史背景"]
     expected_behavior: none
 
@@ -153,8 +162,8 @@ samples:
     scenario: 问答
     ambiguity_level: clear
     original: |
-      给刚入行的 Java 开发讲清楚 SQL 注入：什么是注入、一个真实示例、如何用参数化查询防御。
-      要求分三段，给出可运行的示例代码，并强调只允许使用原生 JDBC 预编译语句（PreparedStatement），禁用字符串拼接。
+      给刚入行的 Java 开发讲清楚 SQL 注入是什么、怎么防。
+      我们这边防的时候只用参数化查询，就是 JDBC 的 PreparedStatement，不让用字符串拼接，ORM 也先不考虑。
     must_preserve: ["SQL 注入", "参数化", "PreparedStatement", "字符串拼接"]
     must_not_add: ["不要要求补充具体数据库类型", "不要引入 ORM 框架推荐"]
     expected_behavior: none
@@ -163,10 +172,9 @@ samples:
     scenario: 问答
     ambiguity_level: clear
     original: |
-      服务器偶尔返回 502 Bad Gateway，帮我在命令行逐步排查，环境是 Nginx 1.24 + 单台 Node.js 应用。
-      请按顺序列出：先看什么日志、每个命令的结果怎么判断、最后给出三条常见原因。
-      每步给出具体命令，不需要写修复脚本。
-    must_preserve: ["502 Bad Gateway", "Nginx 1.24", "Node.js", "三条常见原因"]
+      服务器偶尔返回 502 Bad Gateway，帮我看看怎么查。
+      环境是 Nginx 1.24，单台 Node.js 应用。
+    must_preserve: ["502 Bad Gateway", "Nginx 1.24", "Node.js"]
     must_not_add: ["不要虚构客户端 IP 或具体报错时间", "不要推荐更换架构"]
     expected_behavior: none
 
@@ -175,10 +183,8 @@ samples:
     scenario: 数据分析
     ambiguity_level: clear
     original: |
-      我们要把支付页的新按钮方案与旧方案做 A/B 测试，帮我设计实验方案，包含：
-      1) 主指标和护栏指标；2) 最小样本量估算方法；3) 实验时长；4) 结束时的判定规则。
-      背景：每日下单用户约 2 万，预计转化率从 2% 提升到 2.4%，显著性水平 0.05，检验功效 0.8。
-      输出按这四点组织，直接给出计算过程。
+      支付页要上新按钮，想跟旧方案做个 A/B 测试，帮我把方案设计出来。
+      每日下单用户约 2 万，预计转化率从 2% 提到 2.4%，显著性水平 0.05，检验功效 0.8。
     must_preserve: ["2 万", "2%", "2.4%", "0.05"]
     must_not_add: ["不要虚构具体业务系统名称", "不要要求提供历史实验数据"]
     expected_behavior: none

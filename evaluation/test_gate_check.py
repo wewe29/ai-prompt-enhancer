@@ -46,26 +46,42 @@ def test_regression_samples_load_20():
         assert s["original"]
 
 
-# ---- 离线确定性校验 ----
-def test_offline_retention_is_100_percent():
+# ---- 检测器自检（v0.4.0 代码审查 H1 之后取代"离线确定性校验"）----
+def test_detector_selfcheck_catches_all_corruptions():
+    """检测器必须能检出两种坏结果，并正确放行原样保留。
+
+    这三条替代原先的 test_offline_retention_is_100_percent：
+    原实现拿 original 拼出 enhanced 再检它，判定恒为真，
+    却以"核心约束保留率"的名义打印 100% 并计入发布判定。
+    """
     samples = gate_check.load_regression_samples(REGRESSION)
-    result = gate_check.run_offline_regression(samples)
+    result = gate_check.run_detector_selfcheck(samples)
     assert result["samples"] == 20
-    assert result["retention"] == 1.0
+    assert result["caught_empty_result"] == 20
+    assert result["caught_removed_phrase"] == 20
+    assert result["kept_intact"] == 20
+    assert result["selfcheck_ok"] is True
 
 
-def test_offline_concise_pad_ratio_within_gate():
+def test_detector_selfcheck_fails_when_detector_is_blind():
+    """反向对照：把 retention_ok 换成恒真，自检必须报失败。
+
+    这条是本次修复的核心断言——它保证"检测器坏了"这件事不会再被漏掉。
+    """
     samples = gate_check.load_regression_samples(REGRESSION)
-    result = gate_check.run_offline_regression(samples)
-    assert result["concise_pad_ratio"] == pytest.approx(1.0)
-    assert result["concise_pad_ratio"] <= 1.5
+    original_ok = gate_check.retention_ok
+    try:
+        gate_check.retention_ok = lambda o, e: True      # 模拟坏掉的检测器
+        blind = gate_check.run_detector_selfcheck(samples)
+        assert blind["selfcheck_ok"] is False
+        assert blind["caught_empty_result"] == 0
+    finally:
+        gate_check.retention_ok = original_ok
 
 
-def test_offline_standard_pad_ratio_within_gate():
-    samples = gate_check.load_regression_samples(REGRESSION)
-    result = gate_check.run_offline_regression(samples)
-    assert result["standard_pad_ratio"] <= 2.0
-    assert result["standard_pad_ratio"] > 1.0
+def test_detector_selfcheck_rejects_empty_sample_set():
+    """空样本集不能算自检通过（否则等于没检）。"""
+    assert gate_check.run_detector_selfcheck([])["selfcheck_ok"] is False
 
 
 def test_retention_ok_positive_and_negative():
@@ -82,7 +98,7 @@ def test_simulate_enhanced_modes():
 
 
 def test_run_offline_regression_empty():
-    assert gate_check.run_offline_regression([])["samples"] == 0
+    assert gate_check.run_detector_selfcheck([])["samples"] == 0
 
 
 # ---- check_regression：核心约束保留率 ----
