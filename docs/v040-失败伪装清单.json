@@ -582,6 +582,67 @@
       "acceptance": "该断言必须读 prompts.rs 的模板原文，或删除该等价声明",
       "owner": "WP1",
       "probe": {"kind": "substring_present", "file": "evaluation/test_enhancer.py", "pattern": "expected_prefix = ("}
+    },
+{
+      "id": "G9",
+      "family": "E",
+      "severity": "P1",
+      "layer": "presentation",
+      "file": "src/App.tsx",
+      "line": 300,
+      "symbol": "saveProvider 的成功提示",
+      "claim": "没跑过连接验证也显示「连接验证成功」",
+      "mechanism": "App.tsx:295 `if (apiKeyDraft) await validateProvider(...)` —— 验证只在 Key 非空时跑；:300 无条件 setProviderMessage(\"连接验证成功，配置已保存\")",
+      "consequence": "用户只改模型列表、Key 留空时一次网络请求都没发，界面仍宣称连接已验证 ⇒ 把没做的事说成做了（本项目最核心的缺陷族）",
+      "acceptance": "验证与「配置已保存」必须是两件事、两个文案；未执行验证时界面不得出现「验证成功」字样。需行为级回归测试：Key 为空时保存配置，界面不得出现「验证成功」",
+      "owner": "WP2",
+      "found_by": "产品体验官 / Chief 核实（2026-10-20）",
+      "probe": {
+        "kind": "substring_present",
+        "file": "src/App.tsx",
+        "pattern": "连接验证成功"
+      }
+    },
+{
+      "id": "G10",
+      "family": "E",
+      "severity": "P1",
+      "layer": "product",
+      "file": "src-tauri/src/storage.rs",
+      "line": 501,
+      "symbol": "import_data 的 provider 写入",
+      "claim": "导入包能静默改写计费字段，使月度强制额度失效",
+      "mechanism": "A2 只把 provider.base_url 换成本机端点，input_price / output_price 仍照单全收（整份 save_provider_config(&provider) 写入）",
+      "consequence": "价格直接决定 App.tsx:153-155 的强制额度判定 ⇒ 包里把价格改成 0，用户的月度强制额度从此形同虚设；改高则制造假拦截。提示里只字未提",
+      "acceptance": "导入包不得改写计费字段（input_price / output_price），必须沿用本机当前值，并用 A2 已有的 ImportReport 先例扩展为如实报告「未采用」。需行为级回归测试：导入 inputPrice=0 的包后本机价格未被改、且报告标记未采用",
+      "owner": "WP0",
+      "found_by": "产品体验官 / Chief 核实（2026-10-20）",
+      "probe": {
+        "kind": "guard_in_block",
+        "file": "src-tauri/src/storage.rs",
+        "block": "(?s)pub fn import_data.*?pub fn record_usage",
+        "guard": "price"
+      }
+    },
+{
+      "id": "G11",
+      "family": "E",
+      "severity": "P1",
+      "layer": "presentation",
+      "file": "src/App.tsx",
+      "line": 158,
+      "symbol": "runEnhance 发起请求前的状态重置",
+      "claim": "请求失败会静默丢掉用户已付费跑出来的上一版结果",
+      "mechanism": "App.tsx:158 在发请求**之前**就 `setState(\"streaming\"); setResult(null); setOutput(\"\")`",
+      "consequence": "网络抖一次，用户上一条已付费的结果就没了，且没有任何提示 —— 一次抖动变成真实金钱损失",
+      "acceptance": "请求失败时保留上一版结果并明确标注「这是上一次的结果（时间戳）」，成功返回后才替换。需行为级回归测试：请求失败后旧结果仍在且带标注",
+      "owner": "WP2",
+      "found_by": "产品体验官 / Chief 核实（2026-10-20）",
+      "probe": {
+        "kind": "regex_present",
+        "file": "src/App.tsx",
+        "pattern": "setState\\(\"streaming\"\\)\\s*;\\s*setResult\\(null\\)"
+      }
     }
   ]
 }
