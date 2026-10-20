@@ -59,11 +59,17 @@ def extract_worse_rate(summary: dict[str, Any]) -> float | None:
 
 
 def extract_pad_ratio(summary: dict[str, Any]) -> float | None:
-    """整体平均膨胀比（增强长度/原文长度）。"""
+    """整体平均膨胀比（增强长度/原文长度）。
+
+    缺数据返回 None（**不返回 0.0**）：0.0 会被读成"膨胀完美"。
+    v0.4.0 代码审查 P1-6：report.py 现在在无比值样本时写 `pad_ratio: None`，
+    这个形态必须同样返回 None —— 否则 float(None) 直接抛 TypeError。
+    """
     cost = summary.get("cost") or {}
-    if "pad_ratio" not in cost:
+    value = cost.get("pad_ratio")
+    if value is None:
         return None
-    return round(float(cost["pad_ratio"]), 4)
+    return round(float(value), 4)
 
 
 def check_regression(summary: dict[str, Any]) -> list[dict[str, Any]]:

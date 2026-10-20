@@ -179,6 +179,17 @@ def test_check_regression_pad_ratio_fail():
     assert g["pass"] is False
 
 
+def test_check_regression_pad_ratio_none_is_not_measurable():
+    """P1-6：report.py 在无比值样本时写 `pad_ratio: None`。
+    这个形态必须读成"测不到"（None，判 FAIL），而不是崩在 float(None) 上，
+    更不能被当成 0.0（"膨胀完美"）。"""
+    summary = _synthetic_summary()
+    summary["cost"] = {"pad_ratio": None}
+    g = {g["name"]: g for g in gate_check.check_regression(summary)}["pad_ratio"]
+    assert g["value"] is None
+    assert g["pass"] is False
+
+
 # ---- 缺失数据 ----
 def test_check_regression_missing_fields_report_not_measurable():
     gates = {g["name"]: g for g in gate_check.check_regression({})}

@@ -96,12 +96,19 @@ def compute_gates(summary_in: dict[str, Any]) -> list[dict[str, Any]]:
     # 原写法 `float(cost.get("pad_ratio", 0.0))` 让 cost 整个缺失时 pad=0.0，
     # 于是 `0.0 <= 2.0` → PASS。也就是说"没测到膨胀比"被算成"膨胀完美"。
     # 而它恰好是防"增强器乱加字"的那道闸——缺失时必须判 FAIL，与其余 5 条一致。
+    #
+    # v0.4.0 代码审查 P1-6（上游同步）：report.py 现在在无比值样本时写
+    # `pad_ratio: None`（此前写 0.0）。H2 只在**下游**把 None 判 FAIL，
+    # 上游仍写 0.0 ⇒ fail-open 被下移一层、门槛照样 PASS。
+    # 现在上游写 None，这里再把"键缺失"与"键存在但为 None"分开报，
+    # 两种形态都必须 FAIL —— 缺数据就是缺数据，不是"膨胀完美"。
     cost = summary.get("cost") or {}
-    pad = cost.get("pad_ratio")
-    if pad is None:
+    if "pad_ratio" not in cost:
         gates.append({"name": "整体平均膨胀比 ≤ 2.0", "value": "缺失", "threshold": "×2.0", "pass": False})
+    elif cost["pad_ratio"] is None:
+        gates.append({"name": "整体平均膨胀比 ≤ 2.0", "value": "无样本（未测到膨胀比）", "threshold": "×2.0", "pass": False})
     else:
-        pad = float(pad)
+        pad = float(cost["pad_ratio"])
         gates.append({"name": "整体平均膨胀比 ≤ 2.0", "value": f"×{pad:.2f}", "threshold": "×2.0", "pass": pad <= 2.0})
 
     agreement = (summary.get("judge_agreement") or {}).get("winner_agreement")

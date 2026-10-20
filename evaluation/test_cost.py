@@ -99,6 +99,30 @@ def test_cost_aggregation_empty_without_judges():
     assert report_mod._aggregate(payload)["cost"] == {}
 
 
+def test_pad_ratio_is_none_when_no_ratio_samples():
+    """回归测试（v0.4.0 架构审查 P1-6）：原文为空 ⇒ 没有比值样本。
+    此时必须写 None，**不能写 0.0** ——
+    0.0 会被 release_gate 读成"膨胀完美"并直接放行。"""
+    payload = _cost_payload()
+    payload["samples"][0]["original"] = ""  # 原文为空 ⇒ cost_ratios 少一个样本
+    payload["samples"][1]["original"] = ""  # 全部无比值样本
+    cost = report_mod._aggregate(payload)["cost"]
+    assert cost["pad_ratio"] is None, "无比值样本时 pad_ratio 必须是 None，不是 0.0"
+    assert cost["orig_chars_mean"] == 0.0  # 长度样本还在（cost 字典仍然存在）
+
+
+def test_markdown_renders_missing_pad_ratio_without_faking_a_number(tmp_path):
+    """没有膨胀比数据时，report.md 不得渲染成 ×0.00（那是"膨胀完美"）。"""
+    payload = _cost_payload()
+    payload["samples"][0]["original"] = ""
+    payload["samples"][1]["original"] = ""
+    report_mod.generate(tmp_path, payload)
+    md = (tmp_path / "report.md").read_text(encoding="utf-8")
+    assert "增强膨胀比" in md
+    assert "×0.00" not in md, "缺数据不得渲染成 ×0.00"
+    assert "无样本" in md
+
+
 # ---- 长度控制组聚合 ----
 def _control_payload():
     return {

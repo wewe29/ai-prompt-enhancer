@@ -312,7 +312,11 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
             "enh_chars_mean": round(sum(cost_enh_chars) / len(cost_enh_chars), 1),
             "orig_tokens_mean": orig_tokens_mean,
             "enh_tokens_mean": enh_tokens_mean,
-            "pad_ratio": round(sum(cost_ratios) / len(cost_ratios), 2) if cost_ratios else 0.0,
+            # v0.4.0 架构审查 P1-6：没有比值样本时写 None，**不能写 0.0**。
+            # 0.0 会被下游当成"膨胀完美"：release_gate 的 `0.0 <= 2.0` 直接 PASS，
+            # 把"没测到"算成"测过且完美"。H2 只在 release_gate 层把 None 判 FAIL，
+            # 而上游仍在写 0.0 ⇒ fail-open 被下移了一层，并没有真正关闭。
+            "pad_ratio": round(sum(cost_ratios) / len(cost_ratios), 2) if cost_ratios else None,
         }
         delta_tokens = enh_tokens_mean - orig_tokens_mean
         if delta_tokens > 0 and cost_quality_deltas:
@@ -475,7 +479,12 @@ def _render_markdown(data: dict[str, Any]) -> str:
         lines.append("### 成本与 token\n")
         lines.append(f"- 平均原始提示词长度：**{cost['orig_chars_mean']:.1f}** 字符（估算 {cost['orig_tokens_mean']:.0f} token）")
         lines.append(f"- 平均增强提示词长度：**{cost['enh_chars_mean']:.1f}** 字符（估算 {cost['enh_tokens_mean']:.0f} token）")
-        lines.append(f"- 增强膨胀比：**×{cost['pad_ratio']:.2f}**（增强长度 / 原始长度）")
+        pad_ratio = cost.get("pad_ratio")
+        if pad_ratio is None:
+            # 没有比值样本：如实说"没测到"，不要渲染成 ×0.00（那是"膨胀完美"）
+            lines.append("- 增强膨胀比：**无样本**（本轮没有可比对的原文长度，未测到膨胀比）")
+        else:
+            lines.append(f"- 增强膨胀比：**×{pad_ratio:.2f}**（增强长度 / 原始长度）")
         gain = cost.get("quality_gain_per_1k_tokens")
         if gain is not None:
             mark = "+" if gain >= 0 else ""

@@ -84,6 +84,28 @@ def test_missing_cost_fails_bloat_gate():
     assert bloat2["pass"] is False
 
 
+def test_pad_ratio_none_fails_bloat_gate():
+    """P1-6：report.py 现在在无比值样本时写 `pad_ratio: None`。
+    这个形态必须判 FAIL —— 此前上游写 0.0，release_gate 收到 0.0 ⇒ PASS，
+    "没测到膨胀比"被算成"膨胀完美"，H2 的 fail-open 只是被下移了一层。"""
+    s = _pass_summary()
+    s["cost"] = {"pad_ratio": None, "orig_chars_mean": 10.0}
+    gates = compute_gates(s)
+    bloat = [g for g in gates if "膨胀比" in g["name"]][0]
+    assert bloat["pass"] is False, "缺膨胀比样本必须 FAIL"
+    assert bloat["value"] != "×0.00", "缺数据不得被报成膨胀完美"
+    assert "无样本" in bloat["value"]
+
+
+def test_pad_ratio_none_is_not_silently_zero():
+    """反向对照：把上游改回写 0.0，门槛就会放行 —— 说明这条断言不是恒真的。"""
+    s = _pass_summary()
+    s["cost"] = {"pad_ratio": 0.0}
+    gates = compute_gates(s)
+    bloat = [g for g in gates if "膨胀比" in g["name"]][0]
+    assert bloat["pass"] is True, "0.0 确实会被放行（这正是必须在上游堵住的原因）"
+
+
 def test_fail_summary_flags_multiple():
     gates = compute_gates(_fail_summary())
     failed = [g for g in gates if not g["pass"]]
