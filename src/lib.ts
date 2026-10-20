@@ -203,7 +203,7 @@ export async function exportLocalData(): Promise<{ path: string; records: number
   return { path, records };
 }
 
-export async function importLocalData(): Promise<{ path: string; records: number; skipped: number; baseUrlKept: boolean } | null> {
+export async function importLocalData(): Promise<{ path: string; records: number; skipped: number; baseUrlKept: boolean; pricesKept: boolean } | null> {
   if (!isTauri) throw new Error("数据导入仅在桌面版中可用");
   const picked = await openDialog({
     title: "导入 PromptCraft 数据",
@@ -212,10 +212,11 @@ export async function importLocalData(): Promise<{ path: string; records: number
     filters: [{ name: "PromptCraft 数据包", extensions: ["zip"] }],
   });
   if (!picked || Array.isArray(picked)) return null;
-  // 后端返回 ImportReport：导入条数、**没导入**的条数、以及"API 地址未采用"的标记。
-  // 少导入的条数必须如实报出来，不能让用户以为整包都进来了。
-  const report = await command<{ imported: number; skipped: number; baseUrlKept: boolean }>("import_data", { path: picked });
-  return { path: picked, records: report.imported, skipped: report.skipped, baseUrlKept: report.baseUrlKept };
+  // 后端返回 ImportReport：导入条数、**没导入**的条数，以及"API 地址未采用"
+  // 与"计费字段未采用"的标记。少导入的条数、以及包里带了什么但没被采用，
+  // 都必须如实报出来，不能让用户以为整包都进来了。
+  const report = await command<{ imported: number; skipped: number; baseUrlKept: boolean; pricesKept: boolean }>("import_data", { path: picked });
+  return { path: picked, records: report.imported, skipped: report.skipped, baseUrlKept: report.baseUrlKept, pricesKept: report.pricesKept };
 }
 
 export async function openExternal(url: string): Promise<void> {
@@ -237,10 +238,17 @@ export function safeParseResult(buffer: string): EnhancementResult | null {
 }
 
 export function normalizeResult(result: EnhancementResult): EnhancementResult {
+  // A13：缺失的 `delivery_status` / `enhancement_level` **不得**被补成默认值。
+  //
+  // 此前这里是 `?? "complete"` / `?? (… ? "clarify" : "light")` ——
+  // 后端没给交付状态，前端就替它断言「完整交付」；后端没给档位，
+  // 前端就替模型断言「轻度增强」。**模型没做过判断，系统替他说了。**
+  //
+  // 现在缺失就是缺失，由 src/components/resultTruth.ts 按 fail-closed 呈现
+  // （「不可判定」/「交付状态未知」）。Rust 侧已改为 Option（缺失即 None），
+  // 两层必须一致。
   const legacy = {
     ...result,
-    delivery_status: result.delivery_status ?? "complete",
-    enhancement_level: result.enhancement_level ?? (result.status === "needs_clarification" ? "clarify" : "light"),
     notices: result.notices ?? [],
   };
   return EnhancementResultSchema.parse(legacy) as EnhancementResult;

@@ -45,8 +45,33 @@ def test_system_prompt_version_identical():
     assert enhancer.SYSTEM_PROMPT_VERSION == _rust_version(), "SYSTEM_PROMPT_VERSION 不一致！"
 
 
+def _rust_user_message_template() -> str:
+    """从 src-tauri/src/provider.rs 取出 user message 的 format 模板。
+
+    F2：这条断言原先比的是**测试自己写死的一份拷贝** ——
+    改 Rust 模板它不会红，Python 侧漂移它也不会红。
+    真正的做法是**读对方源码**：把 Rust 的 format 串取出来，
+    用同一组值渲染，与 Python 侧逐字比对。
+    """
+    source = (PROMPTS_RS.parent / "provider.rs").read_text(encoding="utf-8")
+    marker = "系统提示词版本：{SYSTEM_PROMPT_VERSION}"
+    index = source.find(marker)
+    assert index >= 0, "provider.rs 里找不到 user message 模板"
+    # 取**整行**（模板是单行字面量），再取首尾两个引号之间的内容
+    line_start = source.rfind("\n", 0, index) + 1
+    line_end = source.find("\n", index)
+    line = source[line_start:line_end]
+    start = line.find('"')
+    end = line.rfind('"')
+    assert start >= 0 and end > start, f"provider.rs 的模板不是字符串字面量：{line!r}"
+    template = line[start + 1 : end]
+    # Rust 的具名占位符 {SYSTEM_PROMPT_VERSION} 换成位置占位符，
+    # 让它与 Python 侧的 format 串可直接比对。
+    return template.replace("{SYSTEM_PROMPT_VERSION}", "{}").replace("\\n", "\n")
+
+
 def test_build_user_message_matches_rust_template():
-    """验证 user message 模板与 build_body 的 format 字符串结构一致（占位符/换行）。"""
+    """user message 模板必须与 Rust 侧**逐字一致**（读 provider.rs 原文比对）。"""
     msg = enhancer.build_user_message(
         "解释这段代码",
         target_model="豆包",
@@ -58,19 +83,20 @@ def test_build_user_message_matches_rust_template():
         clarification_answers=[],
         attachments=[],
     )
-    expected_prefix = (
-        f"系统提示词版本：{enhancer.SYSTEM_PROMPT_VERSION}\n"
-        "目标模型：豆包\n"
-        "详细程度：标准（适度补充）\n"
-        "自定义详细要求：无\n"
-        "澄清轮次：0/3\n"
-        "用户偏好摘要：\n\n\n"
-        "原始提示词：\n解释这段代码\n"
-        "\n上下文：\n\n\n"
-        "本轮澄清回答：\n\n\n"
-        "附件参考资料：\n"
+    template = _rust_user_message_template()
+    rendered = template.format(
+        enhancer.SYSTEM_PROMPT_VERSION,  # 系统提示词版本
+        "豆包",                      # target_model
+        "标准（适度补充）",            # verbosity_label
+        "无",                        # custom_instructions 默认值
+        0,                           # clarification_round
+        "",                          # profile_summary.join("\n")
+        "解释这段代码",                # original_text
+        "",                          # context_text
+        "",                          # answers_text
+        "",                          # attachments_text
     )
-    assert msg == expected_prefix, f"user message 模板偏差：\n{msg!r}"
+    assert msg == rendered, f"user message 模板与 provider.rs 不一致：\nPython: {msg!r}\nRust:   {rendered!r}"
 
 
 def test_build_user_message_with_attachments_and_answers():
@@ -141,22 +167,47 @@ def test_validate_result_suggestions_0_to_5():
         raise AssertionError("应当抛出异常")
 
 
-def test_normalize_result_derives_enhancement_level_and_delivery_status():
-    ready = enhancer.normalize_result({"primary_prompt": "p"})
-    assert ready["enhancement_level"] == "light"
-    assert ready["delivery_status"] == "complete"
-    assert ready["status"] == "ready"
+def test_normalize_result_does_not_invent_missing_verdicts():
+    """B2：缺失的档位与交付状态**不得**被补成默认值。
 
-    clarifying = enhancer.normalize_result(
-        {"primary_prompt": "p", "status": "needs_clarification"}
-    )
-    assert clarifying["enhancement_level"] == "clarify"
+    此前 Python 侧把缺失的 `enhancement_level` 补成 "light"、缺失的
+    `delivery_status` 补成 "complete" —— 模型没给判断，系统替他断言
+    「轻度增强」。Rust 侧已改为 `Option`（缺失即 None），**两层必须一致**。
+    """
+    ready = enhancer.normalize_result({"primary_prompt": "p"})
+    assert ready.get("enhancement_level") is None, "缺失的档位不得被补成 light"
+    assert ready.get("delivery_status") is None, "缺失的交付状态不得被补成 complete"
+    assert ready["status"] == "ready"
+    assert ready["questions"] == [], "数组字段仍然补空"
 
     preserved = enhancer.normalize_result(
         {"primary_prompt": "p", "enhancement_level": "none", "delivery_status": "partial"}
     )
     assert preserved["enhancement_level"] == "none"
     assert preserved["delivery_status"] == "partial"
+
+
+def test_normalize_result_matches_rust_option_semantics():
+    """F1 / R4：Python 复刻品必须与 Rust 的 Option 语义一致 —— 读 Rust 源码断言。
+
+    这条测试**读 `src-tauri/src/models.rs` 原文**，不是断言自己这一侧的
+    硬编码期望值：Rust 侧若把字段改回 `String` + serde default，
+    这里必须红。
+    """
+    rust = (Path(__file__).resolve().parent.parent / "src-tauri" / "src" / "models.rs").read_text(
+        encoding="utf-8"
+    )
+    for field in ("delivery_status", "enhancement_level"):
+        assert f"pub {field}: Option<String>" in rust, (
+            f"Rust 侧 {field} 应为 Option<String>（缺失即 None）；"
+            f"若已改回带 serde default 的 String，Python 侧不得再补默认值"
+        )
+        assert f"default_delivery_status" not in rust or field != "delivery_status", (
+            "Rust 侧不应再有把缺失交付状态补成 complete 的 default 函数"
+        )
+    assert "fn default_enhancement_level" not in rust, (
+        "Rust 侧不应再有把缺失档位补成 light 的 default 函数"
+    )
 
 
 def test_validate_result_placeholder():

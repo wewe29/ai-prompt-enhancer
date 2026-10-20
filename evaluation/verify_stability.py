@@ -91,6 +91,12 @@ MAX_TOKENS = 8192
 MAX_ATTEMPTS = 2
 
 LEVEL_ORDER = {"none": 0, "light": 1, "clarify": 2}
+# 缺失档位是一个**独立取值**，不是"没有档位"。
+# 此前 Python 侧把缺失的 enhancement_level 补成 "light"；B2 修掉之后，
+# 模型没给档位会真的留空。若这里把空值静默丢出组合，
+# 一条「三次里两次没给档位」的样本会被算成"稳定" —— 正好是本脚本
+# 要测的那类"看起来稳定其实没测到"的假象。
+MISSING_LEVEL = "(空)"
 DIFFICULTIES = ("clear", "medium", "severe")
 
 
@@ -98,16 +104,16 @@ DIFFICULTIES = ("clear", "medium", "severe")
 def level_combo(levels: list[str]) -> str:
     """档位组合：去重 → 按 none<light<clarify 排序 → 用 '+' 连接。
 
-    未知档位排在最后，保持稳定。
+    缺失档位记作 ``(空)``，排最后，保持稳定。
     """
-    unique = {lv for lv in levels if lv}
+    unique = {lv if lv else MISSING_LEVEL for lv in levels}
     ordered = sorted(unique, key=lambda lv: (LEVEL_ORDER.get(lv, 99), lv))
     return "+".join(ordered)
 
 
 def mode_level(levels: list[str]) -> str:
     """众数档位；平手时取**首次出现**的那个。"""
-    present = [lv for lv in levels if lv]
+    present = [lv if lv else MISSING_LEVEL for lv in levels]
     if not present:
         return ""
     counts = Counter(present)

@@ -64,7 +64,13 @@ describe("prompt result helpers", () => {
     expect(safeParseResult("not json")).toBeNull();
   });
 
-  it("fills legacy results without new fields into complete/light with empty notices", () => {
+  it("does NOT invent delivery_status / enhancement_level for legacy results missing them", () => {
+    // A13：后端没给交付状态，前端不得替它断言「完整交付」；后端没给档位，
+    // 前端不得替模型断言「轻度增强」。**模型没做过判断，系统替他说了。**
+    // 缺失就是缺失 —— 由 src/components/resultTruth.ts 按 fail-closed 呈现。
+    //
+    // 这条断言原先写的是 bug（"fills legacy results into complete/light"），
+    // 修好后它必须变红 —— 于是按「反转」而不是「弱化」处理。
     const legacy = {
       status: "ready",
       primary_prompt: "旧版结果",
@@ -75,12 +81,12 @@ describe("prompt result helpers", () => {
       risk_flags: [],
     } as unknown as EnhancementResult;
     const result = normalizeResult(legacy);
-    expect(result.delivery_status).toBe("complete");
-    expect(result.enhancement_level).toBe("light");
+    expect(result.delivery_status).toBeUndefined();
+    expect(result.enhancement_level).toBeUndefined();
     expect(result.notices).toEqual([]);
   });
 
-  it("derives clarify enhancement level for legacy needs_clarification results", () => {
+  it("keeps a present enhancement_level untouched", () => {
     const legacy = {
       status: "needs_clarification",
       primary_prompt: "需要澄清",
@@ -91,8 +97,9 @@ describe("prompt result helpers", () => {
       risk_flags: [],
     } as unknown as EnhancementResult;
     const result = normalizeResult(legacy);
-    expect(result.delivery_status).toBe("complete");
-    expect(result.enhancement_level).toBe("clarify");
+    // 缺失的档位不得被推成 clarify —— 模型没说它要澄清
+    expect(result.enhancement_level).toBeUndefined();
+    expect(result.delivery_status).toBeUndefined();
   });
 
   it("keeps primary_prompt and notices for partial results", () => {

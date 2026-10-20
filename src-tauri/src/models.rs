@@ -180,6 +180,12 @@ pub struct ImportReport {
     /// 导入包里的 API 地址与本机不一致时为 true：
     /// 此时导入包提供的地址被忽略，仍使用本机当前地址。
     pub base_url_kept: bool,
+    /// 导入包里的计费字段（输入/输出价格）与本机不一致时为 true。
+    ///
+    /// G10：价格直接决定前端的**月度强制额度**判定。包里把价格改成 0，
+    /// 用户的强制额度就形同虚设 —— 所以计费口径与 API 地址一样，
+    /// 属于**本机的决策**，导入包不得改写。
+    pub prices_kept: bool,
 }
 
 fn default_models() -> Vec<String> {

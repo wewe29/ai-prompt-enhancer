@@ -529,10 +529,20 @@ impl Storage {
         // 注意：单靠 validate_base_url 挡不住这个 —— 攻击者的地址同样是 https，
         // 只有"导入不改写端点"这条规则才真正关掉这条路径。
         // 端点未采用的事实会出现在返回值里（base_url_kept），不做静默处理。
-        let local_base_url = self.provider_config()?.base_url;
+        let local_provider = self.provider_config()?;
+        let local_base_url = local_provider.base_url;
         let base_url_kept =
             provider.base_url.trim_end_matches('/') != local_base_url.trim_end_matches('/');
         provider.base_url = local_base_url;
+
+        // G10：导入包**不得改写计费字段**。价格直接决定前端的月度强制额度
+        // 判定（estimatedRequestCost / monthlyLimit）：包里把价格改成 0，
+        // 用户的强制额度就形同虚设；改高则制造假拦截。
+        // 与 base_url 同理 —— 计费口径是**本机的决策**，不是包里该带的东西。
+        let prices_kept = provider.input_price != local_provider.input_price
+            || provider.output_price != local_provider.output_price;
+        provider.input_price = local_provider.input_price;
+        provider.output_price = local_provider.output_price;
 
         let total_records = history.len();
         let take = total_records.min(MAX_IMPORT_HISTORY);
@@ -548,6 +558,7 @@ impl Storage {
             imported,
             skipped: total_records - take,
             base_url_kept,
+            prices_kept,
         })
     }
 
@@ -869,6 +880,50 @@ mod tests {
             writer.write_all(bytes).expect("write entry");
         }
         writer.finish().expect("finish archive");
+    }
+
+    /// G10：导入包不得改写计费字段。
+    ///
+    /// 价格直接决定前端的**月度强制额度**判定（estimatedRequestCost / monthlyLimit）：
+    /// 包里把价格改成 0，用户的强制额度就形同虚设；改高则制造假拦截。
+    /// 提示里对此只字未提。
+    ///
+    /// 计费口径是**本机的决策**，与 base_url 同理 —— 不是包里该带的东西。
+    #[test]
+    fn import_package_cannot_rewrite_pricing_fields() {
+        let storage = test_storage();
+        // 本机用**非默认**价格，才能区分"沿用了本机值"与"恰好相等"
+        storage
+            .save_provider_config(&ProviderConfig {
+                base_url: "https://api.deepseek.com".into(),
+                input_price: 0.003,
+                output_price: 0.006,
+                ..Default::default()
+            })
+            .unwrap();
+
+        // 包里带的价格是 0（意图让强制额度失效）
+        let provider = r#"{"baseUrl":"https://api.deepseek.com","hasApiKey":false,"defaultModel":"deepseek-chat","v4FlashModelId":"deepseek-v4-flash","inputPrice":0.0,"outputPrice":0.0}"#;
+        let path = std::env::temp_dir().join(format!("PromptCraft-price-{}", uuid::Uuid::new_v4()));
+        write_archive(
+            &path,
+            &[
+                ("manifest.json", manifest_json()),
+                ("history.json", b"[]".to_vec()),
+                ("settings.json", VALID_SETTINGS.as_bytes().to_vec()),
+                ("provider.json", provider.as_bytes().to_vec()),
+            ],
+        );
+        let report = storage.import_data(&path).unwrap();
+        assert!(
+            report.prices_kept,
+            "包里的价格与本机不同，必须标记为未采用"
+        );
+
+        let stored = storage.provider_config().unwrap();
+        assert_eq!(stored.input_price, 0.003, "导入包不得改写输入价格");
+        assert_eq!(stored.output_price, 0.006, "导入包不得改写输出价格");
+        let _ = fs::remove_file(&path);
     }
 
     fn manifest_json() -> Vec<u8> {

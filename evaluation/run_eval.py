@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import sys
@@ -321,9 +322,13 @@ def main() -> int:
     if args.login:
         return run_login(cfg, args.target)
 
+    # D3：缓存身份指纹。缓存键必须编码模型/温度/提示词版本/样本集，
+    # 否则 --skip-enhance 会复用上一轮的结果，而 meta 声明的却是本轮配置。
+    fps = _cache_fingerprints(cfg, samples_path)
+
     for sample in samples:
         sample.setdefault("enhanced", {})
-        cached = load_cache("enhance", sample["id"], persona=sample.get("persona") or "") if args.skip_enhance else None
+        cached = load_cache("enhance", sample["id"], persona=sample.get("persona") or "", fingerprint=fps["enhance"]) if args.skip_enhance else None
         if cached:
             sample["enhanced"] = cached
         else:
@@ -338,13 +343,13 @@ def main() -> int:
                 except Exception as exc:  # EnhanceError/JudgeError/网络/解析等任何异常：单条隔离，不终止整批
                     sample["enhanced"] = {"error": str(exc)}
                     print(f"[增强] {sample['id']} 失败：{exc}")
-            save_cache("enhance", sample["id"], payload=sample["enhanced"], persona=sample.get("persona") or "")
+            save_cache("enhance", sample["id"], payload=sample["enhanced"], persona=sample.get("persona") or "", fingerprint=fps["enhance"])
         sample["enhanced_text"] = sample["enhanced"].get("primary_prompt", "")
         if sample["enhanced"].get("error"):
             print(f"[增强] {sample['id']} 失败：{sample['enhanced']['error']}")
 
         # 阶段一.5：增强质量（prompt 级）裁判
-        cached_pj = load_cache("prompt_judge", sample["id"], persona=sample.get("persona") or "")
+        cached_pj = load_cache("prompt_judge", sample["id"], persona=sample.get("persona") or "", fingerprint=fps["prompt_judge"])
         if cached_pj is not None:
             sample["prompt_judge"] = cached_pj
         elif args.manual or args.skip_prompt_judge or sample["enhanced"].get("error"):
@@ -359,7 +364,7 @@ def main() -> int:
                         cfg, "提示词裁判",
                     )
                 save_cache("prompt_judge", sample["id"], payload=sample["prompt_judge"],
-                           persona=sample.get("persona") or "")
+                           persona=sample.get("persona") or "", fingerprint=fps["prompt_judge"])
                 time.sleep(float(cfg["run"].get("delay_between", 2)))
             except JudgeError as exc:
                 sample["prompt_judge"] = {"error": str(exc)}
@@ -409,8 +414,9 @@ def main() -> int:
                     rep_out: dict[str, Any] = result if repeats <= 1 else {"rep": rep}
                     for variant in variants:
                         cache_variant = variant + suffix
+                        infer_fp = _infer_fingerprint(cfg, tid, sample)
                         cached = load_cache("infer", sample["id"], tid, cache_variant,
-                                            persona=sample.get("persona") or "") if args.skip_infer else None
+                                            persona=sample.get("persona") or "", fingerprint=infer_fp) if args.skip_infer else None
                         if cached is not None:
                             rep_out[f"{variant}_output"] = cached.get("output", "")
                             rep_out[f"{variant}_error"] = cached.get("error")
@@ -445,7 +451,7 @@ def main() -> int:
                             save_cache("infer", sample["id"], tid, cache_variant,
                                        {"output": output, "latency_s": latency_s,
                                         "est_tokens": est_tokens, "model": tid, "error": None},
-                                       persona=sample.get("persona") or "")
+                                       persona=sample.get("persona") or "", fingerprint=infer_fp)
                             print(f"  [{sample['id']}][{variant}{suffix}] 完成（{len(output)} 字符）")
                         except targets.LoginRequired as exc:
                             login_failed = True
@@ -467,7 +473,7 @@ def main() -> int:
                                 save_cache("infer", sample["id"], tid, cache_variant,
                                            {"output": output, "latency_s": latency_s,
                                             "est_tokens": est_tokens, "model": tid, "error": None},
-                                           persona=sample.get("persona") or "")
+                                           persona=sample.get("persona") or "", fingerprint=infer_fp)
                             except targets.TargetError as retry_exc:
                                 rep_out[f"{variant}_error"] = f"重试仍失败：{retry_exc}"
                         except targets.TargetError as exc:
@@ -499,7 +505,7 @@ def main() -> int:
                 for rep in reps:
                     suffix = _rep_key(repeats, rep.get("rep", 0))
                     cached = load_cache("judge", sample["id"], tid, suffix,
-                                        persona=sample.get("persona") or "") if args.skip_judge else None
+                                        persona=sample.get("persona") or "", fingerprint=fps["judge"]) if args.skip_judge else None
                     if cached is not None:
                         for key in ("judge", "judge2", "judge_control", "judge_padded_vs_orig"):
                             rep[key] = cached.get(key)
@@ -509,7 +515,7 @@ def main() -> int:
                     save_cache("judge", sample["id"], tid, suffix,
                                {key: rep.get(key) for key in
                                 ("judge", "judge2", "judge_control", "judge_padded_vs_orig")},
-                               persona=sample.get("persona") or "")
+                               persona=sample.get("persona") or "", fingerprint=fps["judge"])
                 result["judge"] = aggregate_judges([r.get("judge") for r in reps])
                 result["judge_control"] = aggregate_judges([r.get("judge_control") for r in reps])
                 result["judge_padded_vs_orig"] = aggregate_judges([r.get("judge_padded_vs_orig") for r in reps])
@@ -523,17 +529,33 @@ def main() -> int:
                                           cross_check, second_model, control_group)
 
     # 阶段四：报告
+    #
+    # D4：meta 必须记录**这份产物是怎么来的**，否则产物不可证伪。
+    # 此前 meta 只有 generated_at / targets / 两个模型名 / 成本 / 几个开关 ——
+    # 没有样本集版本、提示词版本、温度、第二裁判模型、配置指纹。
+    # ⇒ 报告里写的「用 X 模型、Y 温度跑出来的」，无法被任何人核对。
     meta = {
         "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "targets": list(enabled.keys()),
         "enhance_model": cfg.get("enhancer", {}).get("model", ""),
         "judge_model": cfg.get("judge", {}).get("model", ""),
+        "judge2_model": cfg.get("judge", {}).get("second_model", ""),
+        "enhance_temperature": cfg.get("enhancer", {}).get("temperature", None),
+        "judge_temperature": cfg.get("judge", {}).get("temperature", None),
+        "prompt_version": _prompt_version(),
+        "judge_version": _judge_version(),
+        "sampleset_version": _sampleset_version(samples_path),
+        "config_hash": _config_hash(args),
+        "cache_fingerprints": fps,
         "estimated_cost": round(_total_cost(samples), 4),
         "offline": offline,
         "control_group": control_group,
         "repeats": repeats,
         "regression_mode": regression_mode,
-        "human_review_count": int(getattr(args, "human_review_count", 0) or 0),
+        # D8：人工评审条数**由答案文件派生**，不由 CLI 自报。
+        # report.py 的发布门槛拿它比 20%；CLI 自报的数字不是证据。
+        "human_review_count": _count_manual_answers(getattr(args, "manual_answers", None)),
+        "human_review_count_source": "answers_file" if getattr(args, "manual_answers", None) else "none",
     }
     payload = {"meta": meta, "samples": samples}
     out_dir = report_mod.timestamp_dir(RESULTS_ROOT)
@@ -585,8 +607,9 @@ def run_manual_answers(args: argparse.Namespace, cfg: dict[str, Any], samples: l
             return 1
 
     used, filled = 0, 0
+    manual_fps = _cache_fingerprints(cfg, getattr(args, "samples", None))
     for sample in samples:
-        enhanced = load_cache("enhance", sample["id"], persona=sample.get("persona") or "") or {}
+        enhanced = load_cache("enhance", sample["id"], persona=sample.get("persona") or "", fingerprint=manual_fps["enhance"]) or {}
         sample["enhanced"] = enhanced
         sample["enhanced_text"] = enhanced.get("primary_prompt", "")
         sample.setdefault("results", {})
@@ -914,8 +937,140 @@ def load_personas(path: str | Path) -> dict[str, dict[str, str]]:
     return out
 
 
-def load_cache(kind: str, sample_id: str, target: str = "", variant: str = "", persona: str = "") -> Any:
-    name = f"{kind}_{sample_id}" + (f"_{persona}" if persona else "") + (f"_{target}" if target else "") + (f"_{variant}" if variant else "")
+def _prompt_version() -> str:
+    """增强用系统提示词的版本（与产品同源）。"""
+    import enhancer
+
+    return getattr(enhancer, "SYSTEM_PROMPT_VERSION", "unknown")
+
+
+def _judge_version() -> str:
+    """裁判提示词的版本。"""
+    import judge as judge_mod
+
+    return getattr(judge_mod, "JUDGE_PROMPT_VERSION", "unknown")
+
+
+def _sampleset_version(samples_path: str | Path | None) -> str:
+    """样本集指纹。样本集变了，产物就不可比。"""
+    if not samples_path:
+        return ""
+    p = Path(str(samples_path))
+    if not p.is_absolute():
+        p = Path(__file__).resolve().parent / p
+    if not p.exists():
+        return ""
+    return hashlib.sha256(p.read_bytes()).hexdigest()[:12]
+
+
+def _config_hash(args: argparse.Namespace) -> str:
+    """配置文件指纹。改了配置却看不出是哪一版配置，是溯源造假的另一种形态。"""
+    path = getattr(args, "config", None)
+    if not path:
+        path = Path(__file__).resolve().parent / "config.yaml"
+    p = Path(str(path))
+    if not p.is_absolute():
+        p = Path(__file__).resolve().parent / p
+    if not p.exists():
+        return ""
+    return hashlib.sha256(p.read_bytes()).hexdigest()[:12]
+
+
+def _fingerprint(*parts: Any) -> str:
+    """把影响产物的参数压成短标签。
+
+    D3：缓存键此前只含 ``kind / sample_id / persona / target / variant``，
+    **不含模型、温度、提示词版本**。于是 ``--skip-enhance`` 会复用上一轮
+    的结果，而产物 meta 声明的却是本轮配置 ⇒ **溯源造假**：
+    报告里写的「用 X 模型、Y 温度跑出来的」，实际可能是另一个模型跑出来的。
+    """
+    raw = "|".join("" if p is None else str(p) for p in parts)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:10]
+
+
+def _cache_fingerprints(cfg: dict[str, Any], samples_path: str | Path | None) -> dict[str, str]:
+    """各类缓存各自的身份指纹。不同种类的产物由不同参数决定，不能共用一个。"""
+    import enhancer
+
+    samples_hash = ""
+    if samples_path:
+        sp = Path(str(samples_path))
+        if not sp.is_absolute():
+            sp = Path(__file__).resolve().parent / sp
+        if sp.exists():
+            samples_hash = hashlib.sha256(sp.read_bytes()).hexdigest()[:10]
+
+    enc = cfg.get("enhancer", {}) or {}
+    jud = cfg.get("judge", {}) or {}
+    return {
+        "enhance": _fingerprint(
+            enc.get("model", ""), enc.get("temperature", ""),
+            getattr(enhancer, "SYSTEM_PROMPT_VERSION", ""), samples_hash,
+        ),
+        "prompt_judge": _fingerprint(
+            jud.get("model", ""), jud.get("temperature", ""),
+            getattr(enhancer, "SYSTEM_PROMPT_VERSION", ""), samples_hash,
+        ),
+        "judge": _fingerprint(
+            jud.get("model", ""), jud.get("temperature", ""),
+            jud.get("second_model", ""), samples_hash,
+        ),
+        "infer": _fingerprint(samples_hash),
+    }
+
+
+def _infer_fingerprint(cfg: dict[str, Any], target_id: str, sample: dict[str, Any]) -> str:
+    """目标站点的回答缓存：身份由**目标模型**与该样本场景的温度决定。"""
+    temp = (cfg.get("scenario_temperatures", {}) or {}).get(sample.get("scenario", ""))
+    return _fingerprint(target_id, temp)
+
+
+def _count_manual_answers(path: str | Path | None) -> int:
+    """从答案文件**派生**人工评审条数（D8）。
+
+    此前 ``human_review_count`` 来自 CLI 自报（``--human-review-count``），
+    而 ``report.py`` 的发布门槛直接拿它比 20% ⇒ ``--human-review-count 999``
+    就能在**零人工评审**的情况下过门槛。**CLI 自报的数字不是证据。**
+
+    现在只认答案文件里真正填了内容的「(样本 × 目标)」对比单元数。
+    """
+    if not path:
+        return 0
+    p = Path(path)
+    if not p.exists():
+        return 0
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return 0
+
+    answers = data.get("answers") if isinstance(data, dict) else data
+    if isinstance(answers, list):
+        answers = {str(i): v for i, v in enumerate(answers)}
+    if not isinstance(answers, dict):
+        return 0
+
+    count = 0
+    for entry in answers.values():
+        if not isinstance(entry, dict):
+            continue
+        for target in ("doubao", "qwen", "deepseek"):
+            original = str(entry.get(f"{target}_original", "") or "").strip()
+            enhanced = str(entry.get(f"{target}_enhanced", "") or "").strip()
+            if original and enhanced:
+                count += 1
+    return count
+
+
+def load_cache(
+    kind: str,
+    sample_id: str,
+    target: str = "",
+    variant: str = "",
+    persona: str = "",
+    fingerprint: str = "",
+) -> Any:
+    name = f"{kind}_{sample_id}" + (f"_{persona}" if persona else "") + (f"_{target}" if target else "") + (f"_{variant}" if variant else "") + (f"__{fingerprint}" if fingerprint else "")
     path = CACHE_DIR / f"{name}.json"
     if path.exists():
         with open(path, "r", encoding="utf-8") as fh:
@@ -923,9 +1078,17 @@ def load_cache(kind: str, sample_id: str, target: str = "", variant: str = "", p
     return None
 
 
-def save_cache(kind: str, sample_id: str, target: str = "", variant: str = "", payload: Any = None, persona: str = "") -> None:
+def save_cache(
+    kind: str,
+    sample_id: str,
+    target: str = "",
+    variant: str = "",
+    payload: Any = None,
+    persona: str = "",
+    fingerprint: str = "",
+) -> None:
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    name = f"{kind}_{sample_id}" + (f"_{persona}" if persona else "") + (f"_{target}" if target else "") + (f"_{variant}" if variant else "")
+    name = f"{kind}_{sample_id}" + (f"_{persona}" if persona else "") + (f"_{target}" if target else "") + (f"_{variant}" if variant else "") + (f"__{fingerprint}" if fingerprint else "")
     path = CACHE_DIR / f"{name}.json"
     text = json.dumps(payload, ensure_ascii=False, indent=2)
     for attempt in range(2):

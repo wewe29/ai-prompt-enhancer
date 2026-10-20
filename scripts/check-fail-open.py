@@ -37,6 +37,65 @@ def _read(rel: str) -> str | None:
     return text.replace("\r\n", "\n")
 
 
+def _strip_comments(text: str, rel: str = "") -> str:
+    """去掉注释，只留代码。**字符串字面量原样保留。**
+
+    为什么需要：探针应当针对**代码**，而不是散文。
+    架构审查官修 A11 时把旧缺陷写进了注释（"此前是 `if let Ok(entry)`"），
+    子串探针于是命中那段注释 —— **缺陷明明修好了，门禁却报 OPEN**。
+    同样的问题也出现在文档字符串里（导出器解释自己删掉了哪段硬编码结论时，
+    恰好把那段结论原文引了出来）。
+
+    做法：按行去掉行注释与块注释，**不动字符串字面量** ——
+    有些探针要找的正是字面量（例如界面文案「连接验证成功」）。
+    """
+    hash_is_comment = rel.endswith(".py") or rel.endswith(".pyi")
+    out: list[str] = []
+    i = 0
+    n = len(text)
+    in_str = ""          # '' 表示不在字符串里
+    in_block = False
+    while i < n:
+        ch = text[i]
+        if in_block:
+            if text.startswith("*/", i):
+                in_block = False
+                out.append("  ")
+                i += 2
+            else:
+                out.append("\n" if ch == "\n" else " ")
+                i += 1
+            continue
+        if in_str:
+            out.append(ch)
+            if ch == "\\" and i + 1 < n:
+                out.append(text[i + 1])
+                i += 2
+                continue
+            if ch == in_str:
+                in_str = ""
+            i += 1
+            continue
+        if ch in ("'", '"'):
+            in_str = ch
+            out.append(ch)
+            i += 1
+            continue
+        if text.startswith("/*", i):
+            in_block = True
+            out.append("  ")
+            i += 2
+            continue
+        if text.startswith("//", i) or (hash_is_comment and ch == "#"):
+            while i < n and text[i] != "\n":
+                out.append(" ")
+                i += 1
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 def _line_of(text: str, needle: str) -> int | None:
     idx = text.find(needle)
     return text.count("\n", 0, idx) + 1 if idx >= 0 else None
@@ -70,15 +129,18 @@ def probe_item(item: dict) -> tuple[str, str]:
     text = _read(rel)
     if text is None:
         return UNVERIFIED, f"文件不存在：{rel}（无法判定）"
+    # 探针只看**代码**：注释里的散文不该被当成缺陷。
+    # （字符串字面量保留 —— 有些探针要找的正是界面文案。）
+    code = _strip_comments(text, rel)
 
     if kind in ("substring_present", "substring_absent"):
-        hit = pattern in text
+        hit = pattern in code
         if kind == "substring_present":
             if hit:
-                return OPEN, f"{rel}:{_line_of(text, pattern)} 命中"
+                return OPEN, f"{rel}:{_line_of(code, pattern)} 命中"
             return FIXED, f"{rel} 已无该模式"
         if hit:
-            return OPEN, f"{rel}:{_line_of(text, pattern)} 仍然存在"
+            return OPEN, f"{rel}:{_line_of(code, pattern)} 仍然存在"
         return FIXED, f"{rel} 已无该模式"
 
     if kind in ("regex_present", "regex_absent"):
@@ -88,13 +150,13 @@ def probe_item(item: dict) -> tuple[str, str]:
             rx = re.compile(pattern)
         except re.error as exc:  # 探测本身写错 = 未判定，不是通过
             return UNVERIFIED, f"正则无法编译：{exc}"
-        m = rx.search(text)
+        m = rx.search(code)
         if kind == "regex_present":
             if m:
-                return OPEN, f"{rel}:{text.count(chr(10), 0, m.start()) + 1} 命中"
+                return OPEN, f"{rel}:{code.count(chr(10), 0, m.start()) + 1} 命中"
             return FIXED, f"{rel} 已无该模式"
         if m:
-            return OPEN, f"{rel}:{text.count(chr(10), 0, m.start()) + 1} 仍然存在"
+            return OPEN, f"{rel}:{code.count(chr(10), 0, m.start()) + 1} 仍然存在"
         return FIXED, f"{rel} 已无该模式"
 
     # ---- required_regex：反向探针。用于「**这个检查必须存在**」的条目。 ----
@@ -110,9 +172,9 @@ def probe_item(item: dict) -> tuple[str, str]:
             rx = re.compile(pattern)
         except re.error as exc:  # 探测本身写错 = 未判定，不是通过
             return UNVERIFIED, f"正则无法编译：{exc}"
-        m = rx.search(text)
+        m = rx.search(code)
         if m:
-            return FIXED, f"{rel}:{text.count(chr(10), 0, m.start()) + 1} 已出现必需逻辑"
+            return FIXED, f"{rel}:{code.count(chr(10), 0, m.start()) + 1} 已出现必需逻辑"
         return OPEN, f"{rel} 缺少必需逻辑（模式未命中）"
 
     # ---- 块级探测：把「修复有没有落到这一段代码里」变成可机器判定的问题 ----
@@ -120,7 +182,7 @@ def probe_item(item: dict) -> tuple[str, str]:
         block_pattern = probe.get("block", "")
         needle = probe.get("guard") or probe.get("forbidden") or ""
         try:
-            block, start = _block(text, block_pattern)
+            block, start = _block(code, block_pattern)
         except ValueError as exc:
             return UNVERIFIED, str(exc)
         if block is None:
@@ -137,7 +199,7 @@ def probe_item(item: dict) -> tuple[str, str]:
         block_pattern = probe.get("block", "")
         needle = probe.get("forbidden", "")
         try:
-            block, start = _block(text, block_pattern)
+            block, start = _block(code, block_pattern)
         except ValueError as exc:
             return UNVERIFIED, str(exc)
         if block is None:

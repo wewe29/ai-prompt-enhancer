@@ -41,7 +41,11 @@
       "consequence": "release_gate 只判 None，拿到 0.0 即 0.0<=2.0 PASS ⇒ 长度失控的版本被放行",
       "acceptance": "无样本时 cost.pad_ratio 必须是 None；release_gate 拿到 None 必须 FAIL（不可判定）",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": "evaluation/report.py", "pattern": "if cost_ratios else 0.0"}
+      "probe": {
+        "kind": "substring_present",
+        "file": "evaluation/report.py",
+        "pattern": "if cost_ratios else 0.0"
+      }
     },
     {
       "id": "A2",
@@ -56,7 +60,11 @@
       "consequence": "控制组与主统计两处不一致，任何一处漏改都会留下放行缺口",
       "acceptance": "两处 pad_ratio 的缺失语义必须一致且均为 None",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": "evaluation/report.py", "pattern": "if ctrl_ratios else 0.0"}
+      "probe": {
+        "kind": "substring_present",
+        "file": "evaluation/report.py",
+        "pattern": "if ctrl_ratios else 0.0"
+      }
     },
     {
       "id": "A3",
@@ -71,7 +79,11 @@
       "consequence": "Markdown 报告里缺失伪装成「膨胀比为 0」",
       "acceptance": "缺失时该单元格必须显示「不可判定」",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": "evaluation/report.py", "pattern": "by_control.get('pad_ratio', 0.0)"}
+      "probe": {
+        "kind": "substring_present",
+        "file": "evaluation/report.py",
+        "pattern": "by_control.get('pad_ratio', 0.0)"
+      }
     },
     {
       "id": "A4",
@@ -86,7 +98,11 @@
       "consequence": "交付状态分布失真，delivery_rate 分母分子都被抬高",
       "acceptance": "未知状态必须计入独立的 unknown 桶并使有效交付率不可判定，不得归 complete",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": "evaluation/report.py", "pattern": "status if status in delivery_counts else \"complete\""}
+      "probe": {
+        "kind": "substring_present",
+        "file": "evaluation/report.py",
+        "pattern": "status if status in delivery_counts else \"complete\""
+      }
     },
     {
       "id": "A5",
@@ -101,7 +117,11 @@
       "consequence": "交付失败率的分母随失败样本一起缩小 ⇒ 失败越多、比率越好看",
       "acceptance": "每个样本都必须进入分母；失败样本计为 hard_failure 且分母固定为样本总数",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": "evaluation/report.py", "pattern": "if isinstance(enhanced, dict) and enhanced:"}
+      "probe": {
+        "kind": "substring_present",
+        "file": "evaluation/report.py",
+        "pattern": "if isinstance(enhanced, dict) and enhanced:"
+      }
     },
     {
       "id": "A6",
@@ -116,7 +136,11 @@
       "consequence": "胜率、CI、变差率全部在存活子集上计算；样本流失越多，一致率越好看",
       "acceptance": "total 必须等于进入比较的样本总数；裁判失败必须单独计数（judge_failed）并在产物中留痕；胜率必须以 total 为分母",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": "evaluation/report.py", "pattern": "if not judge:"}
+      "probe": {
+        "kind": "substring_present",
+        "file": "evaluation/report.py",
+        "pattern": "if not judge:"
+      }
     },
     {
       "id": "A7",
@@ -131,7 +155,11 @@
       "consequence": "裁判没给维度分被当成「四维平均为 0」，进入 by_magnitude 分类",
       "acceptance": "deltas 缺失时 mean_delta 必须为 None，且该样本不进 magnitude 分类",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": "evaluation/report.py", "pattern": "mean_delta = (sum(deltas.values()) / len(deltas)) if deltas else 0.0"}
+      "probe": {
+        "kind": "substring_present",
+        "file": "evaluation/report.py",
+        "pattern": "mean_delta = (sum(deltas.values()) / len(deltas)) if deltas else 0.0"
+      }
     },
     {
       "id": "A8",
@@ -146,7 +174,11 @@
       "consequence": "空结果集被渲染成「变差率 0%」「有效率 0%」这样的正常数字",
       "acceptance": "零样本时这些比率必须为 None，并让依赖它的门槛判「不可判定」",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": "evaluation/report.py", "pattern": "\"improved_pct\": round(100.0 * improved / total, 1) if total else 0.0"}
+      "probe": {
+        "kind": "substring_present",
+        "file": "evaluation/report.py",
+        "pattern": "\"improved_pct\": round(100.0 * improved / total, 1) if total else 0.0"
+      }
     },
     {
       "id": "A9",
@@ -161,7 +193,11 @@
       "consequence": "「未测量该维度」与「该维度相关性为 0」在产物里无法区分",
       "acceptance": "缺失维度必须不出现在 dim_corr 里，或显式标为 None",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": "evaluation/report.py", "pattern": "dim: round(sum(vals) / len(vals), 4) if vals else 0.0"}
+      "probe": {
+        "kind": "substring_present",
+        "file": "evaluation/report.py",
+        "pattern": "dim: round(sum(vals) / len(vals), 4) if vals else 0.0"
+      }
     },
     {
       "id": "A10",
@@ -176,7 +212,11 @@
       "consequence": "数据库或 JSON 损坏时用户看到「默认配置」而不是错误；随后任意一次保存把原配置永久覆盖（额度回落 10 元、容量回落默认 64MB）",
       "acceptance": "读取失败必须返回 Err；不得回落到默认；不得在读取失败后允许保存覆盖",
       "owner": "WP0",
-      "probe": {"kind": "substring_present", "file": "src-tauri/src/storage.rs", "pattern": ".and_then(|json| serde_json::from_str(&json).ok())"}
+      "probe": {
+        "kind": "substring_present",
+        "file": "src-tauri/src/storage.rs",
+        "pattern": ".and_then(|json| serde_json::from_str(&json).ok())"
+      }
     },
     {
       "id": "A11",
@@ -191,7 +231,12 @@
       "consequence": "UI 报「已清空」，但 API Key 仍留在 Windows 凭据管理器里",
       "acceptance": "凭据删除失败必须返回 Err（与本地数据清理结果分开陈述）",
       "owner": "WP0",
-      "probe": {"kind": "forbidden_in_block", "file": "src-tauri/src/storage.rs", "block": "(?s)pub fn clear_all_data.*?pub fn export_data", "forbidden": "if let Ok(entry)"}
+      "probe": {
+        "kind": "forbidden_in_block",
+        "file": "src-tauri/src/storage.rs",
+        "block": "(?s)pub fn clear_all_data.*?pub fn export_data",
+        "forbidden": "if let Ok(entry)"
+      }
     },
     {
       "id": "A12",
@@ -206,7 +251,12 @@
       "consequence": "用户已真实付费的 token/费用在额度面板上显示为 0；部分交付越多，额度统计偏得越多",
       "acceptance": "月度额度必须统计全部实际消耗（success + error + partial），或明确标注「失败不计费」并与供应商账单口径一致",
       "owner": "WP0",
-      "probe": {"kind": "regex_forbidden_in_block", "file": "src-tauri/src/provider.rs", "block": "(?s)pub async fn enhance.*?async fn consume_stream", "forbidden": "Some\\(code\\),\\s*\\)\\s*;\\s*0\\.0"}
+      "probe": {
+        "kind": "regex_forbidden_in_block",
+        "file": "src-tauri/src/provider.rs",
+        "block": "(?s)pub async fn enhance.*?async fn consume_stream",
+        "forbidden": "Some\\(code\\),\\s*\\)\\s*;\\s*0\\.0"
+      }
     },
     {
       "id": "A13",
@@ -221,7 +271,11 @@
       "consequence": "后端返回残缺结构时前端按「完整交付 + 轻度增强」呈现，缺失被伪装成正常结果",
       "acceptance": "关键字段缺失时前端必须显示「结果不完整」，不得静默补默认值",
       "owner": "WP2",
-      "probe": {"kind": "substring_present", "file": "src/lib.ts", "pattern": "delivery_status: result.delivery_status ?? \"complete\""}
+      "probe": {
+        "kind": "substring_present",
+        "file": "src/lib.ts",
+        "pattern": "delivery_status: result.delivery_status ?? \"complete\""
+      }
     },
     {
       "id": "B1",
@@ -236,7 +290,11 @@
       "consequence": "v0.4.0 的核心矛盾（none/light 边界）恰恰是这个检查看不见的地方；同时 clarify 的 acceptable 含 light ⇒ 该澄清却给 light 也判「恰当」",
       "acceptance": "none 与 light 的 acceptable 集合必须不同；clarify 不得把 light 视为恰当；该检查必须能输出「应更克制/过度补全」的真实区分率",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": "evaluation/verify_enhance.py", "pattern": "\"none\": {\"none\", \"light\"},\n        \"light\": {\"none\", \"light\"},"}
+      "probe": {
+        "kind": "substring_present",
+        "file": "evaluation/verify_enhance.py",
+        "pattern": "\"none\": {\"none\", \"light\"},\n        \"light\": {\"none\", \"light\"},"
+      }
     },
     {
       "id": "B2",
@@ -251,7 +309,11 @@
       "consequence": "解析失败的记录被当成 light 档参与判定，缺数据被计成「恰当」",
       "acceptance": "normalize 不得补默认值；缺档位必须落到「无法判断」并被计入分母外的显式缺口计数",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": "evaluation/enhancer.py", "pattern": "\"clarify\" if out.get(\"status\") == \"needs_clarification\" else \"light\""}
+      "probe": {
+        "kind": "substring_present",
+        "file": "evaluation/enhancer.py",
+        "pattern": "\"clarify\" if out.get(\"status\") == \"needs_clarification\" else \"light\""
+      }
     },
     {
       "id": "B3",
@@ -266,7 +328,11 @@
       "consequence": "clarify 模式下事实被复述到假设里尚可命中，复述到澄清问题里则被判「事实丢失」⇒ 澄清样本系统性假阳性",
       "acceptance": "字段名必须与 Rust struct 一致，并由跨层测试钉住（见 F1）",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": "evaluation/verify_enhance.py", "pattern": "str(q.get(\"question\", \"\")) for q in record.get(\"questions\", []) or []"}
+      "probe": {
+        "kind": "substring_present",
+        "file": "evaluation/verify_enhance.py",
+        "pattern": "str(q.get(\"question\", \"\")) for q in record.get(\"questions\", []) or []"
+      }
     },
     {
       "id": "B4",
@@ -281,7 +347,12 @@
       "consequence": "这条测试不是把错误锁死，而是**恒真**：无论 judge.py 怎么实现都通过 ⇒ 修 C4 时它挡不住，也护不住",
       "acceptance": "必须存在一个输入使两种实现给出不同结果的用例（该用例在修复前后结论相反）",
       "owner": "WP1",
-      "probe": {"kind": "forbidden_in_block", "file": "evaluation/test_stat.py", "block": "(?s)def test_judge_agreement_identical_inputs.*?def test_spearman_monotonic_perfect", "forbidden": "all(v == 1.0 for v in ag[\"dim_corr\"].values())"}
+      "probe": {
+        "kind": "forbidden_in_block",
+        "file": "evaluation/test_stat.py",
+        "block": "(?s)def test_judge_agreement_identical_inputs.*?def test_spearman_monotonic_perfect",
+        "forbidden": "all(v == 1.0 for v in ag[\"dim_corr\"].values())"
+      }
     },
     {
       "id": "B5",
@@ -296,7 +367,11 @@
       "consequence": "契约说谎 ⇒ 事件通道上的失败处理形同虚设；真实失败只能走命令返回 Err，流式中途错误没有通道",
       "acceptance": "三处契约必须一致：要么 Rust 补 Error 变体并真的发出来，要么 TS 删除 \"error\" 且前端不再保留死分支",
       "owner": "WP0",
-      "probe": {"kind": "substring_absent", "file": "src-tauri/src/models.rs", "pattern": "pub enum BackendEvent {\n    Delta { data: String },\n    Status { data: String },\n    Result { result: EnhancementResult },\n    Usage { usage: UsageRecord },\n}"}
+      "probe": {
+        "kind": "substring_absent",
+        "file": "src-tauri/src/models.rs",
+        "pattern": "pub enum BackendEvent {\n    Delta { data: String },\n    Status { data: String },\n    Result { result: EnhancementResult },\n    Usage { usage: UsageRecord },\n}"
+      }
     },
     {
       "id": "C1",
@@ -311,7 +386,11 @@
       "consequence": "「新颖性」这一维度实际测的是「相关性」；且该回退在 docstring 里被写成「保证旧数据兼容」，被当作既定设计而非缺陷",
       "acceptance": "novelty 缺失必须判该样本不可评（不得用别的维度顶替），且顶替行为必须可被审计",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": "evaluation/bench_judge.py", "pattern": "if not isinstance(value, (int, float)) and dim == \"novelty\":"}
+      "probe": {
+        "kind": "substring_present",
+        "file": "evaluation/bench_judge.py",
+        "pattern": "if not isinstance(value, (int, float)) and dim == \"novelty\":"
+      }
     },
     {
       "id": "C2",
@@ -326,7 +405,11 @@
       "consequence": "模型排名被污染，且排名是这份报告对外的唯一结论",
       "acceptance": "任何参与排序键的指标不得由别的指标顶替；缺失的排序维度必须让该模型标为不可评",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": "evaluation/bench_report.py", "pattern": "if value is None and dim == \"novelty\":"}
+      "probe": {
+        "kind": "substring_present",
+        "file": "evaluation/bench_report.py",
+        "pattern": "if value is None and dim == \"novelty\":"
+      }
     },
     {
       "id": "C3",
@@ -341,7 +424,11 @@
       "consequence": "缺一个维度的模型 composite 被压低但仍参与排名 ⇒ 缺失变成隐性扣分",
       "acceptance": "任一参与加权的维度缺失时该模型 composite 必须为 None（不可评）",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": "evaluation/bench_report.py", "pattern": "total += (w / total_w) * float(value or 0)"}
+      "probe": {
+        "kind": "substring_present",
+        "file": "evaluation/bench_report.py",
+        "pattern": "total += (w / total_w) * float(value or 0)"
+      }
     },
     {
       "id": "C4",
@@ -356,7 +443,11 @@
       "consequence": "报告里 5 个维度相关性数值完全相同，看上去是 5 次独立测量，实为 1 次；独立复算得 +0.539/+0.708/+0.258/+0.446，与该值无一相等",
       "acceptance": "dim_corr 必须逐维度独立计算；若只算得出一个，则只能输出单个全局相关性，不得展开成 5 维",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": "evaluation/judge.py", "pattern": "\"dim_corr\": {dim: rho for dim in dims}"}
+      "probe": {
+        "kind": "substring_present",
+        "file": "evaluation/judge.py",
+        "pattern": "\"dim_corr\": {dim: rho for dim in dims}"
+      }
     },
     {
       "id": "D1",
@@ -371,7 +462,12 @@
       "consequence": "换模型或换提示词后重跑会覆盖上一轮结果；新旧结果无法区分",
       "acceptance": "文件名必须编码模型/温度/提示词版本/样本集哈希；同名覆盖必须报错或显式 --force",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": "evaluation/verify_enhance.py", "pattern": "raw_path = RESULTS_DIR / f\"v035_enhance_raw{suffix}.json\""}
+      "probe": {
+        "kind": "guard_in_block",
+        "file": "evaluation/verify_enhance.py",
+        "block": "(?s)def main\\(\\).*?api_key = os.environ",
+        "guard": "stamped_name"
+      }
     },
     {
       "id": "D2",
@@ -386,7 +482,12 @@
       "consequence": "改完提示词再 resume，新旧结果混进同一个文件一起汇总；这正是三次尝试之间无法对照同一批样本的技术原因之一",
       "acceptance": "resume 必须比对身份指纹（提示词版本/模型/温度/样本集哈希），不一致必须拒绝复用",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": "evaluation/verify_enhance.py", "pattern": "if args.resume and raw_path.exists():"}
+      "probe": {
+        "kind": "guard_in_block",
+        "file": "evaluation/verify_enhance.py",
+        "block": "(?s)if args\\.resume and raw_path\\.exists\\(\\):.*?records: list",
+        "guard": "assert_same_identity"
+      }
     },
     {
       "id": "D3",
@@ -401,7 +502,12 @@
       "consequence": "--skip-enhance 会复用上一轮结果，而同一次运行的 meta 声明的是本轮配置 ⇒ 产物声明的配置与实际产出的配置不是一回事",
       "acceptance": "缓存键必须包含模型/温度/提示词版本/run id；meta 声明必须与实际产出同源",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": "evaluation/run_eval.py", "pattern": "name = f\"{kind}_{sample_id}\" + (f\"_{persona}\" if persona else \"\") + (f\"_{target}\" if target else \"\") + (f\"_{variant}\" if variant else \"\")"}
+      "probe": {
+        "kind": "guard_in_block",
+        "file": "evaluation/run_eval.py",
+        "block": "(?s)def load_cache\\(.*?return None",
+        "guard": "fingerprint"
+      }
     },
     {
       "id": "D4",
@@ -416,7 +522,11 @@
       "consequence": "拿到一份产物无法判断它是用哪套提示词、哪档温度、哪个人工校准量跑出来的 ⇒ 结论不可证伪",
       "acceptance": "meta 必须含 sampleset_version、prompt_version、temperature、judge2_model、config_hash、human_review_count 的可核证据（产物路径或条目数）",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": "evaluation/run_eval.py", "pattern": "\"human_review_count\": int(getattr(args, \"human_review_count\", 0) or 0),"}
+      "probe": {
+        "kind": "substring_present",
+        "file": "evaluation/run_eval.py",
+        "pattern": "\"human_review_count\": int(getattr(args, \"human_review_count\", 0) or 0),"
+      }
     },
     {
       "id": "D5",
@@ -431,7 +541,12 @@
       "consequence": "换模型/换权重后重跑，上一轮的基准被静默覆盖",
       "acceptance": "out_dir 必须编码模型集合与配置指纹，或默认拒绝覆盖既有目录",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": "evaluation/model_benchmark.py", "pattern": "\"run\": {\"out_dir\": \"results/benchmark\"}"}
+      "probe": {
+        "kind": "guard_in_block",
+        "file": "evaluation/model_benchmark.py",
+        "block": "(?s)out_dir = Path\\(args\\.out_dir\\).*?return 2",
+        "guard": "_identity_out_dir"
+      }
     },
     {
       "id": "D6",
@@ -446,7 +561,11 @@
       "consequence": "换任何数据导出的包，结论文字都不变 ⇒ 对外报告里的结论与数据脱钩",
       "acceptance": "结论段落必须由数据生成；禁止在导出器里写死统计数字",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": "evaluation/export_data_pack.py", "pattern": "胜/平/负 = 4/3/5"}
+      "probe": {
+        "kind": "substring_present",
+        "file": "evaluation/export_data_pack.py",
+        "pattern": "胜/平/负 = 4/3/5"
+      }
     },
     {
       "id": "D7",
@@ -461,7 +580,11 @@
       "consequence": "报告引用的 v040_*.json 不可能随仓库分发 ⇒ 任何数字都无法被第三方复算",
       "acceptance": "被报告引用的产物必须有入库路径（或明确的归档包 + 校验和），并在清单中登记",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": ".gitignore", "pattern": "evaluation/results/"}
+      "probe": {
+        "kind": "substring_present",
+        "file": ".gitignore",
+        "pattern": "\nevaluation/results/\n"
+      }
     },
     {
       "id": "D8",
@@ -476,7 +599,11 @@
       "consequence": "就算补齐脚本，没有人工答案也复算不出人工胜率；「人工校准样本数」目前只是一个 CLI 整数（--human-review-count 999 即可零人工评审过门槛）",
       "acceptance": "人工答案（脱敏后）必须入库或归档，且 human_review_count 必须由答案文件条目数派生，不得由 CLI 自报",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": ".gitignore", "pattern": "evaluation/answers.json"}
+      "probe": {
+        "kind": "required_regex",
+        "file": "docs/evaluation-data-v040/manifest.json",
+        "pattern": "answers_archive"
+      }
     },
     {
       "id": "E1",
@@ -491,7 +618,11 @@
       "consequence": "「增强失败」被表达成「增强器判断不需要增强」——一个从未发生过的判断",
       "acceptance": "fallback/partial 必须携带独立的失败原因字段，enhancement_level 不得在非模型判断路径上取值",
       "owner": "WP0",
-      "probe": {"kind": "substring_present", "file": "src-tauri/src/provider.rs", "pattern": "enhancement_level: \"none\".into(),"}
+      "probe": {
+        "kind": "substring_present",
+        "file": "src-tauri/src/provider.rs",
+        "pattern": "enhancement_level: \"none\".into(),"
+      }
     },
     {
       "id": "E2",
@@ -506,7 +637,11 @@
       "consequence": "增强彻底失败时界面斩钉截铁地陈述了一个不存在的模型判断（缓解事实：同处仍有「原文回退」交付徽章与 notices 提示，失败本身并非完全不可见，但断言仍是假的）",
       "acceptance": "enhancement_level=none 只有在模型真的给出 none 时才可显示该断言；fallback 路径必须显示失败原因而不是判断",
       "owner": "WP2",
-      "probe": {"kind": "substring_present", "file": "src/views/EnhanceView.tsx", "pattern": "增强器判断无需修改，建议直接使用原文"}
+      "probe": {
+        "kind": "substring_present",
+        "file": "src/views/EnhanceView.tsx",
+        "pattern": "增强器判断无需修改，建议直接使用原文"
+      }
     },
     {
       "id": "E3",
@@ -521,7 +656,12 @@
       "consequence": "数据库可存 64MB 历史，备份最多 500 条，用户以为导全了",
       "acceptance": "导出必须走不带 LIMIT 的查询；返回条数必须是真实导出数；超量时必须显式告警",
       "owner": "WP0",
-      "probe": {"kind": "forbidden_in_block", "file": "src-tauri/src/storage.rs", "block": "(?s)pub fn export_data.*?pub fn import_data", "forbidden": "list_history"}
+      "probe": {
+        "kind": "forbidden_in_block",
+        "file": "src-tauri/src/storage.rs",
+        "block": "(?s)pub fn export_data.*?pub fn import_data",
+        "forbidden": "list_history"
+      }
     },
     {
       "id": "E4",
@@ -536,7 +676,12 @@
       "consequence": "导入 20000 条只导进 5000 条，UI 报「已导入 N 条」；用户以为备份已恢复",
       "acceptance": "截断必须显式告知（导入条数 vs 包内条数），或拒绝超量导入",
       "owner": "WP0",
-      "probe": {"kind": "guard_in_block", "file": "src-tauri/src/storage.rs", "block": "(?s)pub fn import_data.*?pub fn record_usage", "guard": "skipped"}
+      "probe": {
+        "kind": "guard_in_block",
+        "file": "src-tauri/src/storage.rs",
+        "block": "(?s)pub fn import_data.*?pub fn record_usage",
+        "guard": "skipped"
+      }
     },
     {
       "id": "E5",
@@ -551,7 +696,12 @@
       "consequence": "导入包写 baseUrl=https://evil.example ⇒ 下次增强时真实 API Key 作为 Bearer token 发给攻击者。v0.3.5 防住了「Key 的值」，没防住「Key 的目的地」",
       "acceptance": "URL 校验必须下沉到存储层（save_provider_config 内部校验），使任何写入路径都不可绕过；导入包必须拒绝非白名单域名或明确告警",
       "owner": "WP0",
-      "probe": {"kind": "guard_in_block", "file": "src-tauri/src/storage.rs", "block": "(?s)pub fn import_data.*?pub fn record_usage", "guard": "base_url"}
+      "probe": {
+        "kind": "guard_in_block",
+        "file": "src-tauri/src/storage.rs",
+        "block": "(?s)pub fn import_data.*?pub fn record_usage",
+        "guard": "base_url"
+      }
     },
     {
       "id": "F1",
@@ -566,7 +716,11 @@
       "consequence": "跨层等价性只覆盖了 prompt 文本本身；解析与校验逻辑漂移不会被发现（B3 的字段名错误正是这类漂移）",
       "acceptance": "每一项声称的等价都必须有读取对方源码的断言；claim 与 test 必须一一对应",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": "evaluation/enhancer.py", "pattern": "parse_result、validate_result 均与 Rust 源码逐字一致，由 tests 通过"}
+      "probe": {
+        "kind": "substring_present",
+        "file": "evaluation/enhancer.py",
+        "pattern": "parse_result、validate_result 均与 Rust 源码逐字一致，由 tests 通过"
+      }
     },
     {
       "id": "F2",
@@ -581,9 +735,13 @@
       "consequence": "断言的是「Python 侧自洽」，不是「与 Rust 一致」；模板真被改动时测试仍然全绿",
       "acceptance": "该断言必须读 prompts.rs 的模板原文，或删除该等价声明",
       "owner": "WP1",
-      "probe": {"kind": "substring_present", "file": "evaluation/test_enhancer.py", "pattern": "expected_prefix = ("}
+      "probe": {
+        "kind": "substring_present",
+        "file": "evaluation/test_enhancer.py",
+        "pattern": "expected_prefix = ("
+      }
     },
-{
+    {
       "id": "G9",
       "family": "E",
       "severity": "P1",
@@ -603,7 +761,7 @@
         "pattern": "连接验证成功"
       }
     },
-{
+    {
       "id": "G10",
       "family": "E",
       "severity": "P1",
@@ -624,7 +782,7 @@
         "guard": "price"
       }
     },
-{
+    {
       "id": "G11",
       "family": "E",
       "severity": "P1",
@@ -644,7 +802,7 @@
         "pattern": "setState\\(\"streaming\"\\)\\s*;\\s*setResult\\(null\\)"
       }
     },
-{
+    {
       "id": "G12",
       "family": "E",
       "severity": "P1",

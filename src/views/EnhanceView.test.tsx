@@ -53,7 +53,7 @@ function makeProps(overrides: Partial<EnhanceViewProps> = {}): EnhanceViewProps 
     attachments: [],
     setAttachments: noop,
     addAttachments: async () => undefined,
-    output: "帮我写一封请假邮件",
+    output: "帮我写一封正式的请假邮件（注明事由与日期）",
     commitOutput: noop,
     undo: noop,
     redo: noop,
@@ -94,7 +94,7 @@ function makeResult(overrides: Partial<EnhancementResult> = {}): EnhancementResu
     enhancement_level: "light",
     notices: [],
     task_type: "other",
-    primary_prompt: "帮我写一封请假邮件",
+    primary_prompt: "帮我写一封正式的请假邮件（注明事由与日期）",
     facts: [],
     assumptions: [],
     questions: [],
@@ -158,5 +158,20 @@ describe("P2-1 增强彻底失败时不得陈述一个没发生过的判断", ()
     expect(html).toContain("轻度增强");
     expect(html).toContain("增强完成");
     expect(html).not.toContain("增强器判断无需修改");
+  });
+
+  it("G12：结果与原文逐字相同，档位一行改为事实陈述，不再说『轻度增强』", () => {
+    // 模型可能原样返回了用户的提示词却标成 light —— 「看起来成功了但其实没干活」，
+    // 恰恰是本产品核心价值主张失效时的表现。此时不得展示与屏幕内容矛盾的断言。
+    const identical = "帮我写一封请假邮件";
+    const result = makeResult({
+      delivery_status: "complete",
+      enhancement_level: "light",
+      primary_prompt: identical,
+    });
+    const html = render({ result, deliveryStatus: "complete", original: identical, output: identical });
+    expect(html).toContain("这一版与你的原文完全相同（没有做出改动）");
+    expect(html).not.toContain("轻度增强");
+    expect(html).toContain("未改动任何内容");
   });
 });

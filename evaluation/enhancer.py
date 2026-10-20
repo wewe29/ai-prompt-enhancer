@@ -1,8 +1,18 @@
-"""复刻 PromptCraft 后端增强逻辑（来源：src-tauri/src/provider.rs）。
+"""复刻 PromptCraft 后端增强逻辑（来源：src-tauri/src/{provider,prompts,models}.rs）。
 
-准确性红线：SYSTEM_PROMPT、SYSTEM_PROMPT_VERSION、user message 模板、
-parse_result、validate_result 均与 Rust 源码逐字一致，由 tests 通过
-读取 provider.rs 原文做等价性断言保证。
+准确性红线 —— **下面每一项都有"读取对方源码"的断言**（见 evaluation/test_enhancer.py）：
+
+1. ``SYSTEM_PROMPT`` —— ``test_system_prompt_byte_identical``（读 prompts.rs）
+2. ``SYSTEM_PROMPT_VERSION`` —— ``test_system_prompt_version_identical``（读 prompts.rs）
+3. user message 模板 —— ``test_build_user_message_matches_rust_template``（读 provider.rs）
+4. 缺失档位 / 交付状态的语义 —— ``test_normalize_result_matches_rust_option_semantics``（读 models.rs）
+
+**明确不声称** ``parse_result`` / ``validate_result`` 与 Rust 逐字一致：
+它们是**行为等价**（由两侧各自的测试覆盖），**没有**跨源码的逐字断言。
+
+> F1：此前本 docstring 写的是「5 项均与 Rust 源码逐字一致，由 tests 通过读取
+> provider.rs 原文做等价性断言保证」——**实际只有 2 项被断言**，claim 比事实宽。
+> 「声称的等价」与「被断言的等价」必须一一对应，否则文档本身就在说谎。
 """
 from __future__ import annotations
 
@@ -201,16 +211,26 @@ def validate_result(result: dict[str, Any]) -> None:
 
 
 def normalize_result(result: dict[str, Any]) -> dict[str, Any]:
-    """补齐 Rust 端 serde 默认值：缺失的数组字段置空，状态类字段按 status 推导。"""
+    """补齐 Rust 端 serde 默认值：缺失的**数组**字段置空。
+
+    **刻意不补 `enhancement_level` 与 `delivery_status`（B2）。**
+
+    此前这里给缺失的 `enhancement_level` 补 "light"、缺失的
+    `delivery_status` 补 "complete"。这与「缺数据当没问题」是同一族：
+    模型没给判断 ⇒ 系统替他断言「轻度增强」；没给交付状态 ⇒ 系统替他
+    断言「完整交付」。
+
+    Rust 侧已改为 `Option<String>`（缺失即 None，见
+    `src-tauri/src/models.rs` 的 `EnhancementResult`），**两层必须一致** ——
+    否则同一份模型输出，产品显示「不可判定」而评测侧照单全收，
+    评测的"合法输出集合"与产品的"合法输出集合"就不是同一个东西。
+
+    缺档位在判定层落到「无法判断」，并被计入显式缺口计数。
+    """
     out = dict(result)
     out.setdefault("status", "ready")
     for key in ("assumptions", "questions", "changes", "suggestions", "risk_flags"):
         out.setdefault(key, [])
-    out.setdefault(
-        "enhancement_level",
-        "clarify" if out.get("status") == "needs_clarification" else "light",
-    )
-    out.setdefault("delivery_status", "complete")
     return out
 
 

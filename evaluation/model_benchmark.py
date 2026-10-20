@@ -81,6 +81,27 @@ DEFAULTS: dict[str, Any] = {
 INFER_TEMPERATURE = 0.7
 
 
+def _identity_out_dir(cfg: dict, models: list, prompts: list) -> Path:
+    """默认输出目录：编码「模型集合 + 关键参数」的指纹，每次运行一个独立目录。
+
+    D5：旧实现固定写 ``results/benchmark``，每次运行覆盖上一轮的
+    ``summary.json`` 与 ``report_benchmark.md``。
+    """
+    import hashlib
+
+    parts = "|".join([
+        ",".join(sorted(str(m) for m in models)),
+        ",".join(sorted(str(p.get("id", "")) for p in prompts)),
+        str((cfg.get("enhancer") or {}).get("model", "")),
+        str((cfg.get("judge") or {}).get("model", "")),
+        str((cfg.get("params") or {}).get("temperature", "")),
+        str((cfg.get("params") or {}).get("repeats", "")),
+    ])
+    tag = hashlib.sha256(parts.encode("utf-8")).hexdigest()[:10]
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    return EVAL_ROOT / "results" / "benchmark" / f"{stamp}__{tag}"
+
+
 def _rep_key(repeats: int, rep: int) -> str:
     """重复实验缓存键后缀：N=1 无后缀（与旧缓存向后兼容），N>1 为 _rep<i>。"""
     return "" if int(repeats) <= 1 else f"_rep{rep}"
@@ -237,6 +258,20 @@ def main(argv: list[str] | None = None) -> int:
     out_dir = Path(args.out_dir) if args.out_dir else Path(cfg["run"]["out_dir"])
     if not out_dir.is_absolute():
         out_dir = EVAL_ROOT / out_dir
+    # D5：默认输出目录必须编码自身身份，且**不得静默覆盖**既有目录。
+    # 旧实现固定写 results/benchmark，每次运行覆盖 summary.json 与
+    # report_benchmark.md ⇒ 上一轮的模型排名被这一轮悄悄换掉，
+    # 而文件里没有任何标识能区分两次运行。
+    if not args.out_dir:
+        out_dir = _identity_out_dir(cfg, models, prompts)
+    if out_dir.exists() and any(out_dir.iterdir()) and not getattr(args, "force", False):
+        print(
+            f"[错误] 输出目录已存在且非空：{out_dir}\n"
+            f"       静默覆盖会让上一轮的模型排名被换掉，而产物里没有任何标识能区分。\n"
+            f"       请换一个 --out-dir，或显式加 --force 表示确实要覆盖。",
+            file=sys.stderr,
+        )
+        return 2
 
     print(f"[配置] 协议 {api_cfg.get('protocol')} | 模型 {len(models)} 个 | 提示词 {len(prompts)} 条")
     print(f"[配置] 增强 {cfg['enhancer'].get('model')} | 裁判 {cfg['judge'].get('model')} | 输出 {out_dir}")
@@ -495,7 +530,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                         help="每个(模型×提示词)重复 N 次（默认取配置 params.repeats，缺省 1）")
     parser.add_argument("--max-prompts", type=int, default=None, help="最多评测的提示词数")
     parser.add_argument("--max-models", type=int, default=None, help="最多评测的模型数")
-    parser.add_argument("--out-dir", default=None, help="报告输出目录（默认配置 run.out_dir）")
+    parser.add_argument("--out-dir", default=None, help="报告输出目录（默认按运行身份新建独立目录）")
+    parser.add_argument("--force", action="store_true",
+                        help="允许覆盖已存在的输出目录（默认拒绝：静默覆盖会让上一轮结果被换掉）")
     return parser.parse_args(argv)
 
 

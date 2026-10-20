@@ -16,6 +16,14 @@
     "consequence": "只剩脚本与报告中的结论数字。原始行级数据必须重跑再生。",
     "remediation": "新增 evaluation/run_identity.py：产物名与缓存键编码自身身份，resume 校验身份，避免再次发生「同名覆盖 + 新旧混跑」。"
   },
+  "answers_archive": {
+    "path": "docs/evaluation-data-v040/answers/",
+    "index": "docs/evaluation-data-v040/answers/INDEX.md",
+    "rule": "脱敏后的人工盲评答案必须归档入库，并在 INDEX.md 登记文件名、用途、评审人数、单元数与 sha256",
+    "status": "EMPTY",
+    "status_note": "v0.4.0 三轮实测的人工作答随 F 盘更换丢失，无法补归档；重跑并重新评审后按规则补齐",
+    "why": "架构审查 D8：旧 .gitignore 把 evaluation/answers.json 整条忽略 ⇒ 人工校准环天然不可复现；且 report.py 的发布门槛拿 CLI 自报的 --human-review-count 比 20% ⇒ --human-review-count 999 就能在零人工评审下过门槛（该漏洞已由 _count_manual_answers() 修掉）"
+  },
   "experiments": [
     {
       "id": "stability",

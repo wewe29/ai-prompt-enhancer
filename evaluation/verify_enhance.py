@@ -41,12 +41,11 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import enhancer  # noqa: E402  （复用既有增强器逻辑，不修改它）
+import run_identity  # noqa: E402  （产物身份 + resume 身份闸，D1/D2）
 
 ROOT = Path(__file__).resolve().parent.parent
 SAMPLES_PATH = ROOT / "evaluation" / "samples_v30.yaml"
 RESULTS_DIR = ROOT / "evaluation" / "results"
-RAW_PATH = RESULTS_DIR / "v035_enhance_raw.json"
-DETERMINISTIC_PATH = RESULTS_DIR / "v035_deterministic.json"
 
 # DeepSeek-V4.1-Flash 的正式 model name（2026-09-10 起）
 # 旧名 deepseek-v4-flash 虽仍可用，但底层已切换到此模型，用正式名更明确。
@@ -58,6 +57,14 @@ MAX_TOKENS = 8192  # V4.1-Flash 思考 token 占比很高，必须给足余量
 # 由 evaluation/test_temperature_consistency.py 保证它与 Rust 产品值一致。
 TEMPERATURE = enhancer.ENHANCEMENT_TEMPERATURE
 MAX_ATTEMPTS = 2
+
+# 判定逻辑的版本。D3：产物必须记录**判定逻辑的版本**，
+# 否则同一份 raw 用不同判定逻辑重跑，产出的文件无法区分。
+JUDGE_VERSION = "v040"
+
+# 档位顺序：用于判断「改多了」还是「改少了」（B3）。
+# 此前判定只按难度分桶，从不比较方向。
+LEVEL_ORDER = {"none": 0, "light": 1, "clarify": 2}
 
 # ---------------------------------------------------------------- 越权动作词
 # 增强结果若夹带这些词，说明引入了用户未要求的"执行类"动作 → 指令越权嫌疑。
@@ -184,6 +191,18 @@ def enhance_one(sample: dict[str, Any], api_key: str) -> dict[str, Any]:
     }
 
 
+def _read_raw(path: Path) -> list[dict[str, Any]]:
+    """读 raw 产物。兼容两种结构：
+
+    * 新结构：``{"_identity": {...}, "records": [...]}``（带运行身份，D1）
+    * 旧结构：顶层就是一个 list（历史产物）
+    """
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(payload, dict):
+        return payload.get("records", [])
+    return payload
+
+
 # ------------------------------------------------------------- 阶段 B 判定
 def normalize_for_match(text: str) -> str:
     """归一化后再比对：抹平空格、全半角、单位写法等纯格式差异。
@@ -211,7 +230,11 @@ def judge_dimension_fact_fidelity(record: dict[str, Any]) -> dict[str, Any]:
         str(a.get("text", "")) for a in record.get("assumptions", []) or []
     )
     questions_text = " ".join(
-        str(q.get("question", "")) for q in record.get("questions", []) or []
+        # B3：字段名是 `text`，不是 `question`。
+        # Rust 侧 ClarifyingQuestion 的字段是 text（models.rs），
+        # 此前这里写成 q.get("question", "") ⇒ 恒为空字符串，
+        # **一条设计好的容错路径（"事实可能保留在澄清问题里"）从未生效**。
+        str(q.get("text", "")) for q in record.get("questions", []) or []
     )
     haystack = normalize_for_match(primary + assumptions_text + questions_text)
 
@@ -337,21 +360,45 @@ def judge_dimension_restraint(record: dict[str, Any]) -> dict[str, Any]:
     level = record.get("enhancement_level") or ""
     status = record.get("status") or ""
     expected = record.get("expected_behavior", "")
-    ambiguity = record.get("ambiguity_level", "")
 
     if not level:
         return {"verdict": "无法判断", "level": level, "expected": expected, "match": None}
 
-    # 预期行为到可接受 level 的映射
+    # 预期行为到可接受 level 的映射。
+    #
+    # B1：此前 none 与 light 映射到**完全相同**的集合 {"none", "light"}，
+    # 于是这个检查在结构上无法区分「本该不动」与「本该轻度增强」——
+    # 而 none/light 恰恰是 v0.4.0 要解决的那条边界。**它对自己的目标无效。**
+    # 样本集的实际分布让这一点更刺眼：clear 档 20 条里 17 条期望 none、
+    # 3 条期望 light，旧口径下这 20 条**一条都区分不了**。
+    # 现在每个预期只接受它自己那一档；clarify 也不再把 light 视为恰当。
     acceptable = {
-        "none": {"none", "light"},
-        "light": {"none", "light"},
-        "clarify": {"light", "clarify"},
-    }.get(expected, {level})
+        "none": {"none"},
+        "light": {"light"},
+        "clarify": {"clarify"},
+    }.get(expected)
+
+    if acceptable is None:
+        # 样本没有标定期望行为 ⇒ 不可判定，不得默认成"恰当"
+        return {"verdict": "无法判断", "level": level, "expected": expected, "match": None}
 
     match = level in acceptable
+    if match:
+        verdict = "恰当"
+    else:
+        # B3：此前 `verdict = "恰当" if match else "应更克制" if ambiguity == "clear"
+        # else "过度补全"` —— 只按难度分桶，**从不比较方向**。于是
+        # 「期望 clarify、实际 none」（明明是太克制）也被标成"过度补全"。
+        # 现在按档位顺序判断方向：改多了 = 过度补全，改少了 = 增强不足。
+        level_rank = LEVEL_ORDER.get(level)
+        expected_rank = LEVEL_ORDER.get(expected)
+        if level_rank is not None and expected_rank is not None and level_rank > expected_rank:
+            verdict = "过度补全"
+        else:
+            verdict = "增强不足"
+
     return {
-        "verdict": "恰当" if match else "应更克制" if ambiguity == "clear" else "过度补全",
+        "verdict": verdict,
         "level": level,
         "expected": expected,
         "match": match,
@@ -436,8 +483,13 @@ def summarize(records: list[dict[str, Any]], judgements: list[dict[str, Any]]) -
             },
             "restraint": {
                 "恰当": count("restraint", "恰当"),
-                "应更克制": count("restraint", "应更克制"),
+                # B1 / B3：桶按**方向**分，不再按难度分。
+                # 「应更克制」这个旧桶被取代 —— 它在旧实现里同时被用来表示
+                # "clear 档不匹配"，而 clear 档的不匹配既可能是改多了、
+                # 也可能是改少了，旧实现分不出来。
                 "过度补全": count("restraint", "过度补全"),
+                "增强不足": count("restraint", "增强不足"),
+                "无法判断": count("restraint", "无法判断"),
             },
         }
 
@@ -467,23 +519,55 @@ def main() -> int:
         action="store_true",
         help="不调用 API，直接用已有 raw 产物重跑阶段 B 判定（修正判定逻辑后用）",
     )
+    parser.add_argument(
+        "--run-dir",
+        default="",
+        help="指定产物目录（--judge-only / --resume 时用；默认按运行身份新建独立目录）",
+    )
     args = parser.parse_args()
 
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    suffix = "_smoke" if args.smoke else ""
-    raw_path = RESULTS_DIR / f"v035_enhance_raw{suffix}.json"
-    det_path = RESULTS_DIR / f"v035_deterministic{suffix}.json"
+    # D1 / D2：产物**必须编码自身身份**，resume **必须校验身份**。
+    # 旧实现把输出写死成 v035_enhance_raw.json，每次重跑静默覆盖上一次，
+    # 而 v0.4.0 的运行也会写进 v035_*；--resume 更是复用"任何没有 error
+    # 的既有记录"，不检查 prompt / 模型 / 参数是否变过 ⇒ 改完提示词再
+    # --resume，新旧结果会被混进同一份产物并一起汇总。
+    identity = run_identity.build_identity(
+        model=MODEL,
+        temperature=TEMPERATURE,
+        samples_path=SAMPLES_PATH,
+        repeats=1,
+        extra={
+            "mode": "smoke" if args.smoke else "full",
+            "judge": "single",
+            "judge_version": JUDGE_VERSION,
+        },
+    )
+    if args.run_dir:
+        run_path = Path(args.run_dir)
+    else:
+        run_path = run_identity.run_dir(RESULTS_DIR / "enhance", identity)
+    run_path.mkdir(parents=True, exist_ok=True)
+    raw_path = run_path / run_identity.stamped_name("v040_enhance_raw", identity)
+    det_path = run_path / run_identity.stamped_name("v040_enhance_deterministic", identity)
 
     # ---- 只重跑判定：完全不需要 API Key ----
     if args.judge_only:
         if not raw_path.exists():
             print(f"ERROR: {raw_path} 不存在，请先跑一次增强", file=sys.stderr)
             return 2
-        records = json.loads(raw_path.read_text(encoding="utf-8"))
+        records = _read_raw(raw_path)
         judgements = [judge(record) for record in records]
         summary = summarize(records, judgements)
         det_path.write_text(
-            json.dumps({"summary": summary, "judgements": judgements}, ensure_ascii=False, indent=2),
+            json.dumps(
+                {
+                    run_identity.IDENTITY_KEY: identity,
+                    "summary": summary,
+                    "judgements": judgements,
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
             encoding="utf-8",
         )
         print(json.dumps(summary, ensure_ascii=False, indent=2))
@@ -505,10 +589,15 @@ def main() -> int:
 
     existing: dict[str, dict[str, Any]] = {}
     if args.resume and raw_path.exists():
-        for item in json.loads(raw_path.read_text(encoding="utf-8")):
+        payload = json.loads(raw_path.read_text(encoding="utf-8"))
+        # D2：resume **必须校验身份**。改完提示词 / 换模型 / 改温度之后
+        # 再 --resume，旧实现会把新旧结果混进同一份产物并一起汇总 ——
+        # 产出一个谁也复现不出的数字。身份不一致 ⇒ 直接拒绝续跑。
+        run_identity.assert_same_identity(payload, identity, context=str(raw_path))
+        for item in _read_raw(raw_path):
             if not item.get("error"):
                 existing[item["id"]] = item
-        print(f"[resume] reuse {len(existing)} succeeded records")
+        print(f"[resume] reuse {len(existing)} succeeded records（身份一致，已校验）")
 
     records: list[dict[str, Any]] = []
     for index, sample in enumerate(samples, start=1):
@@ -528,13 +617,26 @@ def main() -> int:
         )
         # 每条即时落盘，防止长跑中断丢失全部进度
         raw_path.write_text(
-            json.dumps(records, ensure_ascii=False, indent=2), encoding="utf-8"
+            json.dumps(
+                {run_identity.IDENTITY_KEY: identity, "records": records},
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
         )
 
     judgements = [judge(record) for record in records]
     summary = summarize(records, judgements)
     det_path.write_text(
-        json.dumps({"summary": summary, "judgements": judgements}, ensure_ascii=False, indent=2),
+        json.dumps(
+            {
+                run_identity.IDENTITY_KEY: identity,
+                "summary": summary,
+                "judgements": judgements,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
         encoding="utf-8",
     )
 

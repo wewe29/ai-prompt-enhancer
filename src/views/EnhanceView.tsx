@@ -124,7 +124,17 @@ export function EnhanceView(props: EnhanceViewProps) {
     const lengthChange = `原文 ${original.length} 字 -> 结果 ${outputLength} 字${ratio}`;
     const changesText = [...new Set(result.changes.map((change) => changeSummaryLabels[change.type]).filter(Boolean))].join("、") || "无实质修改";
     const source = result.assumptions.length > 0 ? "包含明确假设" : "仅使用用户提供内容";
-    return { level: truth.level, lengthChange, changesText, source };
+    // G12：结果与原文**逐字相同**时，档位标签是一个与屏幕内容矛盾的断言。
+    // 模型可能原样返回了用户的提示词却标成 light —— 这属于"看起来成功了但
+    // 其实没干活"，恰恰是本产品核心价值主张失效时的表现。
+    // 此时改为事实陈述，不再说模型"判断"了什么。
+    const identicalToOriginal = original.trim().length > 0
+      && result.primary_prompt.trim() === original.trim();
+    const level = identicalToOriginal
+      ? { label: "这一版与你的原文完全相同（没有做出改动）", fromModel: false }
+      : truth.level;
+    const changesTextFinal = identicalToOriginal ? "未改动任何内容" : changesText;
+    return { level, lengthChange, changesText: changesTextFinal, source, identicalToOriginal };
   }, [result, original, truth]);
   useEffect(() => {
     const isTyping = () => {

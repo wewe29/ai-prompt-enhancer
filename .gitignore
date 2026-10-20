@@ -23,10 +23,25 @@ screenshots/
 # 评测脚本运行产物（evaluation/）
 evaluation/.venv/
 evaluation/.browser_profile/
-evaluation/results/
 evaluation/__pycache__/
 evaluation/**/__pycache__/
 evaluation/.pytest_cache/
 evaluation/*.egg-info/
-evaluation/answers.json
 evaluation/key.local
+
+# 评测产物（evaluation/results/）：整体不入库，但**不再静默排除证据**。
+# 旧规则是整条 `evaluation/results/`，而报告里写着「见 results/xxx.json」——
+# 那个文件根本不在仓库里 ⇒ **没有人能复核任何一个数字**（P0-4 / D7）。
+# 现在分两层：
+#   1) 可再生的中间产物（缓存、逐次落盘）留在本机，不入库；
+#   2) **参与结论的产物**经 docs/evaluation-data-v040/ 归档入库，
+#      并在 manifest.json 里登记身份、来源脚本与校验和。
+evaluation/results/*
+!evaluation/results/README.md
+
+# 人工盲评答案：本地工作副本不入库，**脱敏后的归档副本必须入库**
+# （docs/evaluation-data-v040/answers/，登记在 manifest.json 的 answers_archive）。
+# 旧规则把 evaluation/answers.json 整条忽略 ⇒ **人工校准环天然不可复现**（D8）；
+# 且 report.py 的发布门槛拿 CLI 自报的 --human-review-count 比 20%
+# ⇒ `--human-review-count 999` 就能在**零人工评审**的情况下过门槛。
+evaluation/answers.json

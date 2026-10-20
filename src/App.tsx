@@ -9,6 +9,7 @@ import type {
   ProfileRule, ProviderConfig, UsageRecord, Verbosity,
 } from "./types";
 import { defaultRules } from "./defaults";
+import { buildProviderSaveMessage, staleResultNotice } from "./providerMessage";
 import { Sidebar, type View } from "./components/Sidebar";
 import { SecurityModal } from "./components/SecurityModal";
 import { SuggestionModal } from "./components/SuggestionModal";
@@ -48,6 +49,8 @@ export default function App() {
   const [output, setOutput] = useState("");
   const [result, setResult] = useState<EnhancementResult | null>(null);
   const [notices, setNotices] = useState<string[]>([]);
+  /** 当前展示的这一版结果的产出时间。G11：失败后要能说清「你看到的是上一次的结果」。 */
+  const [resultAt, setResultAt] = useState("");
   const [state, setState] = useState<EnhancementState>("idle");
   const [error, setError] = useState("");
   const [model, setModel] = useState("deepseek-chat");
@@ -155,7 +158,14 @@ export default function App() {
     if (monthlyLimit > 0 && projectedMonthTotal > monthlyLimit) { setError(`预计本次请求会使本月费用达到约 ¥${projectedMonthTotal.toFixed(2)}，超过强制额度 ¥${monthlyLimit.toFixed(2)}，已阻止调用。`); return; }
 
     const generationId = ++generationRef.current;
-    setShowSecurity(false); setError(monthlyWarningLimit > 0 && projectedMonthTotal >= monthlyWarningLimit ? `费用提醒：预计本次后本月累计约 ¥${projectedMonthTotal.toFixed(2)}，仍允许继续。` : ""); setState("streaming"); setResult(null); setOutput(""); setUndoStack([]); setRedoStack([]); setNotices([]); setActiveCandidate(1);
+    // G11：**不要在发请求之前就把上一版结果清掉。**
+    // 此前这里是 `setResult(null); setOutput("")` —— 网络抖一次，用户上一条
+    // **已经付费跑出来的**结果就没了，而且没有任何提示。
+    // 现在：流式文本缓冲照常清空（否则新旧文本会拼在一起），
+    // 但结构化的上一版结果保留；请求失败时把它还原出来，并标注它是上一次的。
+    const previousResult = result;
+    const previousResultAt = resultAt;
+    setShowSecurity(false); setError(monthlyWarningLimit > 0 && projectedMonthTotal >= monthlyWarningLimit ? `费用提醒：预计本次后本月累计约 ¥${projectedMonthTotal.toFixed(2)}，仍允许继续。` : ""); setState("streaming"); setOutput(""); setUndoStack([]); setRedoStack([]); setNotices([]); setActiveCandidate(1);
     const request: EnhancementRequest = {
       originalText: original,
       contextText: overrideContext ?? context,
@@ -192,6 +202,7 @@ export default function App() {
           }
           setNotices(nextNotices);
           setOutput(normalized.primary_prompt);
+          setResultAt(new Date().toLocaleTimeString());
           setState(normalized.status === "needs_clarification" ? "needs_clarification" : "ready");
           persistHistory(normalized.primary_prompt, { deliveryStatus: normalized.delivery_status, enhancementLevel: normalized.enhancement_level, promptVersion: SYSTEM_PROMPT_VERSION });
         }
@@ -201,6 +212,15 @@ export default function App() {
     } catch (cause) {
       if (generationId !== generationRef.current) return;
       setState("error"); setError(cause instanceof Error ? cause.message : String(cause));
+      // G11：失败时**保留上一版已付费的结果**，并如实标注它是上一次的。
+      // 诚实的定义是「用户知道自己在看什么」，不是把东西藏起来 ——
+      // 清空会让一次网络抖动变成真实的金钱损失。
+      if (previousResult) {
+        setResult(previousResult);
+        setOutput(previousResult.primary_prompt);
+        setResultAt(previousResultAt);
+        setNotices((prev) => [...prev, staleResultNotice(previousResultAt)]);
+      }
     }
   };
 
@@ -292,12 +312,18 @@ export default function App() {
   const saveProvider = async (modelsOverride?: string[]) => {
     setSavingProvider(true); setProviderMessage("");
     try {
-      if (apiKeyDraft) await validateProvider(apiKeyDraft, provider.baseUrl);
+      // G9：**验证与保存是两件事**。
+      // 此前只在 apiKeyDraft 非空时才 validateProvider，却无条件显示
+      // 「连接验证成功，配置已保存」—— Key 留空时（用户只想改模型列表）
+      // 一次网络请求都没发，界面照样宣称验证成功。
+      const didValidate = Boolean(apiKeyDraft);
+      if (didValidate) await validateProvider(apiKeyDraft as string, provider.baseUrl);
       const models = [...new Set(modelsOverride ?? provider.models)].filter((id) => id.trim());
       if (!models.length) throw new Error("自定义模型列表不能为空");
       if (!models.includes(provider.defaultModel)) models.unshift(provider.defaultModel);
       const next = { ...provider, models, hasApiKey: Boolean(apiKeyDraft || provider.hasApiKey) };
-      await saveProviderConfig(next, apiKeyDraft || undefined); setProvider({ ...provider, models, hasApiKey: next.hasApiKey }); setApiKeyDraft(""); setProviderMessage("连接验证成功，配置已保存");
+      await saveProviderConfig(next, apiKeyDraft || undefined); setProvider({ ...provider, models, hasApiKey: next.hasApiKey }); setApiKeyDraft("");
+      setProviderMessage(buildProviderSaveMessage({ validated: didValidate, keyWritten: Boolean(apiKeyDraft) }));
     } catch (cause) { setProviderMessage(cause instanceof Error ? cause.message : String(cause)); }
     finally { setSavingProvider(false); }
   };
