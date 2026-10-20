@@ -14,7 +14,7 @@ use tauri::{AppHandle, Manager};
 use zip::{CompressionMethod, ZipArchive, ZipWriter, write::SimpleFileOptions};
 
 const SERVICE: &str = "PromptCraft";
-const API_KEY_ACCOUNT: &str = "deepseek-api-key";
+pub(crate) const API_KEY_ACCOUNT: &str = "deepseek-api-key";
 const DB_KEY_ACCOUNT: &str = "database-key";
 const ARCHIVE_SCHEMA_VERSION: u8 = 1;
 const MAX_ARCHIVE_BYTES: u64 = 100 * 1024 * 1024;

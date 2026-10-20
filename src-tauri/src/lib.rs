@@ -4,6 +4,10 @@ mod attachments;
 #[cfg(test)]
 mod claims;
 mod models;
+/// WP0 端到端探针（P0-1 / P0-2 / P0-3）。只在测试构建里存在，
+/// 运行入口是 tools\probe-p0-baseline.ps1。
+#[cfg(test)]
+mod probe;
 mod prompts;
 mod provider;
 mod security;
