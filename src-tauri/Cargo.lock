@@ -3005,7 +3005,7 @@ dependencies = [
  "open",
  "pdf-extract",
  "quick-xml 0.38.4",
- "rand 0.9.5",
+ "rand 0.10.2",
  "regex",
  "reqwest 0.12.28",
  "rusqlite",
