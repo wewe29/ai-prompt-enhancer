@@ -571,8 +571,18 @@ impl Storage {
             params![uuid::Uuid::new_v4().to_string(), model, input_tokens, output_tokens, cost, duration_ms, status, error_code, Utc::now().to_rfc3339()],
         ).map_err(|error| error.to_string())?;
         let month_prefix = Utc::now().format("%Y-%m").to_string();
+        // 月度累计必须统计**全部**实际消耗：success + partial + fallback + error。
+        //
+        // 此前这里带 `AND status='success'` 过滤，于是：
+        // * 部分交付（partial）与原文回退（fallback）的真实消耗被归零；
+        // * 失败请求的消耗也一并消失。
+        // 用户已经真实付费的 token 在额度面板上显示为 0，
+        // 强制额度拦截随之失效（A12）。
+        //
+        // 口径说明：各条记录的 estimated_cost 都是按本机单价估出来的，
+        // 失败请求按"请求已发出"记输入估算成本（保守，宁可略高不可略低于真实账单）。
         connection.query_row(
-            "SELECT COALESCE(SUM(estimated_cost),0) FROM usage_records WHERE substr(created_at,1,7)=?1 AND status='success'",
+            "SELECT COALESCE(SUM(estimated_cost),0) FROM usage_records WHERE substr(created_at,1,7)=?1",
             [month_prefix], |row| row.get(0),
         ).map_err(|error| error.to_string())
     }
@@ -733,10 +743,35 @@ fn get_or_create_database_key(credential_service: &str) -> Result<String, String
     }
     let bytes: [u8; 32] = rand::random();
     let key = hex::encode(bytes);
-    entry
-        .set_password(&key)
-        .map_err(|error| format!("无法保存数据库密钥：{error}"))?;
-    Ok(key)
+    // 写入后**读回校验**。
+    //
+    // Windows 凭据管理器在并发访问时会静默失败（keyring 既不重试也不报错）：
+    // 密钥"写成功了"但读不回来 ⇒ 下次开库会生成一把新密钥 ⇒
+    // 数据库文件在、密钥对不上 ⇒ 用户看到 "hmac check failed"，
+    // 历史记录整个打不开，而且没有任何解释。
+    //
+    // 重试时**始终使用同一把 key**：即使写入其实成功了、只是读回抖了一下，
+    // 重写同一把 key 也不会把用户已有的库变成解不开的库。
+    let mut last_error = "未知错误".to_string();
+    for attempt in 0..5 {
+        match entry.set_password(&key) {
+            Ok(()) => {}
+            Err(error) => {
+                last_error = error.to_string();
+                std::thread::sleep(std::time::Duration::from_millis(20 * (attempt + 1)));
+                continue;
+            }
+        }
+        match entry.get_password() {
+            Ok(stored) if stored == key => return Ok(key),
+            // 另一个写者赢了这一轮：用它读回来的那一把，别自己再写一遍。
+            Ok(stored) if !stored.is_empty() => return Ok(stored),
+            Ok(_) => last_error = "写入的数据库密钥读回为空".into(),
+            Err(error) => last_error = error.to_string(),
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20 * (attempt + 1)));
+    }
+    Err(format!("无法保存数据库密钥：{last_error}"))
 }
 
 #[cfg(test)]

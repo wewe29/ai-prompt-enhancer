@@ -1,6 +1,6 @@
 use crate::{
     AppState,
-    models::{BackendEvent, EnhancementRequest, EnhancementResult, UsageRecord},
+    models::{BackendEvent, DeliveryFailure, EnhancementRequest, EnhancementResult, UsageRecord},
     prompts::{SYSTEM_PROMPT, SYSTEM_PROMPT_VERSION, verbosity_label},
     security::redact_sensitive,
 };
@@ -56,12 +56,27 @@ pub async fn enhance(
             "error",
             Some("REQUEST_INVALID"),
         );
+        report_failure(&on_event, "REQUEST_INVALID", &message);
         return Err(message);
     }
-    let api_key = state.storage.api_key()?;
-    let config = state.storage.provider_config()?;
+    let api_key = match state.storage.api_key() {
+        Ok(key) => key,
+        Err(error) => {
+            report_failure(&on_event, "CREDENTIAL_UNAVAILABLE", &error);
+            return Err(error);
+        }
+    };
+    let config = match state.storage.provider_config() {
+        Ok(config) => config,
+        Err(error) => {
+            report_failure(&on_event, "CONFIG_UNAVAILABLE", &error);
+            return Err(error);
+        }
+    };
     if request.model.trim().is_empty() {
-        return Err("所选模型没有可用的 API model_id".into());
+        let message = "所选模型没有可用的 API model_id".to_string();
+        report_failure(&on_event, "MODEL_UNAVAILABLE", &message);
+        return Err(message);
     }
 
     let token = CancellationToken::new();
@@ -109,15 +124,18 @@ pub async fn enhance(
                 if status.is_server_error() && attempt == 0 {
                     continue;
                 }
+                let code = error_code_for_status(status.as_u16());
                 record_error_usage(
                     &state,
                     &request,
                     config.input_price,
                     config.output_price,
                     started.elapsed().as_millis() as u64,
-                    error_code_for_status(status.as_u16()),
+                    code,
                 );
-                return Err(map_http_error(status.as_u16(), &message));
+                let mapped = map_http_error(status.as_u16(), &message);
+                report_failure(&on_event, code, &mapped);
+                return Err(mapped);
             }
             Err(error) if attempt == 0 && (error.is_connect() || error.is_timeout()) => continue,
             Err(error) => {
@@ -130,7 +148,9 @@ pub async fn enhance(
                     started.elapsed().as_millis() as u64,
                     code,
                 );
-                return Err(format!("网络请求失败（{code}），输入内容仍已保留：{error}"));
+                let message = format!("网络请求失败（{code}），输入内容仍已保留：{error}");
+                report_failure(&on_event, code, &message);
+                return Err(message);
             }
         };
         let (raw, wire_usage) = match consume_stream(response, &on_event, token.clone()).await {
@@ -145,7 +165,9 @@ pub async fn enhance(
                     started.elapsed().as_millis() as u64,
                     "STREAM_INTERRUPTED",
                 );
-                return Err(format!("{error}，已自动重试一次"));
+                let message = format!("{error}，已自动重试一次");
+                report_failure(&on_event, "STREAM_INTERRUPTED", &message);
+                return Err(message);
             }
         };
         if token.is_cancelled() {
@@ -189,10 +211,18 @@ pub async fn enhance(
         });
         match parsed {
             Ok(mut result) => {
+                // 交付状态**由后端决定**，模型给的值不可信。
+                // （此前 models.rs 的 `#[serde(default = "default_delivery_status")]`
+                // 会在模型漏给这个字段时补成 "complete" —— 缺数据被当成没问题。）
+                result.delivery_status = Some("complete".into());
                 let error_code = match validate_complete_result(&result, &request.original_text) {
                     Ok(()) => None,
                     Err(_) => {
-                        result.delivery_status = "partial".into();
+                        result.delivery_status = Some("partial".into());
+                        result.failure_reason = Some(DeliveryFailure {
+                            code: "STRUCTURE_PARTIAL".into(),
+                            message: "模型返回的增强结构不完整，主提示词仍可使用。".into(),
+                        });
                         result
                             .notices
                             .push("模型返回不完整的增强结构，主提示词仍可使用。".into());
@@ -218,7 +248,7 @@ pub async fn enhance(
                     Some(prompt) => partial_result(prompt),
                     None => fallback_result(&request.original_text),
                 };
-                let code = if result.delivery_status == "partial" {
+                let code = if result.delivery_status.as_deref() == Some("partial") {
                     "STRUCTURE_PARTIAL"
                 } else {
                     "STRUCTURE_FALLBACK"
@@ -228,8 +258,14 @@ pub async fn enhance(
             }
         }
     }
-    let (result, wire_usage, error_code) =
-        outcome.ok_or_else(|| "DeepSeek 服务暂时不可用，已自动重试一次".to_string())?;
+    let (result, wire_usage, error_code) = match outcome {
+        Some(outcome) => outcome,
+        None => {
+            let message = "DeepSeek 服务暂时不可用，已自动重试一次".to_string();
+            report_failure(&on_event, "NO_OUTCOME", &message);
+            return Err(message);
+        }
+    };
 
     let input_tokens = wire_usage
         .prompt_tokens
@@ -244,43 +280,34 @@ pub async fn enhance(
         config.output_price,
     );
     let duration_ms = started.elapsed().as_millis() as u64;
-    let month_total = match error_code {
-        Some(code) => {
-            let _ = state.storage.record_usage(
-                &request.model,
-                input_tokens,
-                output_tokens,
-                estimated_cost,
-                duration_ms,
-                "error",
-                Some(code),
-            );
-            0.0
-        }
-        None => state
-            .storage
-            .record_usage(
-                &request.model,
-                input_tokens,
-                output_tokens,
-                estimated_cost,
-                duration_ms,
-                "success",
-                None,
-            )
-            .unwrap_or_else(|_| {
-                let _ = state.storage.record_usage(
-                    &request.model,
-                    input_tokens,
-                    output_tokens,
-                    estimated_cost,
-                    duration_ms,
-                    "error",
-                    Some("STORAGE_FAILED"),
-                );
-                0.0
-            }),
+    // A12：失败 / 部分交付的真实消耗**必须**计入月度累计。
+    //
+    // 此前 error_code 分支返回 month_total = 0.0，而 storage.rs 的月度 SUM
+    // 又只统计 status='success' ⇒ 用户已经真实付费的 token 在额度面板上显示为 0，
+    // 强制额度拦截随之失效（部分交付越多，额度统计偏得越多）。
+    //
+    // 现在：
+    // * 结构类失败（partial / fallback）用真实估算成本入账，状态记 partial；
+    // * 其余失败记 error，同样入账（storage 的月度 SUM 统计全部状态）；
+    // * 用量写库失败时 month_total = None（不可判定），**不再**回落成 0.0 ——
+    //   0.0 会被前端当成"本月没花过钱"，拦截随之失效。
+    let usage_status = match error_code {
+        Some(code) if code == "STRUCTURE_PARTIAL" || code == "STRUCTURE_FALLBACK" => "partial",
+        Some(_) => "error",
+        None => "success",
     };
+    let month_total = state
+        .storage
+        .record_usage(
+            &request.model,
+            input_tokens,
+            output_tokens,
+            estimated_cost,
+            duration_ms,
+            usage_status,
+            error_code,
+        )
+        .ok();
     on_event
         .send(BackendEvent::Result { result })
         .map_err(|error| error.to_string())?;
@@ -745,11 +772,11 @@ fn validate_complete_result(result: &EnhancementResult, original: &str) -> Resul
     if !TASK_TYPES.contains(&result.task_type.as_str()) {
         return Err("模型返回了无效任务类型，请重新生成".into());
     }
-    if !matches!(
-        result.enhancement_level.as_str(),
-        "none" | "light" | "clarify"
-    ) {
-        return Err("模型返回了无效增强等级，请重新生成".into());
+    // 档位必须由模型真的给出。模型没给或给了非法值 ⇒ 不可判定（fail-closed），
+    // 不得回落成 "light"：那等于替模型编了一次它没做过的判断。
+    match result.enhancement_level.as_deref() {
+        Some("none" | "light" | "clarify") => {}
+        _ => return Err("模型返回了无效增强等级，请重新生成".into()),
     }
     Ok(())
 }
@@ -839,6 +866,19 @@ fn error_code_for_transport(error: &reqwest::Error) -> &'static str {
     }
 }
 
+/// 向事件通道报告一次失败。
+///
+/// B5：失败必须**同时**走两条路 ——
+/// 事件通道（前端在流式中途就能看到）与命令的 Err 返回（权威失败通道）。
+/// 只走一条就会"契约说谎"：要么前端留着一个永远不可达的 `error` 分支，
+/// 要么失败在前端完全不可见。
+fn report_failure(on_event: &Channel<BackendEvent>, code: &str, message: &str) {
+    let _ = on_event.send(BackendEvent::Error {
+        code: code.to_string(),
+        message: message.to_string(),
+    });
+}
+
 fn record_error_usage(
     state: &State<'_, AppState>,
     request: &EnhancementRequest,
@@ -860,6 +900,11 @@ fn record_error_usage(
     );
 }
 
+/// 结构不完整、但仍拿到了主提示词：交付 **部分**。
+///
+/// 档位必须是 `None`：这条路径上模型**没有**给出过任何档位判断。
+/// 此前硬编码 `enhancement_level: "none"`，等于宣称"模型判断过无需修改"，
+/// 而模型压根没参与这次判断 —— 一个从未发生过的判断（E1）。
 fn partial_result(prompt: String) -> EnhancementResult {
     EnhancementResult {
         status: "ready".into(),
@@ -872,12 +917,20 @@ fn partial_result(prompt: String) -> EnhancementResult {
         risk_flags: Vec::new(),
         facts: Vec::new(),
         candidates: Vec::new(),
-        delivery_status: "partial".into(),
-        enhancement_level: "none".into(),
+        delivery_status: Some("partial".into()),
+        enhancement_level: None,
+        failure_reason: Some(DeliveryFailure {
+            code: "STRUCTURE_PARTIAL".into(),
+            message: "模型返回的增强结构不完整，本次只交付了主提示词。".into(),
+        }),
         notices: vec!["模型返回不完整的增强结构，主提示词仍可使用。".into()],
     }
 }
 
+/// 结构彻底解析失败、原文回退：交付 **回退**。
+///
+/// 同样：档位是 `None`，失败原因走**独立字段** `failure_reason`，
+/// 不得复用 `enhancement_level` 表达"结构解析失败"（E1）。
 fn fallback_result(original: &str) -> EnhancementResult {
     EnhancementResult {
         status: "ready".into(),
@@ -890,8 +943,12 @@ fn fallback_result(original: &str) -> EnhancementResult {
         risk_flags: Vec::new(),
         facts: Vec::new(),
         candidates: Vec::new(),
-        delivery_status: "fallback".into(),
-        enhancement_level: "none".into(),
+        delivery_status: Some("fallback".into()),
+        enhancement_level: None,
+        failure_reason: Some(DeliveryFailure {
+            code: "STRUCTURE_FALLBACK".into(),
+            message: "增强服务未返回可用结构，本次已保留原始提示词。".into(),
+        }),
         notices: vec!["增强服务未返回可用结构，本次已保留原始提示词".into()],
     }
 }
@@ -972,8 +1029,9 @@ mod tests {
             risk_flags: Vec::new(),
             facts: Vec::new(),
             candidates: Vec::new(),
-            delivery_status: "complete".into(),
-            enhancement_level: "light".into(),
+            delivery_status: Some("complete".into()),
+            enhancement_level: Some("light".into()),
+            failure_reason: None,
             notices: Vec::new(),
         };
         assert!(validate_core_result(&result).is_ok());
@@ -1059,8 +1117,9 @@ mod tests {
             risk_flags: Vec::new(),
             facts: Vec::new(),
             candidates: Vec::new(),
-            delivery_status: "complete".into(),
-            enhancement_level: "light".into(),
+            delivery_status: Some("complete".into()),
+            enhancement_level: Some("light".into()),
+            failure_reason: None,
             notices: Vec::new(),
         };
         assert!(validate_core_result(&result).is_ok());
@@ -1137,16 +1196,64 @@ mod tests {
     }
 
     #[test]
-    fn fallback_keeps_original_text() {
+    fn fallback_keeps_original_text_and_claims_no_judgement() {
+        // 回归测试（E1）：结构解析彻底失败时构造 fallback 结果并返回成功，
+        // 而 fallback 的 enhancement_level 硬编码 none ⇒
+        // 「增强失败」被表达成「增强器判断不需要增强」—— 一个从未发生过的判断。
+        //
+        // 现在：档位必须是 None（模型没做过判断），失败原因走独立字段。
         let result = fallback_result("  保留原文提示词  ");
         assert_eq!(result.primary_prompt, "保留原文提示词");
-        assert_eq!(result.delivery_status, "fallback");
-        assert_eq!(result.enhancement_level, "none");
+        assert_eq!(result.delivery_status.as_deref(), Some("fallback"));
+        assert!(
+            result.enhancement_level.is_none(),
+            "回退路径不得给出任何档位判断（曾硬编码 none）"
+        );
+        let failure = result
+            .failure_reason
+            .as_ref()
+            .expect("回退必须携带自己的失败原因");
+        assert_eq!(failure.code, "STRUCTURE_FALLBACK");
+        assert!(!failure.message.is_empty(), "失败原因必须有一句人话");
         assert!(
             result
                 .notices
                 .iter()
                 .any(|notice| notice.contains("已保留原始提示词"))
+        );
+    }
+
+    #[test]
+    fn partial_delivery_claims_no_judgement_either() {
+        // 同型第二处：partial_result 此前也把档位硬编码成 none。
+        let result = partial_result("半个提示词".into());
+        assert_eq!(result.delivery_status.as_deref(), Some("partial"));
+        assert!(
+            result.enhancement_level.is_none(),
+            "部分交付路径不得给出任何档位判断（曾硬编码 none）"
+        );
+        assert_eq!(
+            result.failure_reason.as_ref().map(|failure| failure.code.as_str()),
+            Some("STRUCTURE_PARTIAL")
+        );
+    }
+
+    #[test]
+    fn a_model_without_enhancement_level_is_not_given_one_by_us() {
+        // fail-closed：模型没给档位 ⇒ 不可判定，不得回落成 "light"。
+        // 回落成 light 等于替模型编了一次它没做过的判断。
+        let mut value = complete_body();
+        value.as_object_mut().unwrap().remove("enhancement_level");
+        let parsed = parse_enhancement(&value.to_string()).and_then(|value| {
+            let (value, _) = normalize_value(value);
+            let result = serde_json::from_value::<EnhancementResult>(value)
+                .map_err(|_| "无法解析".to_string())?;
+            validate_complete_result(&result, "解释这段代码")?;
+            Ok(result)
+        });
+        assert!(
+            parsed.is_err(),
+            "模型缺档位时不得被判为完整交付（曾回落成 light）"
         );
     }
 
@@ -1427,9 +1534,11 @@ mod tests {
         body.as_object_mut().unwrap().remove("status");
         cases.push(case(body.to_string(), true));
 
+        // 缺 enhancement_level：系统提示词把它列为必填字段，
+        // 缺它 ⇒ 档位不可判定 ⇒ 按新契约是"部分交付"，不是完整交付。
         let mut body = complete_body();
         body.as_object_mut().unwrap().remove("enhancement_level");
-        cases.push(case(body.to_string(), true));
+        cases.push(case(body.to_string(), false));
 
         // Extra complete recovery variants.
         for index in 0..4 {
@@ -1455,9 +1564,11 @@ mod tests {
         for index in 0..4 {
             let mut body = complete_body();
             body.as_object_mut().unwrap().remove("delivery_status");
+            // delivery_status 现在由后端决定，模型给不给都无所谓；
+            // 但 enhancement_level 是模型的判断，缺了就不可判定 ⇒ 部分交付。
             body.as_object_mut().unwrap().remove("enhancement_level");
             body["primary_prompt"] = json!(format!("默认字段提示词 {index}"));
-            cases.push(case(body.to_string(), true));
+            cases.push(case(body.to_string(), false));
         }
         for index in 0..4 {
             let mut body = complete_body();
@@ -1511,8 +1622,13 @@ mod tests {
         });
         match parsed {
             Ok(mut result) => {
+                result.delivery_status = Some("complete".into());
                 if validate_complete_result(&result, original).is_err() {
-                    result.delivery_status = "partial".into();
+                    result.delivery_status = Some("partial".into());
+                    result.failure_reason = Some(DeliveryFailure {
+                        code: "STRUCTURE_PARTIAL".into(),
+                        message: "模型返回的增强结构不完整，主提示词仍可使用。".into(),
+                    });
                     result
                         .notices
                         .push("模型返回不完整的增强结构，主提示词仍可使用。".into());
@@ -1537,15 +1653,15 @@ mod tests {
         for (index, item) in cases.iter().enumerate() {
             assert!(item.is_deliverable, "case {index}: 标记为可交付");
             let result = deliver_structure(&item.raw, ORIGINAL);
-            match result.delivery_status.as_str() {
-                "complete" => {
+            match result.delivery_status.as_deref() {
+                Some("complete") => {
                     complete_count += 1;
                     assert!(
                         item.expect_complete,
                         "case {index}: 预期非 complete，实际 complete"
                     );
                 }
-                "partial" => {
+                Some("partial") => {
                     partial_count += 1;
                     assert!(
                         !item.expect_complete,
@@ -1556,7 +1672,7 @@ mod tests {
                         "case {index}: partial 必须有主提示词"
                     );
                 }
-                "fallback" => {
+                Some("fallback") => {
                     fallback_count += 1;
                     assert!(
                         !item.expect_complete,
@@ -1579,7 +1695,7 @@ mod tests {
                         "case {index}: fallback 不得虚构问题"
                     );
                 }
-                other => panic!("case {index}: 未知交付状态 {other}"),
+                other => panic!("case {index}: 未知交付状态 {other:?}"),
             }
         }
         assert_eq!(
@@ -1587,13 +1703,22 @@ mod tests {
             100,
             "可交付率必须为 100%"
         );
-        assert!(
-            complete_count >= 95,
-            "完整结构成功率必须不低于 95%，实际 {complete_count}"
+        // 契约变更（E1）：模型**必须**给出 enhancement_level（系统提示词把它列为必填字段）。
+        // 缺这个字段 ⇒ 档位不可判定 ⇒ 按新契约判为"部分交付"，
+        // 而不是替模型回落成 "light"（那等于编了一次它没做过的判断）。
+        //
+        // 100 个用例的完整分布：
+        // * 91 完整交付
+        // * 5 部分交付（删掉了必填的 enhancement_level）—— 新契约带来的
+        // * 1 部分交付（primary_prompt 里留着 XXX 占位符）—— 原有
+        // * 3 原文回退（空载荷 / 纯文本 / 未闭合对象）—— 原有
+        assert_eq!(
+            complete_count, 91,
+            "完整结构成功率必须为 91/100（5 个用例缺必填的 enhancement_level，按新契约判为部分交付），实际 {complete_count}"
         );
-        assert!(
-            partial_count + fallback_count <= 5,
-            "非完整交付不得超过 5 条，实际 {}",
+        assert_eq!(
+            partial_count + fallback_count, 9,
+            "非完整交付必须恰好是 5 个缺 enhancement_level + 1 个 XXX 占位符 + 3 个不可解析，实际 {}",
             partial_count + fallback_count
         );
     }
