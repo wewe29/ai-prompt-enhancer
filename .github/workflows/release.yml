@@ -1,0 +1,143 @@
+name: Release
+
+# 在 GitHub 的服务器上构建 Windows 便携包并发布 Release。
+#
+# 为什么需要它：**发布不应该依赖某一台机器的网络与工具链。**
+# 2026-10-20 发布 v0.4.0 时，本机到 api.github.com 的 HTTPS 通路整个不通
+# （直连超时、代理上游 502、gh 报 EOF），只有 SSH 可用 —— 分支与 tag 能推，
+# 但 Release 只能靠 GitHub 自己来做。工作流跑在 GitHub 的 runner 上，
+# 不受本机网络影响。
+#
+# 触发：
+#   - 推送 v* tag（tag 必须在**包含本文件**的提交上，否则不会触发）
+#   - 手动 workflow_dispatch（分支选 release/v0.4.0，tag 参数填要发布的 tag）
+#
+# 纪律：发布前必须跑完三套回归。**发一个没跑过测试的构建是没有意义的。**
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要发布的 tag（例如 v0.4.0）'
+        required: true
+        default: 'v0.4.0'
+      ref:
+        description: '构建所用的 ref（默认该 tag 指向的提交）'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build portable package and publish release
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Resolve tag and ref
+        id: target
+        shell: pwsh
+        run: |
+          $tag = '${{ github.event.inputs.tag }}'
+          if (-not $tag) { $tag = '${{ github.ref_name }}' }
+          $ref = '${{ github.event.inputs.ref }}'
+          if (-not $ref) { $ref = $tag }
+          $version = $tag -replace '^v', ''
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "ref=$ref" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          Write-Host "[release] tag=$tag ref=$ref version=$version"
+
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.target.outputs.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install frontend dependencies
+        run: npm.cmd ci
+
+      - name: Install OpenSSL development files
+        shell: pwsh
+        run: |
+          vcpkg install openssl:x64-windows
+          $prefix = Join-Path $env:VCPKG_INSTALLATION_ROOT 'installed\x64-windows'
+          "OPENSSL_DIR=$prefix" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "OPENSSL_INCLUDE_DIR=$prefix\include" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "OPENSSL_LIB_DIR=$prefix\lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          # build-portable.ps1 从 $env:OPENSSL_DIR\bin 复制运行库 DLL
+          Add-Content -Path $env:GITHUB_PATH -Value "$prefix\bin"
+
+      - name: Run frontend tests
+        run: npm.cmd test
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: python -m pip install -r evaluation/requirements.txt
+
+      - name: Run evaluation unit tests
+        run: python -m pytest evaluation -q
+
+      - name: Run Rust tests
+        run: cargo test --manifest-path src-tauri\Cargo.toml
+
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path src-tauri\Cargo.toml --all -- --check
+
+      - name: Build portable package
+        shell: pwsh
+        run: |
+          $version = '${{ steps.target.outputs.version }}'
+          Write-Host "[release] building version $version"
+          $env:PROMPTCRAFT_NO_CARGO_REDIRECT = '1'
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-portable.ps1
+          $zip = "release\PromptCraft-$version-windows-x64-portable.zip"
+          if (-not (Test-Path $zip)) { throw "便携包未生成：$zip" }
+          $shaFile = "release-assets\SHA256-zip.txt"
+          $actual = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          $declared = ((Get-Content $shaFile -Raw) -split '\s+')[0].ToLower()
+          if ($actual -ne $declared) {
+            throw "SHA-256 不一致：实际 $actual 声明 $declared"
+          }
+          Write-Host "[release] SHA-256 校验通过：$actual"
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.target.outputs.tag }}
+          name: PromptCraft ${{ steps.target.outputs.tag }} — 诚实性闭环：41 条「失败显示成成功」全部关掉（不含效果宣称）
+          body_path: release-assets/RELEASE_NOTES-v0.4.0.md
+          fail_on_unmatched_files: true
+          files: |
+            release/PromptCraft-${{ steps.target.outputs.version }}-windows-x64-portable.zip
+            release-assets/SHA256-zip.txt
+            release-assets/README.txt
+
+      - name: Summary
+        shell: pwsh
+        run: |
+          $tag = '${{ steps.target.outputs.tag }}'
+          $version = '${{ steps.target.outputs.version }}'
+          Write-Host ""
+          Write-Host "[release] 完成"
+          Write-Host "  Release : https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$tag"
+          Write-Host "  产物    : release\PromptCraft-$version-windows-x64-portable.zip"
