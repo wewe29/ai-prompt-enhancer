@@ -37,7 +37,7 @@
       "script_status": "REBUILT",
       "script_note": "原脚本随 F: 盘丢失。2026-10-20 按报告给出的指标口径重建，判据写进代码；新增 evaluation/test_v040_measurement.py（26 例离线）钉住口径。",
       "raw_artifact": null,
-      "raw_status": "LOST",
+      "raw_status": "ARCHIVED",
       "conditions": {
         "model": "deepseek-flash",
         "temperature": 0.35,
@@ -47,7 +47,180 @@
       },
       "conclusions": "docs/evaluation-data-v040/conclusions/stability_v040.json",
       "reproduce": "py -3 evaluation/verify_stability.py --repeats 3",
-      "api_calls": 180
+      "api_calls": 180,
+      "archived_artifacts": [
+        {
+          "file": "docs/evaluation-data-v040/stability/v040_stability_raw__m-deepseek-flash__t0.35__r3__7b2b4ea682.json",
+          "bytes": 56256,
+          "sha256": "d1f3d800c3435f9ed97121919d529d8c30199653f3031c621d7b32ab6dc0deca"
+        },
+        {
+          "file": "docs/evaluation-data-v040/stability/v040_stability_summary__m-deepseek-flash__t0.35__r3__7b2b4ea682.json",
+          "bytes": 2836,
+          "sha256": "4cf2e5d1640056af2f33f99bb262cd3fc60c10514b71c39028668aed037f056d"
+        }
+      ],
+      "archived_at": "2026-10-20T17:30:51+00:00",
+      "reproduction_check": {
+        "rows": [
+          {
+            "scope": "clear",
+            "metric": "samples",
+            "report": 20,
+            "rerun": 20,
+            "same": true
+          },
+          {
+            "scope": "clear",
+            "metric": "consistent",
+            "report": 9,
+            "rerun": 11,
+            "same": false
+          },
+          {
+            "scope": "clear",
+            "metric": "drifted",
+            "report": 11,
+            "rerun": 9,
+            "same": false
+          },
+          {
+            "scope": "clear",
+            "metric": "level_combos",
+            "report": {
+              "none+light": 10,
+              "light": 5,
+              "none": 4,
+              "light+clarify": 1
+            },
+            "rerun": {
+              "none": 7,
+              "none+light": 7,
+              "light": 4,
+              "light+clarify": 2
+            },
+            "same": false
+          },
+          {
+            "scope": "clear",
+            "metric": "none_light_boundary.samples",
+            "report": 20,
+            "rerun": 20,
+            "same": true
+          },
+          {
+            "scope": "clear",
+            "metric": "none_light_boundary.flipped",
+            "report": 11,
+            "rerun": 9,
+            "same": false
+          },
+          {
+            "scope": "clear",
+            "metric": "none_light_boundary.flip_rate",
+            "report": 0.55,
+            "rerun": 0.45,
+            "same": false
+          },
+          {
+            "scope": "medium",
+            "metric": "samples",
+            "report": 20,
+            "rerun": 20,
+            "same": true
+          },
+          {
+            "scope": "medium",
+            "metric": "consistent",
+            "report": 14,
+            "rerun": 18,
+            "same": false
+          },
+          {
+            "scope": "medium",
+            "metric": "drifted",
+            "report": 6,
+            "rerun": 2,
+            "same": false
+          },
+          {
+            "scope": "medium",
+            "metric": "level_combos",
+            "report": {
+              "light": 12,
+              "none+light": 4,
+              "clarify": 2,
+              "light+clarify": 2
+            },
+            "rerun": {
+              "light": 16,
+              "clarify": 2,
+              "light+clarify": 1,
+              "none+light": 1
+            },
+            "same": false
+          },
+          {
+            "scope": "medium",
+            "metric": "none_light_boundary.samples",
+            "report": 18,
+            "rerun": 18,
+            "same": true
+          },
+          {
+            "scope": "medium",
+            "metric": "none_light_boundary.flipped",
+            "report": 6,
+            "rerun": 2,
+            "same": false
+          },
+          {
+            "scope": "medium",
+            "metric": "none_light_boundary.flip_rate",
+            "report": 0.33,
+            "rerun": 0.1111,
+            "same": false
+          },
+          {
+            "scope": "severe",
+            "metric": "samples",
+            "report": 20,
+            "rerun": 20,
+            "same": true
+          },
+          {
+            "scope": "severe",
+            "metric": "consistent",
+            "report": 20,
+            "rerun": 20,
+            "same": true
+          },
+          {
+            "scope": "severe",
+            "metric": "drifted",
+            "report": 0,
+            "rerun": 0,
+            "same": true
+          },
+          {
+            "scope": "severe",
+            "metric": "level_combos",
+            "report": {
+              "clarify": 19,
+              "light": 1
+            },
+            "rerun": {
+              "clarify": 19,
+              "light": 1
+            },
+            "same": true
+          }
+        ],
+        "matched": 8,
+        "total": 18,
+        "all_same": false,
+        "note": "对账口径：**数字一致 ≠ 结论一致**。本轮实验的条件与原实验相同（同模型、同温度、同提示词、同样本集），但两者是**不同时间点的独立运行**，因此档位分布的差异属于**运行间波动**，正是效果验证官测出的 41 点噪声地板的体现。逐项差异本身即是证据。"
+      }
     },
     {
       "id": "severe_blind",

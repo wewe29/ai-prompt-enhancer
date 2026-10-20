@@ -1,0 +1,106 @@
+{
+  "_identity": {
+    "fields": {
+      "prompt_version": "promptcraft-v2.2.0",
+      "prompt_sha256": "5705ebf9220e57129d9becf77452c473b1847be23a64803cf3e1bca2346b794d",
+      "model": "deepseek-flash",
+      "temperature": 0.35,
+      "samples_sha256": "0865542e383ecff400d472bf9aef9074b1e0d7602de8c7a1e854cdaba14ccd41",
+      "repeats": 3
+    },
+    "tag": "7b2b4ea682",
+    "created_at": "2026-10-20T16:55:35+00:00"
+  },
+  "metrics": {
+    "by_difficulty": {
+      "clear": {
+        "samples": 20,
+        "consistent": 11,
+        "drifted": 9,
+        "consistent_rate": 0.55,
+        "level_combos": {
+          "none": 7,
+          "none+light": 7,
+          "light": 4,
+          "light+clarify": 2
+        },
+        "none_light_boundary": {
+          "samples": 20,
+          "flipped": 9,
+          "flip_rate": 0.45,
+          "strict_samples": 18,
+          "strict_flipped": 7,
+          "flip_rate_strict": 0.3889,
+          "length_spread_avg": 0.7413,
+          "length_spread_max": 3.3095,
+          "delivery_status_drift": 0
+        },
+        "per_click_disagreement": {
+          "disagree_calls": 9,
+          "total_calls": 60,
+          "rate": 0.15
+        }
+      },
+      "medium": {
+        "samples": 20,
+        "consistent": 18,
+        "drifted": 2,
+        "consistent_rate": 0.9,
+        "level_combos": {
+          "light": 16,
+          "clarify": 2,
+          "light+clarify": 1,
+          "none+light": 1
+        },
+        "none_light_boundary": {
+          "samples": 18,
+          "flipped": 2,
+          "flip_rate": 0.1111,
+          "strict_samples": 17,
+          "strict_flipped": 1,
+          "flip_rate_strict": 0.0588,
+          "length_spread_avg": 0.9797,
+          "length_spread_max": 2.6864,
+          "delivery_status_drift": 0
+        },
+        "per_click_disagreement": {
+          "disagree_calls": 2,
+          "total_calls": 60,
+          "rate": 0.0333
+        }
+      },
+      "severe": {
+        "samples": 20,
+        "consistent": 20,
+        "drifted": 0,
+        "consistent_rate": 1.0,
+        "level_combos": {
+          "clarify": 19,
+          "light": 1
+        },
+        "none_light_boundary": {
+          "samples": 1,
+          "flipped": 0,
+          "flip_rate": 0.0,
+          "strict_samples": 1,
+          "strict_flipped": 0,
+          "flip_rate_strict": 0.0,
+          "length_spread_avg": 6.7845,
+          "length_spread_max": 29.875,
+          "delivery_status_drift": 0
+        },
+        "per_click_disagreement": {
+          "disagree_calls": 0,
+          "total_calls": 60,
+          "rate": 0.0
+        }
+      }
+    },
+    "totals": {
+      "records": 180,
+      "samples": 60,
+      "errors": 0,
+      "error_samples": 0
+    }
+  }
+}
