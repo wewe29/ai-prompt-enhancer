@@ -643,6 +643,26 @@
         "file": "src/App.tsx",
         "pattern": "setState\\(\"streaming\"\\)\\s*;\\s*setResult\\(null\\)"
       }
+    },
+{
+      "id": "G12",
+      "family": "E",
+      "severity": "P1",
+      "layer": "presentation",
+      "file": "src/views/EnhanceView.tsx",
+      "line": 212,
+      "symbol": "增强结果摘要里的「增强等级」标签",
+      "claim": "结果与原文逐字相同时，仍显示「增强等级：轻度增强」",
+      "mechanism": "模型把 primary_prompt 原样返回、却标了 enhancement_level=light 时，界面照抄这个档位标签；而 EnhanceView 里两者都可见，却没有任何「结果与原文相同」的检查",
+      "consequence": "「看起来成功了但其实没干活」—— 用户看到的是一句模型给的、却与屏幕上文字矛盾的断言。恰恰是本产品核心价值主张失效时的表现",
+      "acceptance": "必须检测 primary_prompt 与原文是否实质相同（逐字相同或仅格式差异），命中时把档位标签换成事实陈述（「这一版与你的原文完全相同（没有做出改动）」），不得继续显示判断性档位。需行为级回归测试",
+      "owner": "WP2",
+      "found_by": "产品体验官（方案 A-6.1）/ Chief 核实（2026-10-20）",
+      "probe": {
+        "kind": "required_regex",
+        "file": "src/views/EnhanceView.tsx",
+        "pattern": "primary_prompt[\\s\\S]{0,100}==[\\s\\S]{0,100}original|original[\\s\\S]{0,100}==[\\s\\S]{0,100}primary_prompt"
+      }
     }
   ]
 }

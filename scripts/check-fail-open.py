@@ -97,6 +97,24 @@ def probe_item(item: dict) -> tuple[str, str]:
             return OPEN, f"{rel}:{text.count(chr(10), 0, m.start()) + 1} 仍然存在"
         return FIXED, f"{rel} 已无该模式"
 
+    # ---- required_regex：反向探针。用于「**这个检查必须存在**」的条目。 ----
+    #   多数条目是「坏模式还在不在」（present/absent）；但有一类缺陷是
+    #   **压根没有做某个检查**（例如「结果与原文逐字相同却不提示」），
+    #   这类没有「坏字符串」可找，只能反向要求某段逻辑必须存在。
+    #   语义：找到 ⇒ FIXED；找不到 ⇒ OPEN（不是"无法判定"）。
+    #   保持 fail-closed：文件不存在或正则写坏 ⇒ UNVERIFIED，绝不报 FIXED。
+    if kind == "required_regex":
+        import re
+
+        try:
+            rx = re.compile(pattern)
+        except re.error as exc:  # 探测本身写错 = 未判定，不是通过
+            return UNVERIFIED, f"正则无法编译：{exc}"
+        m = rx.search(text)
+        if m:
+            return FIXED, f"{rel}:{text.count(chr(10), 0, m.start()) + 1} 已出现必需逻辑"
+        return OPEN, f"{rel} 缺少必需逻辑（模式未命中）"
+
     # ---- 块级探测：把「修复有没有落到这一段代码里」变成可机器判定的问题 ----
     if kind in ("guard_in_block", "forbidden_in_block"):
         block_pattern = probe.get("block", "")
