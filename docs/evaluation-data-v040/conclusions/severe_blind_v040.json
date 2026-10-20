@@ -1,0 +1,52 @@
+{
+  "experiment": "severe_blind",
+  "title": "severe 档澄清质量人工盲评（20 条 / 60 个问题）",
+  "source_report": "docs/PromptCraft-v0.4.0-效果验证报告.md",
+  "source_section": "§四",
+  "conditions": {
+    "model": "deepseek-flash",
+    "temperature": 0.35,
+    "prompt_version": "promptcraft-v2.2.0",
+    "shuffle_seed": 20260930,
+    "units": 20,
+    "questions_per_unit": 3
+  },
+  "judgement": {
+    "question": "这组澄清问题里，有几个是「不回答就没法完成任务」的？",
+    "scale": "3 / 2 / 1 / 0",
+    "explicit_warning": "不要因为「解释写得通」或「问得比用户想得细」就算命中 —— 细不等于必要。",
+    "reviewer_blinded_to": ["expected_behavior", "must_preserve", "must_not_add", "enhancement_level", "scenario", "model_name", "sample_id"]
+  },
+  "claims": {
+    "hit_distribution": {"3": 9, "2": 8, "1": 1, "0": 2},
+    "total_hits": 44,
+    "total_questions": 60,
+    "hit_rate": 0.7333,
+    "by_scenario": [
+      {"scenario": "办公写作", "units": 4, "hits": 12, "questions": 12, "hit_rate": 1.0},
+      {"scenario": "编程", "units": 4, "hits": 10, "questions": 12, "hit_rate": 0.8333},
+      {"scenario": "创意", "units": 3, "hits": 7, "questions": 9, "hit_rate": 0.7778},
+      {"scenario": "数据分析", "units": 3, "hits": 7, "questions": 9, "hit_rate": 0.7778},
+      {"scenario": "问答", "units": 3, "hits": 7, "questions": 9, "hit_rate": 0.7778},
+      {"scenario": "翻译", "units": 3, "hits": 1, "questions": 9, "hit_rate": 0.1111}
+    ],
+    "scenario_rate_spread": 9.0
+  },
+  "interpretation": {
+    "failure_mode": "问用户已经知道的事（不是「问得不够细」，是「问得多余」）",
+    "examples": [
+      {"sample": "v30_translate_generic", "user_said": "帮我翻译一下。", "hit": "0/3"},
+      {"sample": "v30_translate_audio_transcript", "user_said": "把这段会议录音翻译成英文，我后面要用。", "hit": "0/3"},
+      {"sample": "v30_translate_two_versions", "user_said": "（两个版本对照翻译）", "hit": "1/3"}
+    ],
+    "cross_check": "20 条的 expected_behavior 全部标为 clarify，实际档位也全部为 clarify ⇒ 档位判断 20/20 恰当，但澄清命中率仅 11%（翻译）。「该不该澄清」与「澄清问得好不好」是两个不同的轴。",
+    "sample_set_gap": "现有样本集能标定「档位」，但没有任何字段能标定「澄清质量」—— v0.4.0 若要把 severe 澄清质量纳入门禁，必须先给样本集补这一维标注"
+  },
+  "caveats": {
+    "reviewers": "1 名评审者、20 条、单轮，无评审者间一致性数据",
+    "ruler": "「不回答就没法完成任务」这把尺子是本轮新造的，无对照实验证明它与真实用户感受一致；绝对值只能作同尺子下的纵向对比",
+    "status": "原始 API 响应与人工作答均已丢失；本文件是**报告声称值**"
+  },
+  "reproduce": "py -3 evaluation/v040_severe_blind.py export --raw <raw.json> --outdir <dir> && py -3 evaluation/v040_severe_blind.py parse --answers <answers.json> --key <blind_key.json> && py -3 evaluation/v040_severe_blind.py aggregate --scored <scored.json>",
+  "raw_status": "LOST"
+}

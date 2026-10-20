@@ -1,0 +1,110 @@
+{
+  "schema_version": "1.0",
+  "title": "PromptCraft v0.4.0 测量证据索引",
+  "note": "本目录登记 v0.4.0 三次实测的「结论 + 复现材料」。结论与复现材料必须同版本，否则结论不可复核。",
+  "baseline": {
+    "branch": "release/v0.4.0",
+    "conditions": {
+      "model": "deepseek-flash",
+      "prompt_version": "promptcraft-v2.2.0",
+      "samples": "evaluation/samples_v30.yaml"
+    }
+  },
+  "data_loss": {
+    "cause": "F: 盘被更换为完全不同的内容，evaluation/results/ 下全部原始 API 响应随旧工作区消失",
+    "recoverable": false,
+    "consequence": "只剩脚本与报告中的结论数字。原始行级数据必须重跑再生。",
+    "remediation": "新增 evaluation/run_identity.py：产物名与缓存键编码自身身份，resume 校验身份，避免再次发生「同名覆盖 + 新旧混跑」。"
+  },
+  "experiments": [
+    {
+      "id": "stability",
+      "title": "档位稳定性（60 条 × 3 次 = 180 次运行）",
+      "report": "docs/PromptCraft-v0.4.0-效果验证报告.md",
+      "report_section": "§三",
+      "scripts": [
+        "evaluation/verify_stability.py",
+        "evaluation/run_identity.py"
+      ],
+      "script_status": "REBUILT",
+      "script_note": "原脚本随 F: 盘丢失。2026-10-20 按报告给出的指标口径重建，判据写进代码；新增 evaluation/test_v040_measurement.py（26 例离线）钉住口径。",
+      "raw_artifact": null,
+      "raw_status": "LOST",
+      "conditions": {
+        "model": "deepseek-flash",
+        "temperature": 0.35,
+        "prompt_version": "promptcraft-v2.2.0",
+        "repeats": 3,
+        "sample_count": 60
+      },
+      "conclusions": "docs/evaluation-data-v040/conclusions/stability_v040.json",
+      "reproduce": "py -3 evaluation/verify_stability.py --repeats 3",
+      "api_calls": 180
+    },
+    {
+      "id": "severe_blind",
+      "title": "severe 档澄清质量人工盲评（20 条 / 60 个问题）",
+      "report": "docs/PromptCraft-v0.4.0-效果验证报告.md",
+      "report_section": "§四",
+      "scripts": [
+        "evaluation/v040_severe_blind.py",
+        "evaluation/_parse_blind_answers.py",
+        "evaluation/_aggregate_blind_by_scenario.py"
+      ],
+      "script_status": "REBUILT",
+      "script_note": "原脚本随 F: 盘丢失。2026-10-20 按报告 §4.1 的实验设计重建（固定 seed=20260930、R01–R20 中性编号、评审者不可见样本标注/场景/档位）。",
+      "raw_artifact": null,
+      "raw_status": "LOST",
+      "human_answers": "LOST",
+      "human_answers_note": "人工作答本身也在丢失范围内（见清单 D8：evaluation/answers.json 曾被 .gitignore 排除）。D8 闭环后，人工作答必须入库。",
+      "conditions": {
+        "model": "deepseek-flash",
+        "temperature": 0.35,
+        "prompt_version": "promptcraft-v2.2.0",
+        "shuffle_seed": 20260930,
+        "sample_count": 20
+      },
+      "conclusions": "docs/evaluation-data-v040/conclusions/severe_blind_v040.json",
+      "reproduce": "py -3 evaluation/v040_severe_blind.py export --raw <raw.json> --outdir <dir>  # 其后 parse / aggregate",
+      "api_calls": 20
+    },
+    {
+      "id": "vote",
+      "title": "档位投票是否有用（240 次调用）",
+      "report": "docs/PromptCraft-v0.4.0-投票实测报告.md",
+      "report_section": "§一",
+      "scripts": [
+        "evaluation/verify_vote_stability.py",
+        "evaluation/level_vote.py"
+      ],
+      "script_status": "AVAILABLE",
+      "script_note": "脚本在 F: 盘丢失后已随 bac4185 恢复入库；原始数据仍丢失。",
+      "raw_artifact": null,
+      "raw_status": "LOST",
+      "conditions": {
+        "model": "deepseek-flash",
+        "temperature": 0.1,
+        "prompt_version": "promptcraft-v2.2.0",
+        "sample_count": 40,
+        "repeats": 3,
+        "candidates_per_click": 2
+      },
+      "conclusions": "docs/evaluation-data-v040/conclusions/vote_v040.json",
+      "reproduce": "py -3 evaluation/verify_vote_stability.py",
+      "api_calls": 240
+    }
+  ],
+  "gates": [
+    {
+      "id": "fail_open",
+      "script": "scripts/check-fail-open.py",
+      "registry": "docs/v040-失败伪装清单.json",
+      "purpose": "37 条「把失败显示成成功」同族项的机器复核；探测不到 ≠ 通过（kind=manual 一律报 UNVERIFIED）"
+    },
+    {
+      "id": "measurement_unit",
+      "script": "evaluation/test_v040_measurement.py",
+      "purpose": "运行身份、档位稳定性指标口径、severe 盲评流程的离线单测（0 次 API 调用）"
+    }
+  ]
+}

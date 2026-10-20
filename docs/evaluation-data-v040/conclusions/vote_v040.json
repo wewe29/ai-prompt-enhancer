@@ -1,0 +1,54 @@
+{
+  "experiment": "vote",
+  "title": "档位投票是否有用（240 次调用）",
+  "source_report": "docs/PromptCraft-v0.4.0-投票实测报告.md",
+  "source_section": "§一",
+  "conditions": {
+    "model": "deepseek-flash",
+    "temperature": 0.1,
+    "prompt_version": "promptcraft-v2.2.0",
+    "repeats": 3,
+    "candidates_per_click": 2,
+    "sample_count": 40,
+    "api_calls": 240
+  },
+  "claims": {
+    "by_difficulty": {
+      "clear": {
+        "flipped_samples": 9,
+        "samples": 20,
+        "flip_rate": 0.45,
+        "flipped_samples_after_vote": 9,
+        "flip_rate_after_vote": 0.45,
+        "per_click_disagreement": {"numerator": 18, "denominator": 60, "rate": 0.30},
+        "vote_changed_result": {"numerator": 0, "denominator": 60}
+      },
+      "medium": {
+        "flipped_samples": 3,
+        "samples": 19,
+        "flip_rate": 0.16,
+        "flipped_samples_after_vote": 3,
+        "flip_rate_after_vote": 0.16,
+        "per_click_disagreement": {"numerator": 8, "denominator": 57, "rate": 0.14},
+        "vote_changed_result": {"numerator": 0, "denominator": 57}
+      }
+    },
+    "totals": {
+      "clicks": 117,
+      "vote_equal_to_first_sample": 117
+    }
+  },
+  "interpretation": {
+    "mathematical_reason": "多数投票要求 n ≥ 3。n = 2 时两次相同则一致、两次不同则 1:1 平局按首次出现破平局 ⇒ majority_vote([A, B]) ≡ A，是恒等式，与模型无关",
+    "root_cause": "self-consistency 的原始实现是 n = 5（paths: int = 5），照搬结构却把 n 缩到 2，把「多数」退化成了「第一个」",
+    "more_important_finding": "跨点击漂移不在「单次调用内部」：12 个翻转样本里有 2 个每一次点击内部两次采样都完全一致，三次点击之间却跳了 ⇒ 漂移来自采样的独立性，不是采样的随机性",
+    "product_note": "provider.rs 与 models.rs 的注释已改写为「它不改变任何决策」并写明实测数字；带「已按多数决定」的分支在 n=2 下不可达，是为将来 n=3 预留的"
+  },
+  "caveats": {
+    "n3_untested": "温度固定在 0.1，没有测 n=3。「双峰足够尖锐」这个观察只有 2 个样本支撑，不是普适结论。",
+    "effect_verifier_dispute": "效果验证官判定「n=3 也治不了」属过度断言（仅 2 样本支撑「峰是尖的」），「双峰」是未被排除而非被数据证实；n=3 值得一次 180 次调用的定向实测（约 $0.39）。",
+    "status": "原始 API 响应已丢失；本文件是**报告声称值**"
+  },
+  "reproduce": "py -3 evaluation/verify_vote_stability.py",
+  "raw_status": "LOST"
+}
