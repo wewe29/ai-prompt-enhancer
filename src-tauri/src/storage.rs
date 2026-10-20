@@ -833,14 +833,27 @@ mod tests {
     }
 
     /// 删除单个测试凭据，退避重试以对抗凭据管理器的瞬时占用。
+    ///
+    /// **重试必须同时覆盖 `Entry::new` 与 `delete_credential`。**
+    /// 此前 `Entry::new` 失败时直接 `return`（不进重试），而凭据管理器
+    /// 在被占用时**连条目都打不开** —— 于是这一条路径上的失败被静默吞掉。
+    ///
+    /// 次数与退避也调过：8 次 × 10~80ms 实测仍会**间歇性**残留 1~2 条
+    /// （Windows 凭据管理器在被扫描/占用时的占用窗口比 360ms 长）。
+    /// 现为 20 次 × 25~500ms（合计约 5 秒上限），实测残留概率显著下降。
+    /// 即便仍残留，tools/cleanup-test-credentials.py 也能兜底清理。
     fn delete_test_credential(service: &str, account: &str) {
-        for attempt in 0..8 {
-            let Ok(entry) = Entry::new(service, account) else {
-                return;
+        for attempt in 0..20 {
+            let entry = match Entry::new(service, account) {
+                Ok(entry) => entry,
+                Err(_) => {
+                    std::thread::sleep(std::time::Duration::from_millis(25 * (attempt + 1)));
+                    continue;
+                }
             };
             match entry.delete_credential() {
                 Ok(()) | Err(keyring::Error::NoEntry) => return,
-                Err(_) => std::thread::sleep(std::time::Duration::from_millis(10 * (attempt + 1))),
+                Err(_) => std::thread::sleep(std::time::Duration::from_millis(25 * (attempt + 1))),
             }
         }
     }

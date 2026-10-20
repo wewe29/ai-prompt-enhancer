@@ -163,15 +163,18 @@ struct ProbeSandbox {
 impl ProbeSandbox {
     fn new() -> Self {
         let dir = std::env::temp_dir().join(format!("PromptCraft-probe-{}", uuid::Uuid::new_v4()));
-        // 凭据服务名用**固定名**而不是每次生成 UUID。
+        // 凭据服务名**每个测试实例唯一**。
         //
-        // 原因：探针进程一旦被中断（崩溃 / 被杀），`Drop` 不会执行 ⇒ 凭据条目泄漏。
-        // 用 UUID 命名时，每次中断都留下一条永久残留 —— 实测一次会话崩溃就在
-        // 用户真实的 Windows 凭据管理器里堆了 92 条 `PromptCraftProbe-*`。
-        // 固定名让**下一次运行覆盖上一次**，最多泄漏 1 条，且清理逻辑照常生效。
-        // 固定名依然与生产的 `deepseek-api-key.PromptCraft` 完全隔离。
-        const SERVICE: &str = "PromptCraftProbe";
-        Self { dir, service: SERVICE.to_string() }
+        // 曾经试过改成固定名（`PromptCraftProbe`）以防崩溃时泄漏，结果更糟：
+        // 探针的这些用例是 `cargo test` 的并行测试，共享服务名时，
+        // **一个用例的 Drop 会删掉另一个用例正在用的凭据**，
+        // 于是出现「增强请求应当成功: 尚未配置 DeepSeek API Key」的随机失败。
+        // 隔离优先于防泄漏。
+        //
+        // 崩溃时的泄漏由 tools/cleanup-test-credentials.py 兜底清理
+        // （只删带 Test-/Probe- 后缀的沙箱条目，绝不碰生产条目）。
+        let service = format!("PromptCraftProbe-{}", uuid::Uuid::new_v4());
+        Self { dir, service }
     }
 
     fn open_storage(&self) -> Storage {
@@ -184,8 +187,23 @@ impl Drop for ProbeSandbox {
         // 凭据删除要与其它测试的凭据操作串行化：Windows 凭据管理器在并发删改时
         // 会静默失败（keyring 既不重试也不报错），表现为读回偶发失败。
         let _guard = crate::storage::test_credential_lock().lock();
-        if let Ok(entry) = keyring::Entry::new(&self.service, crate::storage::API_KEY_ACCOUNT) {
-            let _ = entry.delete_credential();
+        // **两个账号都要删**：API Key 账号与数据库密钥账号。
+        // 此前只删了前者 ⇒ 每次探针运行都留下一条 `database-key.PromptCraftProbe`
+        // （实测清理后仍剩这一条）。storage.rs 的 TestSandbox 本来就两个都删，
+        // 这里必须对齐。
+        for account in [crate::storage::API_KEY_ACCOUNT, "database-key"] {
+            // 退避重试：凭据管理器在被占用时**连条目都打不开**，
+            // `Entry::new` 失败也必须重试，不能一次就放弃（否则会残留）。
+            for attempt in 0..20 {
+                let Ok(entry) = keyring::Entry::new(&self.service, account) else {
+                    std::thread::sleep(std::time::Duration::from_millis(25 * (attempt + 1)));
+                    continue;
+                };
+                match entry.delete_credential() {
+                    Ok(()) | Err(keyring::Error::NoEntry) => break,
+                    Err(_) => std::thread::sleep(std::time::Duration::from_millis(25 * (attempt + 1))),
+                }
+            }
         }
         let _ = std::fs::remove_dir_all(&self.dir);
     }

@@ -1,1 +1,1 @@
-c11f34c4666c80df80d7db6d93fb9d0cf8be20e9a77c8cbdb52e55b123df6fb6  PromptCraft-0.3.5-windows-x64-portable.zip
+4a9109f8c943555b2c24450ce7e4d4be339cde9cb87fa6c56cc2d8aad85ba621  PromptCraft-0.4.0-windows-x64-portable.zip

@@ -64,6 +64,24 @@
 
 **回归规模**：Rust 49 → 70，前端 55 → 84，评测 168 → 279（全绿）。
 
+**测试卫生（不面向用户，但影响每个人的机器）**
+
+- 清理 Windows 凭据管理器里**本项目的测试残留**（实测一次会话崩溃后堆了 105 条：
+  92 条 `PromptCraftProbe-*` + 13 条 `PromptCraftTest-*`）。根因是沙箱靠 `Drop`
+  清理凭据，**而进程被中断时 `Drop` 根本不执行** —— 与 v0.3.4 修过的那次同类复发，
+  只是换了个文件名。已清理并复查生产条目（`database-key.PromptCraft`、
+  `deepseek-api-key.PromptCraft`）仍在。
+- 探针的 `Drop` 补上此前漏掉的**数据库密钥账号**（此前只删 API Key 账号）；
+  清理重试覆盖 `Entry::new` 失败（此前直接 return，不重试），次数由 8×10~80ms
+  提到 20×25~500ms。
+- 新增 `tools/cleanup-test-credentials.py`：只删带 `Test-`/`Probe-` 后缀的沙箱条目，
+  绝不碰生产条目，结束时复查生产条目仍在。
+- **诚实的边界**：仍**不能保证 0 残留**（每轮间歇性残留 0~1 条），
+  v0.3.4 CHANGELOG 里「连续 4 次运行凭据增量均为 0」的旧断言已一并更正。
+- 另：探针用例在**并行高负载**下偶发失败（`sqlcipher mlock` 拿不到内存锁，
+  Windows 提交额度限制 1453 ⇒ 报「无法解密本地数据库」）。这是**环境性 flake**，
+  非逻辑缺陷；偶发时重跑即可。
+
 ## [0.3.5] - 2026-09-30
 
 ### v0.3.4 评审发现的缺陷修复
@@ -73,6 +91,16 @@
 - **【阻断】ZIP 导入凭据投毒**：`ProviderConfig.api_key` 原只有 `skip_serializing`，仅挡导出方向。攻击者在 `provider.json` 植入 `apiKey` 字段即可经 `import_data` → `save_provider_config` 改写真实 Windows 凭据管理器（评审中已实测复现：攻击者 Key 被写入并可读回）。现补 `skip_deserializing`，并在 `import_data` 内显式 `provider.api_key = None` 双保险。回归测试 `import_never_plants_api_key_into_credential_store` 验证用户原有 Key 不被改写。
 - **【高】置顶功能生产不可达**：`HistoryRecord` 无 `pinned` 字段、全仓库无任何 tauri command 或前端入口可置顶，容量清理的置顶保护实际从未被触发，旧测试用裸 SQL 置位因而"虚假通过"。现贯通全链路：`HistoryRecord.pinned` + `set_history_pinned` 存储方法 + `set_history_pinned` Tauri 命令 + 历史页置顶按钮（置顶记录排最前、带高亮）。测试改用公开 API 而非裸 SQL。
 - **【高】测试污染真实凭据管理器**：`test_storage()` 只在创建时隔离、从不清理，每跑一次 `cargo test` 就往用户真实凭据管理器追加 `PromptCraftTest-*` 条目并留下临时目录（实测一度累积 162 条）。现由 `TestSandbox` 在 `Drop` 中串行化清理（Windows 凭据管理器在并发删改时会静默失败，故用进程级锁 + 退避重试）。实测连续 4 次运行凭据增量均为 0。
+  > **2026-10-20 更正**：上面「连续 4 次运行凭据增量均为 0」**不总成立**。
+  > 重新实测：清理后连跑多轮，每轮仍会**间歇性残留 0~1 条**
+  > （`database-key.PromptCraftTest-*` 或 `deepseek-api-key.PromptCraftProbe-*`）。
+  > 根因是 Windows 凭据管理器在被占用/被扫描时删除会静默失败，
+  > 且「靠进程退出清理」的设计在进程被杀时**必然泄漏**（Drop 根本不执行）。
+  > 2026-10-20 已做三件事：① 清理重试覆盖 `Entry::new` 失败（此前直接 return，不重试），
+  > 并把 8 次 × 10~80ms 提到 20 次 × 25~500ms；② 探针的 `Drop` 补上此前漏掉的
+  > **数据库密钥账号**（只删了 API Key 账号）；③ 新增 `tools/cleanup-test-credentials.py`
+  > （只删带 `Test-`/`Probe-` 后缀的沙箱条目，绝不碰生产条目，结束时复查生产条目仍在）。
+  > **仍不能保证 0 残留**，需要时请跑一次该脚本。
 - **【中】错误码缺超时分类**：`is_timeout()` 与 `is_connect()` 此前都归入 `NETWORK_FAILED`，用量记录无法区分两类成因。新增 `error_code_for_transport`，区分 `TIMEOUT` 与 `NETWORK_UNREACHABLE`。
 - **【中】清空测试恒真断言**：原测试存入 `AppSettings::default()`（其 `profile_rules` 本就是空数组）后再断言为空，删除逻辑失效时同样会通过。现存入全字段非默认的设置，逐字段断言回落，并补 `max_history_mb`。
 - **【中】容量上限不可配置**：需求要求"按配置清理"，此前 `MAX_HISTORY_CONTENT_BYTES` 为硬编码常量。现新增 `AppSettings.max_history_mb`（默认 64 MB，夹取 1..=1024，非法值回落默认），设置页新增"历史容量上限（MB）"输入项；同步修正设置页长期显示的、早已失效的"最大 500 MB"文案。导入包不得把该值设为 0/负数使其失效。
