@@ -174,6 +174,9 @@ impl ProbeSandbox {
 
 impl Drop for ProbeSandbox {
     fn drop(&mut self) {
+        // 凭据删除要与其它测试的凭据操作串行化：Windows 凭据管理器在并发删改时
+        // 会静默失败（keyring 既不重试也不报错），表现为读回偶发失败。
+        let _guard = crate::storage::test_credential_lock().lock();
         if let Ok(entry) = keyring::Entry::new(&self.service, crate::storage::API_KEY_ACCOUNT) {
             let _ = entry.delete_credential();
         }
@@ -317,22 +320,33 @@ fn probe_p0_1_key_is_saved_and_really_used_against_the_endpoint() {
     let endpoint = spawn_mock_endpoint(MODEL_OUTPUT);
 
     // ① 通过真实命令层保存 Key（这一步就走 IPC 的 serde 反序列化）
+    //    凭据写入必须与其它测试的凭据操作串行化：Windows 凭据管理器在并发删改时
+    //    会静默失败，写进去的值可能当场读不回来。
     let app = build_probe_app(Arc::new(sandbox.open_storage()));
     let webview = open_webview(&app);
-    let saved = invoke(
-        &webview,
-        "save_provider_config",
-        json!({
-            "config": provider_config_body(&endpoint.base_url),
-            "apiKey": PROBE_KEY,
-        }),
-    );
+    let saved = {
+        let _guard = crate::storage::test_credential_lock().lock();
+        invoke(
+            &webview,
+            "save_provider_config",
+            json!({
+                "config": provider_config_body(&endpoint.base_url),
+                "apiKey": PROBE_KEY,
+            }),
+        )
+    };
     assert!(saved.is_ok(), "保存供应商配置命令失败：{:?}", saved.err());
 
     // ② 重新打开（模拟重启）：全新的 Storage 实例 + 真实命令读回
     let reopened = sandbox.open_storage();
+    // 读回凭据必须与其它测试的凭据操作串行化（见 test_credential_lock 的说明）：
+    // 并发删改时 Windows 凭据管理器会静默失败，表现为"刚存的 Key 读不回来"。
+    let read_back = {
+        let _guard = crate::storage::test_credential_lock().lock();
+        crate::storage::read_test_credential(&reopened)
+    };
     assert_eq!(
-        reopened.api_key().expect("重启后应能读回 API Key"),
+        read_back.expect("重启后应能读回 API Key"),
         PROBE_KEY,
         "重启后读回的 API Key 与写入值不一致"
     );
@@ -444,8 +458,12 @@ fn probe_p0_2_import_cannot_redirect_the_key_to_another_host() {
     );
 
     // 断言 ②：导入包里的 apiKey 没有进本机凭据
+    let local_key = {
+        let _guard = crate::storage::test_credential_lock().lock();
+        crate::storage::read_test_credential(&sandbox.open_storage())
+    };
     assert_eq!(
-        sandbox.open_storage().api_key().expect("读回本机 Key"),
+        local_key.expect("读回本机 Key"),
         PROBE_KEY,
         "导入包不得改写本机 API Key"
     );

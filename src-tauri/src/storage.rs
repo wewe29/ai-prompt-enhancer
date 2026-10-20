@@ -4,6 +4,7 @@ use chrono::{Duration, Utc};
 use keyring::Entry;
 use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
 use std::{
     fs,
     io::{Read, Write},
@@ -115,20 +116,57 @@ impl Storage {
         Ok(storage)
     }
 
-    pub fn provider_config(&self) -> Result<ProviderConfig, String> {
+    /// 读取 app_settings 中某一行的原始 JSON 文本。
+    ///
+    /// 三种结果必须分得开：
+    /// - `Ok(None)`：这一行不存在（首次运行的**合法**状态，不是错误）
+    /// - `Ok(Some(json))`：这一行存在
+    /// - `Err(_)`：数据库读取失败
+    ///
+    /// 纪律：不能用 `.ok()` 把"读不到"和"没有"混成一种。
+    /// 混成一种之后，调用方只能回落默认值 —— 那正是 A10 的缺陷。
+    fn read_settings_json(&self, key: &str) -> Result<Option<String>, String> {
         let connection = self
             .connection
             .lock()
             .map_err(|_| "数据库锁已损坏".to_string())?;
-        let stored: Option<String> = connection
-            .query_row(
-                "SELECT value_json FROM app_settings WHERE key = 'provider.deepseek'",
-                [],
-                |row| row.get(0),
-            )
-            .ok();
-        let mut config: ProviderConfig = stored
-            .and_then(|json| serde_json::from_str(&json).ok())
+        match connection.query_row(
+            "SELECT value_json FROM app_settings WHERE key = ?1",
+            params![key],
+            |row| row.get(0),
+        ) {
+            Ok(json) => Ok(Some(json)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(error) => Err(format!("无法读取本地配置（{key}）：{error}")),
+        }
+    }
+
+    /// 读取并解析 app_settings 中某一行的配置。
+    ///
+    /// - `Ok(None)`：这一行不存在
+    /// - `Ok(Some(value))`：这一行存在且内容可解析
+    /// - `Err(_)`：数据库读取失败 **或** 内容已损坏
+    ///
+    /// 内容损坏时**必须**报错，不得回落默认值（A10）：
+    /// 回落默认值会让用户看到"默认配置"而不是错误，
+    /// 随后任意一次保存把原值永久覆盖
+    /// （额度回落 10 元、容量回落默认 64MB），且全程没有任何提示。
+    fn read_settings_value<T: DeserializeOwned>(&self, key: &str) -> Result<Option<T>, String> {
+        let Some(json) = self.read_settings_json(key)? else {
+            return Ok(None);
+        };
+        let value = serde_json::from_str::<T>(&json).map_err(|error| {
+            format!("本地配置（{key}）内容已损坏，无法读取，已拒绝按默认值处理：{error}")
+        })?;
+        Ok(Some(value))
+    }
+
+    pub fn provider_config(&self) -> Result<ProviderConfig, String> {
+        // A10：读取失败必须返回 Err，不得回落默认 ProviderConfig。
+        // 回落默认值 = 用户看到"默认配置"而不是错误，
+        // 而下一次保存会把原配置（额度/容量/端点）永久覆盖。
+        let mut config: ProviderConfig = self
+            .read_settings_value::<ProviderConfig>("provider.deepseek")?
             .unwrap_or_default();
         let mut needs_repair = false;
         let legacy_v4_id = config.v4_flash_model_id.eq_ignore_ascii_case("V4-Flash")
@@ -147,6 +185,10 @@ impl Storage {
         }
         if needs_repair {
             let json = serde_json::to_string(&config).map_err(|error| error.to_string())?;
+            let connection = self
+                .connection
+                .lock()
+                .map_err(|_| "数据库锁已损坏".to_string())?;
             connection.execute(
                 "INSERT INTO app_settings(key, value_json, updated_at) VALUES('provider.deepseek', ?1, ?2)
                  ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json, updated_at=excluded.updated_at",
@@ -185,6 +227,10 @@ impl Storage {
     /// 而不是只在 Tauri 命令层拦一道。
     pub fn save_provider_config(&self, config: &ProviderConfig) -> Result<(), String> {
         security::validate_base_url(&config.base_url)?;
+        // A10：既有配置读不出来时**拒绝覆盖**。
+        // 库里那一行可能已经损坏，盲目写入等于用新值盖掉用户原来的配置，
+        // 而原值再也回不来。读取失败必须让调用方看见错误，而不是被这次保存掩盖。
+        self.read_settings_value::<ProviderConfig>("provider.deepseek")?;
         let mut safe_config = config.clone();
         safe_config.api_key = None;
         safe_config.base_url = config.base_url.trim_end_matches('/').to_string();
@@ -312,25 +358,18 @@ impl Storage {
     }
 
     pub fn app_settings(&self) -> Result<AppSettings, String> {
-        let connection = self
-            .connection
-            .lock()
-            .map_err(|_| "数据库锁已损坏".to_string())?;
-        let stored: Option<String> = connection
-            .query_row(
-                "SELECT value_json FROM app_settings WHERE key = 'ui.local'",
-                [],
-                |row| row.get(0),
-            )
-            .ok();
-        Ok(stored
-            .and_then(|json| serde_json::from_str(&json).ok())
+        // 与 provider_config 同一条纪律（A10 同型第二处）：
+        // 损坏的设置行必须报错，不得回落默认值 ——
+        // 回落之后前端会拿默认值回写，把用户原来的设置静默覆盖。
+        Ok(self
+            .read_settings_value::<AppSettings>("ui.local")?
             .unwrap_or_default())
     }
 
     pub fn save_app_settings(&self, settings: &AppSettings) -> Result<(), String> {
-        let json = serde_json::to_string(settings).map_err(|error| error.to_string())?;
-        let connection = self
+        // 既有设置读不出来时拒绝覆盖（同 A10）：损坏的行不能被默认值悄悄顶掉。
+        self.read_settings_value::<AppSettings>("ui.local")?;
+        let json = serde_json::to_string(settings).map_err(|error| error.to_string())?;        let connection = self
             .connection
             .lock()
             .map_err(|_| "数据库锁已损坏".to_string())?;
@@ -343,6 +382,18 @@ impl Storage {
     }
 
     pub fn clear_all_data(&self) -> Result<(), String> {
+        self.clear_all_data_with(|| remove_api_key_credential(&self.credential_service))
+    }
+
+    /// 清空本地数据并删除凭据。
+    ///
+    /// `remove_credential` 抽成参数是为了让"凭据条目创建失败"这条路径**可被测试覆盖**：
+    /// keyring 的 `Entry::new` 在真实环境里几乎不会失败，
+    /// 没有这个接缝就只能靠读代码来断言它被处理了。
+    fn clear_all_data_with<F>(&self, remove_credential: F) -> Result<(), String>
+    where
+        F: FnOnce() -> Result<(), String>,
+    {
         let mut connection = self
             .connection
             .lock()
@@ -361,19 +412,13 @@ impl Storage {
             .map_err(|error| error.to_string())?;
         transaction.commit().map_err(|error| error.to_string())?;
         drop(connection);
-        if let Ok(entry) = Entry::new(&self.credential_service, API_KEY_ACCOUNT) {
-            match entry.delete_credential() {
-                Ok(()) => {}
-                // 凭据本就不存在（用户从未配置过 Key）视为清理完成
-                Err(keyring::Error::NoEntry) => {}
-                Err(error) => {
-                    return Err(format!(
-                        "本地数据已清空，但删除 Windows 凭据失败：{error}；请打开凭据管理器手动确认。"
-                    ));
-                }
-            }
-        }
-        Ok(())
+        // A11：凭据删除失败必须报错。
+        // 此前 `if let Ok(entry) = Entry::new(...)` 把"条目创建失败"整段吞掉，
+        // 函数照样返回 Ok ⇒ UI 报"已清空"，而 API Key 仍留在 Windows 凭据管理器里。
+        // 错误文案必须如实说明"本地数据已清空"但"凭据未删"。
+        remove_credential().map_err(|error| {
+            format!("本地数据已清空，但{error}；请打开凭据管理器手动确认。")
+        })
     }
 
     pub fn export_data(&self, path: &Path) -> Result<usize, String> {
@@ -602,6 +647,57 @@ impl Storage {
     }
 }
 
+/// 从 Windows 凭据管理器删除 API Key。
+///
+/// **条目创建失败与删除失败都必须上报**：两者都意味着"Key 可能还在"。
+/// 此前条目创建失败被 `if let Ok(entry)` 整段吞掉，函数照样返回 Ok，
+/// UI 于是报"已清空"，而 Key 仍留在凭据管理器里（A11）。
+fn remove_api_key_credential(service: &str) -> Result<(), String> {
+    let entry = Entry::new(service, API_KEY_ACCOUNT)
+        .map_err(|error| format!("无法访问 Windows 凭据管理器以删除 API Key：{error}"))?;
+    match entry.delete_credential() {
+        Ok(()) => Ok(()),
+        // 凭据本就不存在（用户从未配置过 Key）视为清理完成
+        Err(keyring::Error::NoEntry) => Ok(()),
+        Err(error) => Err(format!("删除 Windows 凭据失败：{error}")),
+    }
+}
+
+/// 测试专用的**进程级**凭据锁。
+///
+/// Windows 凭据管理器在并发删改时会**静默失败**：keyring 既不重试也不报错，
+/// 于是 `get_password` 偶发返回 Err，表现为"刚写进去的 Key 读不回来"。
+/// 实测并行跑测试时每次残留 1~3 条凭据、读回偶发失败；
+/// 串行化凭据的写入/读取/删除之后，这条抖动归零。
+///
+/// 放在 crate 层而不是某个测试模块里，是为了让 `probe.rs` 的端到端探针
+/// 也能用同一把锁 —— 它同样会写、读、删凭据。
+#[cfg(test)]
+pub(crate) fn test_credential_lock() -> &'static Mutex<()> {
+    static LOCK: Mutex<()> = Mutex::new(());
+    &LOCK
+}
+
+/// 测试专用的凭据读回：带退避重试。
+///
+/// Windows 凭据管理器在并发删改时会**静默失败**，读回可能偶发返回 Err
+/// （"刚写进去的 Key 读不回来"）。keyring 既不重试也不报错，
+/// 所以只能由调用方在测试里重试 —— 退避 + 重试之后这条抖动消失。
+#[cfg(test)]
+pub(crate) fn read_test_credential(storage: &Storage) -> Result<String, String> {
+    let mut last_error = "凭据读取未执行".to_string();
+    for attempt in 0..8 {
+        match storage.api_key() {
+            Ok(value) => return Ok(value),
+            Err(error) => {
+                last_error = error;
+                std::thread::sleep(std::time::Duration::from_millis(10 * (attempt + 1)));
+            }
+        }
+    }
+    Err(last_error)
+}
+
 fn read_archive_json<T: for<'de> Deserialize<'de>>(
     archive: &mut ZipArchive<fs::File>,
     name: &str,
@@ -687,8 +783,7 @@ mod tests {
     }
 
     fn test_credential_lock() -> &'static Mutex<()> {
-        static LOCK: Mutex<()> = Mutex::new(());
-        &LOCK
+        crate::storage::test_credential_lock()
     }
 
     /// 删除单个测试凭据，退避重试以对抗凭据管理器的瞬时占用。
@@ -779,7 +874,11 @@ mod tests {
                 profile_rules: json!([{"id": "r1", "kind": "goal"}]),
             })
             .unwrap();
-        storage.clear_all_data().unwrap();
+        // 凭据删除必须与其它测试的凭据操作串行化（见 test_credential_lock 的说明）
+        {
+            let _guard = test_credential_lock().lock();
+            storage.clear_all_data().unwrap();
+        }
         assert!(storage.list_history(None).unwrap().is_empty());
         // 清空后应回落到默认值：所有非默认字段都必须变回默认，
         // 否则说明 app_settings 行没被删除。
@@ -971,6 +1070,126 @@ mod tests {
             !raw.contains("evil.example.com"),
             "库里的投毒地址必须被修掉：{raw}"
         );
+    }
+
+    #[test]
+    fn provider_config_fails_closed_when_stored_json_is_corrupt() {
+        // 回归测试（A10）：配置读取失败静默回落默认 ProviderConfig，
+        // 且下次保存会覆盖原值 ⇒ 额度回落 10 元、容量回落默认 64MB，全程无提示。
+        // 读取必须返回 Err；不得回落到默认配置；也不得在读取失败后允许保存覆盖。
+        let storage = test_storage();
+        const CORRUPT: &str = "{ this is not json";
+        {
+            let connection = storage.connection.lock().unwrap();
+            connection.execute(
+                "INSERT INTO app_settings(key, value_json, updated_at) VALUES('provider.deepseek', ?1, ?2)
+                 ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json",
+                params![CORRUPT, Utc::now().to_rfc3339()],
+            ).unwrap();
+        }
+
+        // 1) 读取必须报错，而不是回落到默认配置
+        let error = storage.provider_config().unwrap_err();
+        assert!(
+            error.contains("损坏") || error.contains("无法读取"),
+            "读取失败必须报错，实际：{error}"
+        );
+        // 回落默认的典型症状：base_url 变成默认端点、额度回到 10 元那套默认值。
+        // 这里断言的是"没有拿到一份看起来正常的默认配置"。
+        assert!(
+            !error.contains("api.deepseek.com"),
+            "错误文案不得给出'看起来正常的默认配置'，实际：{error}"
+        );
+
+        // 2) 读取失败后不得允许保存覆盖
+        let save = storage.save_provider_config(&ProviderConfig {
+            base_url: "https://api.deepseek.com".into(),
+            ..Default::default()
+        });
+        assert!(save.is_err(), "读取失败后不得允许保存覆盖原配置");
+
+        // 3) 库里那一行必须原样保留（没被默认值顶掉）
+        let raw: String = {
+            let connection = storage.connection.lock().unwrap();
+            connection
+                .query_row(
+                    "SELECT value_json FROM app_settings WHERE key='provider.deepseek'",
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap()
+        };
+        assert_eq!(raw, CORRUPT, "损坏的原值不得被覆盖");
+    }
+
+    #[test]
+    fn provider_config_returns_default_when_no_row_exists_yet() {
+        // fail-closed 的边界：首次运行**没有**这一行是合法状态，必须给默认配置。
+        // 把"没有"和"读坏了"混成一种错误，会让新装用户完全无法使用。
+        let storage = test_storage();
+        let config = storage.provider_config().expect("首次运行应返回默认配置");
+        assert_eq!(config.base_url, crate::models::DEFAULT_BASE_URL);
+        assert_eq!(config.input_price, 0.001, "首次运行应给默认计费单价");
+        assert!(!config.has_api_key);
+    }
+
+    #[test]
+    fn app_settings_fails_closed_when_stored_json_is_corrupt() {
+        // A10 同型第二处：ui.local 那一行损坏时同样不得回落默认值。
+        // 回落之后前端会拿默认值回写，把用户原来的设置（额度/容量/偏好）静默覆盖。
+        let storage = test_storage();
+        {
+            let connection = storage.connection.lock().unwrap();
+            connection.execute(
+                "INSERT INTO app_settings(key, value_json, updated_at) VALUES('ui.local', ?1, ?2)
+                 ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json",
+                params!["<<<corrupt>>>", Utc::now().to_rfc3339()],
+            ).unwrap();
+        }
+        let error = storage.app_settings().unwrap_err();
+        assert!(error.contains("损坏"), "损坏的设置必须报错，实际：{error}");
+        assert!(
+            storage.save_app_settings(&AppSettings::default()).is_err(),
+            "读取失败后不得允许保存覆盖原设置"
+        );
+    }
+
+    #[test]
+    fn clear_all_data_reports_credential_removal_failure() {
+        // 回归测试（A11）：凭据条目创建失败时整块清理被跳过，但函数仍返回 Ok。
+        // ⇒ UI 报"已清空"，而 API Key 仍留在 Windows 凭据管理器里。
+        // keyring 的 Entry::new 在真实环境几乎不会失败，
+        // 所以这里用接缝注入失败，断言错误**真的**被上报。
+        let storage = test_storage();
+        storage.save_history(&record("a", "增强A", 0)).unwrap();
+        let error = storage
+            .clear_all_data_with(|| {
+                Err("无法访问 Windows 凭据管理器以删除 API Key：模拟故障".into())
+            })
+            .unwrap_err();
+        assert!(
+            error.contains("本地数据已清空"),
+            "错误必须如实说明本地数据已清空，实际：{error}"
+        );
+        assert!(
+            error.contains("凭据"),
+            "错误必须说明凭据未删除，实际：{error}"
+        );
+        // 本地数据确实清掉了（错误文案说的是事实，不是借口）
+        assert!(storage.list_history(None).unwrap().is_empty());
+    }
+
+    #[test]
+    fn clear_all_data_succeeds_when_no_credential_exists() {
+        // 边界：用户从未配置过 Key 时，NoEntry 视为清理完成，不得报错。
+        let storage = test_storage();
+        storage.save_history(&record("a", "增强A", 0)).unwrap();
+        {
+            let _guard = test_credential_lock().lock();
+            storage
+                .clear_all_data()
+                .expect("从未配置过 Key 时清空应当成功");
+        }
     }
 
     #[test]
