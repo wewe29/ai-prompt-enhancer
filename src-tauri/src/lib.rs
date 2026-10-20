@@ -8,8 +8,9 @@ mod storage;
 use crate::{
     models::{
         AppSettings, BackendEvent, EnhancementRequest, ExtractedAttachment, HistoryRecord,
-        ProviderConfig,
+        ImportReport, ProviderConfig,
     },
+    security::validate_base_url,
     storage::Storage,
 };
 use sha2::{Digest, Sha256};
@@ -60,10 +61,8 @@ fn save_provider_config(
     // 现在 API Key 只从独立的 api_key 参数进来（仅设置页能传），
     // 导入包路径（import_data → Storage::import_data）拿不到这个参数。
     validate_base_url(&config.base_url)?;
-    if let Some(key) = api_key.as_deref() {
-        if !key.trim().is_empty() {
-            state.storage.save_api_key(key)?;
-        }
+    if let Some(key) = api_key.as_deref().filter(|key| !key.trim().is_empty()) {
+        state.storage.save_api_key(key)?;
     }
     let mut config = config;
     config.base_url = config.base_url.trim_end_matches('/').to_string();
@@ -199,17 +198,8 @@ fn export_data(path: String, state: State<'_, AppState>) -> Result<usize, String
 }
 
 #[tauri::command]
-fn import_data(path: String, state: State<'_, AppState>) -> Result<usize, String> {
+fn import_data(path: String, state: State<'_, AppState>) -> Result<ImportReport, String> {
     state.storage.import_data(std::path::Path::new(&path))
-}
-
-fn validate_base_url(value: &str) -> Result<(), String> {
-    let parsed = Url::parse(value).map_err(|_| "API Base URL 无效".to_string())?;
-    let is_local = matches!(parsed.host_str(), Some("127.0.0.1" | "localhost"));
-    if parsed.scheme() != "https" && !(parsed.scheme() == "http" && is_local) {
-        return Err("API 地址必须使用 HTTPS；仅本机地址允许 HTTP".into());
-    }
-    Ok(())
 }
 
 fn validate_target_url(value: &str) -> Result<(), String> {

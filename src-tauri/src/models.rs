@@ -144,6 +144,23 @@ pub struct ProviderConfig {
     pub api_key: Option<String>,
 }
 
+/// 默认 API 端点。读取供应商配置时若发现库里的地址非法，回落到这里。
+pub const DEFAULT_BASE_URL: &str = "https://api.deepseek.com";
+
+/// 导入结果报告。导入的一切"没做/少做/被忽略"都必须出现在这里，
+/// 不允许只报一个成功的条数（v0.4.0 架构审查 P0-3）。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportReport {
+    /// 实际导入的历史记录条数。
+    pub imported: usize,
+    /// 因超过单包上限而**未**导入的条数（0 表示全部导入）。
+    pub skipped: usize,
+    /// 导入包里的 API 地址与本机不一致时为 true：
+    /// 此时导入包提供的地址被忽略，仍使用本机当前地址。
+    pub base_url_kept: bool,
+}
+
 fn default_models() -> Vec<String> {
     vec!["deepseek-chat".into()]
 }
@@ -151,7 +168,7 @@ fn default_models() -> Vec<String> {
 impl Default for ProviderConfig {
     fn default() -> Self {
         Self {
-            base_url: "https://api.deepseek.com".into(),
+            base_url: DEFAULT_BASE_URL.into(),
             has_api_key: false,
             default_model: "deepseek-chat".into(),
             v4_flash_model_id: "deepseek-v4-flash".into(),

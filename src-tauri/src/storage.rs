@@ -1,4 +1,5 @@
-use crate::models::{AppSettings, HistoryRecord, ProviderConfig, default_history_mb};
+use crate::models::{AppSettings, HistoryRecord, ImportReport, ProviderConfig, default_history_mb};
+use crate::security;
 use chrono::{Duration, Utc};
 use keyring::Entry;
 use rusqlite::{Connection, params};
@@ -21,6 +22,9 @@ const MAX_ARCHIVE_BYTES: u64 = 100 * 1024 * 1024;
 const MAX_ARCHIVE_ENTRY_BYTES: u64 = 8 * 1024 * 1024;
 // 历史记录文本内容总量上限（title+original+enhanced 的字节数），超出后按最旧未置顶清理
 const MAX_HISTORY_CONTENT_BYTES: i64 = 64 * 1024 * 1024;
+// 单次导入的历史记录条数上限。超出部分**如实报告**在 ImportReport.skipped 里，
+// 绝不静默丢弃（静默截断会被用户当成"导入完整"）。
+const MAX_IMPORT_HISTORY: usize = 5_000;
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -124,16 +128,28 @@ impl Storage {
         let mut config: ProviderConfig = stored
             .and_then(|json| serde_json::from_str(&json).ok())
             .unwrap_or_default();
+        let mut needs_repair = false;
         let legacy_v4_id = config.v4_flash_model_id.eq_ignore_ascii_case("V4-Flash")
             || config.v4_flash_model_id.eq_ignore_ascii_case("v4-flash");
         if legacy_v4_id {
             config.v4_flash_model_id = "deepseek-v4-flash".into();
+            needs_repair = true;
+        }
+        // v0.4.0 架构审查 P0-2（读路径纵深防御）：v0.3.5 的导入包能把 base_url
+        // 改成任意地址，于是库里可能**已经存着**攻击者的地址。
+        // 只修写入路径救不了已中招的机器：读取时同样要校验，
+        // 非法地址回落到默认端点，并把库里那行一并修掉。
+        if security::validate_base_url(&config.base_url).is_err() {
+            config.base_url = crate::models::DEFAULT_BASE_URL.to_string();
+            needs_repair = true;
+        }
+        if needs_repair {
             let json = serde_json::to_string(&config).map_err(|error| error.to_string())?;
             connection.execute(
                 "INSERT INTO app_settings(key, value_json, updated_at) VALUES('provider.deepseek', ?1, ?2)
                  ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json, updated_at=excluded.updated_at",
                 params![json, Utc::now().to_rfc3339()],
-            ).map_err(|error| format!("无法迁移 V4-Flash 模型配置：{error}"))?;
+            ).map_err(|error| format!("无法修复供应商配置：{error}"))?;
         }
         config.has_api_key = self.api_key().is_ok();
         config.api_key = None;
@@ -160,9 +176,16 @@ impl Storage {
     ///
     /// 凭据走 `save_api_key` 单独写入：配置保存路径不得有写凭据的能力，
     /// 否则导入包就能借道这里改写本机 API Key。
+    ///
+    /// base_url 校验**下沉到这里**（v0.4.0 架构审查 P0-2）：
+    /// 它决定用户真实 API Key 被 Bearer 头发往哪里，
+    /// 因此所有写入路径（设置页保存、导入包写入）必须共享同一道校验，
+    /// 而不是只在 Tauri 命令层拦一道。
     pub fn save_provider_config(&self, config: &ProviderConfig) -> Result<(), String> {
+        security::validate_base_url(&config.base_url)?;
         let mut safe_config = config.clone();
         safe_config.api_key = None;
+        safe_config.base_url = config.base_url.trim_end_matches('/').to_string();
         safe_config.has_api_key = self.api_key().is_ok();
         let json = serde_json::to_string(&safe_config).map_err(|error| error.to_string())?;
         let connection = self
@@ -380,7 +403,7 @@ impl Storage {
         Ok(history.len())
     }
 
-    pub fn import_data(&self, path: &Path) -> Result<usize, String> {
+    pub fn import_data(&self, path: &Path) -> Result<ImportReport, String> {
         let metadata = fs::metadata(path).map_err(|error| format!("无法读取导入文件：{error}"))?;
         if metadata.len() > MAX_ARCHIVE_BYTES {
             return Err("导入包不能超过 100 MB".into());
@@ -431,15 +454,32 @@ impl Storage {
             settings.max_history_mb = default_history_mb();
         }
 
+        // v0.4.0 架构审查 P0-2：导入包**不得改写 API 地址**。
+        // base_url 决定用户真实 API Key 被 Bearer 头发往哪里，属于本机的安全决策，
+        // 只能由设置页决定；导入包提供的地址一律忽略。
+        // 注意：单靠 validate_base_url 挡不住这个 —— 攻击者的地址同样是 https，
+        // 只有"导入不改写端点"这条规则才真正关掉这条路径。
+        // 端点未采用的事实会出现在返回值里（base_url_kept），不做静默处理。
+        let local_base_url = self.provider_config()?.base_url;
+        let base_url_kept =
+            provider.base_url.trim_end_matches('/') != local_base_url.trim_end_matches('/');
+        provider.base_url = local_base_url;
+
+        let total_records = history.len();
+        let take = total_records.min(MAX_IMPORT_HISTORY);
         let mut imported = 0;
-        for mut record in history.into_iter().take(5_000) {
+        for mut record in history.into_iter().take(take) {
             record.id = uuid::Uuid::new_v4().to_string();
             self.save_history(&record)?;
             imported += 1;
         }
         self.save_app_settings(&settings)?;
         self.save_provider_config(&provider)?;
-        Ok(imported)
+        Ok(ImportReport {
+            imported,
+            skipped: total_records - take,
+            base_url_kept,
+        })
     }
 
     pub fn record_usage(
@@ -793,6 +833,123 @@ mod tests {
     }
 
     #[test]
+    fn import_package_cannot_redirect_api_key_to_third_party() {
+        // 回归测试（v0.4.0 架构审查 P0-2）：导入包里的 API 地址不得生效。
+        // base_url 决定用户真实 API Key 被 Bearer 头发往哪里，
+        // 攻击者的地址同样是 https —— 单靠 validate_base_url 挡不住，
+        // 只有"导入不改写端点"这条规则才真正关掉这条路径。
+        let storage = test_storage();
+        let provider = r#"{"baseUrl":"https://evil.example.com","hasApiKey":true,"defaultModel":"deepseek-chat","v4FlashModelId":"deepseek-v4-flash","inputPrice":0.001,"outputPrice":0.002}"#;
+        let path = std::env::temp_dir().join(format!("PromptCraft-evil-{}", uuid::Uuid::new_v4()));
+        write_archive(
+            &path,
+            &[
+                ("manifest.json", manifest_json()),
+                ("history.json", b"[]".to_vec()),
+                ("settings.json", VALID_SETTINGS.as_bytes().to_vec()),
+                ("provider.json", provider.as_bytes().to_vec()),
+            ],
+        );
+        let report = storage.import_data(&path).unwrap();
+        assert!(
+            report.base_url_kept,
+            "导入包的 API 地址与本机不同，必须标记为未采用"
+        );
+        let stored = storage.provider_config().unwrap();
+        assert_eq!(
+            stored.base_url,
+            crate::models::DEFAULT_BASE_URL,
+            "导入包不得改写 API 地址"
+        );
+        assert!(
+            !stored.base_url.contains("evil.example.com"),
+            "用户的 Key 不得被发往攻击者地址"
+        );
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn save_provider_config_rejects_unsafe_base_url() {
+        // 所有写入路径共享的校验：明文远程地址与非法地址一律拒绝。
+        let storage = test_storage();
+        let error = storage
+            .save_provider_config(&ProviderConfig {
+                base_url: "http://evil.example.com".into(),
+                ..Default::default()
+            })
+            .unwrap_err();
+        assert!(error.contains("HTTPS"), "{error}");
+        assert!(
+            storage
+                .save_provider_config(&ProviderConfig {
+                    base_url: "not-a-url".into(),
+                    ..Default::default()
+                })
+                .is_err(),
+            "非法地址必须被拒绝"
+        );
+        // 本机 HTTP 代理是合法用法，不能被误伤
+        storage
+            .save_provider_config(&ProviderConfig {
+                base_url: "http://127.0.0.1:8080".into(),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(
+            storage.provider_config().unwrap().base_url,
+            "http://127.0.0.1:8080"
+        );
+    }
+
+    #[test]
+    fn provider_config_repairs_invalid_base_url_from_older_versions() {
+        // v0.3.5 的导入包能把 base_url 改成任意地址，库里可能**已经存着**
+        // 攻击者的地址。只修写入路径救不了已中招的机器：读取时也必须校验。
+        // 能自动判定的只有"非法地址"（空值/非 URL/明文 HTTP）——
+        // 这类地址不可能是用户自己设的（设置页同样过不了校验），一律回落为默认端点。
+        // 注意：https 形态的第三方地址无法与"用户自设的代理/中转地址"区分，
+        // 读取路径不做静默改写；那条路径由"导入不改写端点"（写入侧）挡住。
+        let storage = test_storage();
+        {
+            let connection = storage.connection.lock().unwrap();
+            let poisoned = json!({
+                "baseUrl": "http://evil.example.com",
+                "hasApiKey": false,
+                "defaultModel": "deepseek-chat",
+                "v4FlashModelId": "deepseek-v4-flash",
+                "inputPrice": 0.001,
+                "outputPrice": 0.002,
+            });
+            connection.execute(
+                "INSERT INTO app_settings(key, value_json, updated_at) VALUES('provider.deepseek', ?1, ?2)
+                 ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json, updated_at=excluded.updated_at",
+                params![poisoned.to_string(), Utc::now().to_rfc3339()],
+            ).unwrap();
+        }
+        let config = storage.provider_config().unwrap();
+        assert_eq!(
+            config.base_url,
+            crate::models::DEFAULT_BASE_URL,
+            "非法 API 地址必须回落为默认端点"
+        );
+        // 库里那一行也要被修掉，而不是只在返回值里换掉
+        let raw: String = {
+            let connection = storage.connection.lock().unwrap();
+            connection
+                .query_row(
+                    "SELECT value_json FROM app_settings WHERE key='provider.deepseek'",
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap()
+        };
+        assert!(
+            !raw.contains("evil.example.com"),
+            "库里的投毒地址必须被修掉：{raw}"
+        );
+    }
+
+    #[test]
     fn import_never_plants_api_key_into_credential_store() {
         // 回归测试（凭据投毒）：攻击者在 provider.json 里植入 apiKey 字段。
         // 该字段曾经能被反序列化进 ProviderConfig，再经 save_provider_config
@@ -995,8 +1152,9 @@ mod tests {
             ],
         );
         let storage = test_storage();
-        let imported = storage.import_data(&path).unwrap();
-        assert_eq!(imported, 1);
+        let report = storage.import_data(&path).unwrap();
+        assert_eq!(report.imported, 1);
+        assert_eq!(report.skipped, 0);
         let items = storage.list_history(None).unwrap();
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].original, "旧原文");

@@ -1,5 +1,21 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
+use url::Url;
+
+/// API Base URL 校验：必须 HTTPS；仅本机地址允许 HTTP。
+///
+/// 放在共享模块而不是 Tauri 命令层，是为了让**所有**写入路径
+/// （设置页保存、导入包写入）走同一道关：
+/// v0.4.0 架构审查 P0-2 —— 导入包曾能改写 base_url，
+/// 而用户真实的 API Key 会带着 Bearer 头发往那个地址。
+pub fn validate_base_url(value: &str) -> Result<(), String> {
+    let parsed = Url::parse(value).map_err(|_| "API Base URL 无效".to_string())?;
+    let is_local = matches!(parsed.host_str(), Some("127.0.0.1" | "localhost"));
+    if parsed.scheme() != "https" && !(parsed.scheme() == "http" && is_local) {
+        return Err("API 地址必须使用 HTTPS；仅本机地址允许 HTTP".into());
+    }
+    Ok(())
+}
 
 static API_KEY: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\bsk-[A-Za-z0-9_-]{12,}\b").expect("api key regex"));
@@ -93,5 +109,18 @@ mod tests {
                 .contains(&"injection:instruction_override".to_string())
         );
         assert!(findings("普通需求，没有任何敏感内容").is_empty());
+    }
+
+    #[test]
+    fn base_url_must_be_https_except_for_localhost() {
+        assert!(validate_base_url("https://api.deepseek.com").is_ok());
+        // 本机地址允许 HTTP（本地代理是合法用法）
+        assert!(validate_base_url("http://127.0.0.1:8080").is_ok());
+        assert!(validate_base_url("http://localhost:1234").is_ok());
+        // 明文远程地址必须拒绝
+        assert!(validate_base_url("http://evil.example.com").is_err());
+        // 不是 URL 的一律拒绝
+        assert!(validate_base_url("evil.example.com").is_err());
+        assert!(validate_base_url("").is_err());
     }
 }

@@ -203,7 +203,7 @@ export async function exportLocalData(): Promise<{ path: string; records: number
   return { path, records };
 }
 
-export async function importLocalData(): Promise<{ path: string; records: number } | null> {
+export async function importLocalData(): Promise<{ path: string; records: number; skipped: number; baseUrlKept: boolean } | null> {
   if (!isTauri) throw new Error("数据导入仅在桌面版中可用");
   const picked = await openDialog({
     title: "导入 PromptCraft 数据",
@@ -212,8 +212,10 @@ export async function importLocalData(): Promise<{ path: string; records: number
     filters: [{ name: "PromptCraft 数据包", extensions: ["zip"] }],
   });
   if (!picked || Array.isArray(picked)) return null;
-  const records = await command<number>("import_data", { path: picked });
-  return { path: picked, records };
+  // 后端返回 ImportReport：导入条数、**没导入**的条数、以及"API 地址未采用"的标记。
+  // 少导入的条数必须如实报出来，不能让用户以为整包都进来了。
+  const report = await command<{ imported: number; skipped: number; baseUrlKept: boolean }>("import_data", { path: picked });
+  return { path: picked, records: report.imported, skipped: report.skipped, baseUrlKept: report.baseUrlKept };
 }
 
 export async function openExternal(url: string): Promise<void> {
