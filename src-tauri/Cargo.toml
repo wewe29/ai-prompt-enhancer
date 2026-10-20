@@ -42,5 +42,11 @@ url = "2.5"
 uuid = { version = "1.16", features = ["v4", "serde"] }
 zip = { version = "4", default-features = false, features = ["deflate"] }
 
+# 仅测试构建使用：Tauri 的 mock runtime，让 WP0 探针能走**真实命令层**
+# （IPC 的 serde 反序列化 + 真实命令处理函数）而不是直接调内部函数。
+# 生产构建不受影响（dev-dependency 不进入 release 产物）。
+[dev-dependencies]
+tauri = { version = "2", features = ["test"] }
+
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.61", features = ["Win32_System_Memory"] }
