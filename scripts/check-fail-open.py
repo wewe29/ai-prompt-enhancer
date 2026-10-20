@@ -141,13 +141,15 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="复核「把失败显示成成功」清单")
     ap.add_argument("--json", action="store_true", help="输出 JSON 摘要")
     ap.add_argument("--only", default="", help="只复核指定子族，逗号分隔，如 A,C")
+    ap.add_argument("--registry", default="", help="指定清单文件路径（默认 docs/v040-失败伪装清单.json）")
     args = ap.parse_args()
 
-    if not REGISTRY.exists():
-        print(f"找不到清单：{REGISTRY}", file=sys.stderr)
+    registry_path = Path(args.registry) if args.registry else REGISTRY
+    if not registry_path.exists():
+        print(f"找不到清单：{registry_path}", file=sys.stderr)
         return 2
 
-    reg = json.loads(REGISTRY.read_text(encoding="utf-8"))
+    reg = json.loads(registry_path.read_text(encoding="utf-8"))
     only = {x.strip().upper() for x in args.only.split(",") if x.strip()}
 
     rows = []
@@ -175,7 +177,7 @@ def main() -> int:
     else:
         base = reg["baseline"]
         print(f"基线 commit = {base['commit']}  分支 = {base['branch']}")
-        print(f"清单 = {REGISTRY.relative_to(ROOT)}  条目 = {len(rows)}")
+        print(f"清单 = {registry_path}  条目 = {len(rows)}")
         print("-" * 110)
         for r in rows:
             print(

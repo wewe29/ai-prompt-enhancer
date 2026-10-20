@@ -1,0 +1,44 @@
+﻿基线 commit = bac4185  分支 = release/v0.4.0
+清单 = D:\workspace\1-projects\ai-prompt-enhancer\docs\v040-失败伪装清单.json  条目 = 37
+--------------------------------------------------------------------------------------------------------------
+[P0] A1  evaluation/report.py            :315   FIXED      evaluation/report.py 已无该模式
+[P0] A2  evaluation/report.py            :332   OPEN       evaluation/report.py:336 命中
+[P1] A3  evaluation/report.py            :584   OPEN       evaluation/report.py:593 命中
+[P0] A4  evaluation/report.py            :192   OPEN       evaluation/report.py:193 命中
+[P1] A5  evaluation/report.py            :187   OPEN       evaluation/report.py:187 命中
+[P0] A6  evaluation/report.py            :194   OPEN       evaluation/report.py:196 命中
+[P1] A7  evaluation/report.py            :236   OPEN       evaluation/report.py:236 命中
+[P1] A8  evaluation/report.py            :282   OPEN       evaluation/report.py:282 命中
+[P1] A9  evaluation/report.py            :300   OPEN       evaluation/report.py:300 命中
+[P0] A10 src-tauri/src/storage.rs        :117   OPEN       src-tauri/src/storage.rs:131 命中
+[P1] A11 src-tauri/src/storage.rs        :317   OPEN       src-tauri/src/storage.rs:345 代码块内仍存在 'if let Ok(entry)'
+[P1] A12 src-tauri/src/provider.rs       :225   OPEN       src-tauri/src/provider.rs:37 代码块内仍命中禁止模式
+[P1] A13 src/lib.ts                      :227   OPEN       src/lib.ts:242 命中
+[P0] B1  evaluation/verify_enhance.py    :343   OPEN       evaluation/verify_enhance.py:347 命中
+[P1] B2  evaluation/verify_enhance.py    :339   OPEN       evaluation/enhancer.py:211 命中
+[P1] B3  evaluation/verify_enhance.py    :211   OPEN       evaluation/verify_enhance.py:214 命中
+[P1] B4  evaluation/test_stat.py         :57    OPEN       evaluation/test_stat.py:57 代码块内仍存在 'all(v == 1.0 for v in ag["dim_corr"].values())'
+[P1] B5  src-tauri/src/models.rs         :177   OPEN       src-tauri/src/models.rs:194 仍然存在
+[P1] C1  evaluation/bench_judge.py       :89    OPEN       evaluation/bench_judge.py:89 命中
+[P0] C2  evaluation/bench_report.py      :66    OPEN       evaluation/bench_report.py:66 命中
+[P1] C3  evaluation/bench_report.py      :68    OPEN       evaluation/bench_report.py:68 命中
+[P0] C4  evaluation/judge.py             :186   OPEN       evaluation/judge.py:191 命中
+[P1] D1  evaluation/verify_enhance.py    :471   OPEN       evaluation/verify_enhance.py:474 命中
+[P0] D2  evaluation/verify_enhance.py    :503   OPEN       evaluation/verify_enhance.py:507 命中
+[P0] D3  evaluation/run_eval.py          :904   OPEN       evaluation/run_eval.py:905 命中
+[P0] D4  evaluation/run_eval.py          :518   OPEN       evaluation/run_eval.py:528 命中
+[P1] D5  evaluation/model_benchmark.py   :78    OPEN       evaluation/model_benchmark.py:78 命中
+[P1] D6  evaluation/export_data_pack.py  :72    OPEN       evaluation/export_data_pack.py:74 命中
+[P0] D7  .gitignore                      :26    OPEN       .gitignore:26 命中
+[P0] D8  .gitignore                      :31    OPEN       .gitignore:31 命中
+[P0] E1  src-tauri/src/provider.rs       :854   OPEN       src-tauri/src/provider.rs:867 命中
+[P0] E2  src/views/EnhanceView.tsx       :192   OPEN       src/views/EnhanceView.tsx:192 命中
+[P0] E3  src-tauri/src/storage.rs        :216   FIXED      src-tauri/src/storage.rs:379 代码块内已无 'list_history'
+[P1] E4  src-tauri/src/storage.rs        :435   FIXED      src-tauri/src/storage.rs:430 代码块内已出现守卫 'skipped'
+[P0] E5  src-tauri/src/storage.rs        :441   FIXED      src-tauri/src/storage.rs:430 代码块内已出现守卫 'base_url'
+[P1] F1  evaluation/enhancer.py          :3     OPEN       evaluation/enhancer.py:4 命中
+[P2] F2  evaluation/test_enhancer.py     :61    OPEN       evaluation/test_enhancer.py:61 命中
+--------------------------------------------------------------------------------------------------------------
+OPEN 33 / FIXED 4 / UNVERIFIED 0 / TOTAL 37
+
+⛔ 仍有 14 条 P0 未闭环： A2, A4, A6, A10, B1, C2, C4, D2, D3, D4, D7, D8, E1, E2
