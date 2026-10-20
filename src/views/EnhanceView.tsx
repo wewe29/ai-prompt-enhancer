@@ -5,6 +5,7 @@ import { copyText, targetModels } from "../lib";
 import { classifyTask, preflight } from "../preflight";
 import type { Attachment, EnhancementResult, EnhancementState, ProviderConfig, Suggestion, UsageRecord, Verbosity } from "../types";
 import { StatusBadge } from "../components/StatusBadge";
+import { resolveResultTruth } from "../components/resultTruth";
 
 const detailLabels: Record<Verbosity, string> = { concise: "简洁", standard: "标准", deep: "深入", custom: "自定义" };
 
@@ -92,7 +93,7 @@ export function EnhanceView(props: EnhanceViewProps) {
     clarify: "澄清表达",
     remove_redundancy: "精简重复内容",
   };
-  const enhancementLevelLabels: Record<string, string> = { none: "无需明显修改", light: "轻度增强", clarify: "需要澄清" };
+  // 档位文案表已移入 src/components/resultTruth.ts：那里的表只允许用于"模型真的做过判断"的情形。
   const deliveryLabels: Record<string, string> = { complete: "完整交付", partial: "部分交付", fallback: "原文回退" };
   const suggestionKindLabels: Record<string, string> = { goal: "目标", context: "背景", format: "格式", constraint: "约束", alternate_intent: "备选意图" };
   const riskCategoryLabels: Record<string, string> = { destructive: "破坏性操作", medical: "医疗", legal: "法律", financial: "金融", credential: "凭据", privacy: "隐私", factual: "事实性" };
@@ -113,16 +114,18 @@ export function EnhanceView(props: EnhanceViewProps) {
     ];
     return checks.filter(([empty]) => empty).map(([, label]) => label);
   }, [result]);
+  // 界面能说的三件事（状态徽标 / 档位 / chip）统一由这一个解析器决定，
+  // 规则与依据见 src/components/resultTruth.ts。
+  const truth = useMemo(() => resolveResultTruth({ result, state, deliveryStatus }), [result, state, deliveryStatus]);
   const resultSummary = useMemo(() => {
     if (!result) return null;
-    const level = enhancementLevelLabels[result.enhancement_level ?? "light"] ?? "轻度增强";
     const outputLength = result.primary_prompt.length;
     const ratio = original.length > 0 ? `（${(outputLength / original.length).toFixed(2)} 倍）` : "";
     const lengthChange = `原文 ${original.length} 字 -> 结果 ${outputLength} 字${ratio}`;
     const changesText = [...new Set(result.changes.map((change) => changeSummaryLabels[change.type]).filter(Boolean))].join("、") || "无实质修改";
     const source = result.assumptions.length > 0 ? "包含明确假设" : "仅使用用户提供内容";
-    return { level, lengthChange, changesText, source };
-  }, [result, original]);
+    return { level: truth.level, lengthChange, changesText, source };
+  }, [result, original, truth]);
   useEffect(() => {
     const isTyping = () => {
       const el = document.activeElement;
@@ -189,7 +192,7 @@ export function EnhanceView(props: EnhanceViewProps) {
       </article>
 
       <article className="editor-panel output-panel">
-        <div className="panel-heading"><div><span className="step-index">02</span><h2>增强结果</h2></div><div className="panel-actions">{deliveryStatus && result ? <span className={`delivery-badge ${deliveryStatus}`}>{deliveryLabels[deliveryStatus] ?? deliveryStatus}</span> : null}{result?.enhancement_level === "none" && state !== "streaming" ? <span className="none-hint">增强器判断无需修改，建议直接使用原文</span> : null}<StatusBadge state={state} /><button onClick={undo} disabled={!undoStack.length} title="撤销"><Undo2 size={16} /></button><button onClick={redo} disabled={!redoStack.length} title="重做"><RotateCw size={16} /></button></div></div>
+        <div className="panel-heading"><div><span className="step-index">02</span><h2>增强结果</h2></div><div className="panel-actions">{deliveryStatus && result ? <span className={`delivery-badge ${deliveryStatus}`}>{deliveryLabels[deliveryStatus] ?? deliveryStatus}</span> : null}{truth.chip ? <span className="none-hint">{truth.chip}</span> : null}<StatusBadge status={truth.status} /><button onClick={undo} disabled={!undoStack.length} title="撤销"><Undo2 size={16} /></button><button onClick={redo} disabled={!redoStack.length} title="重做"><RotateCw size={16} /></button></div></div>
         {notices.length > 0 && <div className={`notices-strip${deliveryStatus ? ` ${deliveryStatus}` : ""}`}><AlertTriangle size={15} /><ul>{deliveryStatus === "partial" && missingFields.length > 0 && <li className="missing-line" key="missing-fields">本次交付缺失：{missingFields.join("、")}</li>}{[...new Set(notices)].map((notice) => <li key={notice}>{notice}</li>)}</ul></div>}
         {result && state !== "streaming" && <div className="candidate-strip"><span>候选 {activeShown}/{displayCandidates.length}</span>{displayCandidates.length > 1 && displayCandidates.map((item) => <button key={item.index} className={item.index === activeShown ? "selected" : ""} onClick={() => switchCandidate(item.index)} title={item.note || `切换到候选 ${item.index}`}>{item.index}</button>)}{displayCandidates.length > 1 && <small>切换候选会替换当前输出，可用撤销恢复</small>}</div>}
         <div className="output-wrap">
@@ -209,7 +212,7 @@ export function EnhanceView(props: EnhanceViewProps) {
     </section>
 
     {resultSummary && <section className="result-summary">
-      <div className="summary-row"><span>增强等级</span><strong>{resultSummary.level}</strong></div>
+      <div className="summary-row"><span>增强等级</span><strong title={resultSummary.level.fromModel ? undefined : "本次交付没有返回可靠的档位判断"}>{resultSummary.level.label}</strong></div>
       <div className="summary-row"><span>交付状态</span><strong>{deliveryStatus ? deliveryLabels[deliveryStatus] ?? deliveryStatus : "完整交付"}</strong></div>
       <div className="summary-row"><span>长度变化</span><strong>{resultSummary.lengthChange}</strong></div>
       <div className="summary-row"><span>修改摘要</span><strong>{resultSummary.changesText}</strong></div>
