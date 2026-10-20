@@ -94,12 +94,25 @@ export async function getProviderConfig(): Promise<ProviderConfig> {
   return stored ? JSON.parse(stored) : { baseUrl: "https://api.deepseek.com", hasApiKey: false, defaultModel: "deepseek-chat", v4FlashModelId: "deepseek-v4-flash", inputPrice: 0.001, outputPrice: 0.002, models: ["deepseek-chat"] };
 }
 
-export async function saveProviderConfig(config: ProviderConfig & { apiKey?: string }): Promise<void> {
+/**
+ * 构造"保存供应商配置"命令的参数。
+ *
+ * API Key 必须作为**独立参数**下发，不能塞在 config 里：
+ * 后端 ProviderConfig.api_key 带 skip_deserializing，塞进去也会被丢弃
+ * （v0.4.0 架构审查 P0-1：Key 填了存不进去，UI 却报"配置已保存"）。
+ */
+export function buildProviderSaveArgs(config: ProviderConfig, apiKey?: string): { config: ProviderConfig; apiKey: string | null } {
+  const trimmed = apiKey?.trim() ?? "";
+  return { config, apiKey: trimmed ? trimmed : null };
+}
+
+export async function saveProviderConfig(config: ProviderConfig, apiKey?: string): Promise<void> {
+  const args = buildProviderSaveArgs(config, apiKey);
   if (isTauri) {
-    await command("save_provider_config", { config });
+    await command("save_provider_config", args);
     return;
   }
-  localStorage.setItem("promptcraft.provider", JSON.stringify({ ...config, apiKey: undefined, hasApiKey: Boolean(config.apiKey || config.hasApiKey) }));
+  localStorage.setItem("promptcraft.provider", JSON.stringify({ ...args.config, hasApiKey: Boolean(args.apiKey || args.config.hasApiKey) }));
 }
 
 export async function validateProvider(apiKey: string, baseUrl: string): Promise<void> {

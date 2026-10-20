@@ -296,8 +296,8 @@ export default function App() {
       const models = [...new Set(modelsOverride ?? provider.models)].filter((id) => id.trim());
       if (!models.length) throw new Error("自定义模型列表不能为空");
       if (!models.includes(provider.defaultModel)) models.unshift(provider.defaultModel);
-      const next = { ...provider, models, hasApiKey: Boolean(apiKeyDraft || provider.hasApiKey), apiKey: apiKeyDraft || undefined };
-      await saveProviderConfig(next); setProvider({ ...provider, models, hasApiKey: next.hasApiKey }); setApiKeyDraft(""); setProviderMessage("连接验证成功，配置已保存");
+      const next = { ...provider, models, hasApiKey: Boolean(apiKeyDraft || provider.hasApiKey) };
+      await saveProviderConfig(next, apiKeyDraft || undefined); setProvider({ ...provider, models, hasApiKey: next.hasApiKey }); setApiKeyDraft(""); setProviderMessage("连接验证成功，配置已保存");
     } catch (cause) { setProviderMessage(cause instanceof Error ? cause.message : String(cause)); }
     finally { setSavingProvider(false); }
   };

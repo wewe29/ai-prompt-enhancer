@@ -49,10 +49,23 @@ fn get_provider_config(state: State<'_, AppState>) -> Result<ProviderConfig, Str
 
 #[tauri::command]
 fn save_provider_config(
-    mut config: ProviderConfig,
+    config: ProviderConfig,
+    api_key: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    // v0.4.0 架构审查 P0-1：凭据与配置必须是**两条独立的路**。
+    // ProviderConfig.api_key 带 skip_deserializing，命令入参里恒为 None，
+    // 此前"保存 Key"与"保存配置"共用这一个入口 ⇒ set_password 永不被调用，
+    // 新装用户填完 Key 点保存，UI 报"配置已保存"而后端静默丢弃。
+    // 现在 API Key 只从独立的 api_key 参数进来（仅设置页能传），
+    // 导入包路径（import_data → Storage::import_data）拿不到这个参数。
     validate_base_url(&config.base_url)?;
+    if let Some(key) = api_key.as_deref() {
+        if !key.trim().is_empty() {
+            state.storage.save_api_key(key)?;
+        }
+    }
+    let mut config = config;
     config.base_url = config.base_url.trim_end_matches('/').to_string();
     state.storage.save_provider_config(&config)
 }

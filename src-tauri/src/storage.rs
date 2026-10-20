@@ -140,13 +140,27 @@ impl Storage {
         Ok(config)
     }
 
-    pub fn save_provider_config(&self, config: &ProviderConfig) -> Result<(), String> {
-        if let Some(api_key) = config.api_key.as_ref().filter(|key| !key.trim().is_empty()) {
-            Entry::new(&self.credential_service, API_KEY_ACCOUNT)
-                .map_err(|error| format!("无法访问 Windows 凭据管理器：{error}"))?
-                .set_password(api_key.trim())
-                .map_err(|error| format!("无法保存 API Key：{error}"))?;
+    /// 写入 API Key 到 Windows 凭据管理器。
+    ///
+    /// 凭据**只能**经由本函数落盘。`ProviderConfig.api_key` 带 `skip_deserializing`，
+    /// 反序列化入口永远拿不到它——把凭据与配置混在同一个保存函数里，
+    /// 会让"保存凭据"和"导入配置"共用同一条入口（v0.4.0 架构审查 P0-1）。
+    pub fn save_api_key(&self, api_key: &str) -> Result<(), String> {
+        let key = api_key.trim();
+        if key.is_empty() {
+            return Err("API Key 不能为空".into());
         }
+        Entry::new(&self.credential_service, API_KEY_ACCOUNT)
+            .map_err(|error| format!("无法访问 Windows 凭据管理器：{error}"))?
+            .set_password(key)
+            .map_err(|error| format!("无法保存 API Key：{error}"))
+    }
+
+    /// 保存供应商配置（**不含**凭据）。
+    ///
+    /// 凭据走 `save_api_key` 单独写入：配置保存路径不得有写凭据的能力，
+    /// 否则导入包就能借道这里改写本机 API Key。
+    pub fn save_provider_config(&self, config: &ProviderConfig) -> Result<(), String> {
         let mut safe_config = config.clone();
         safe_config.api_key = None;
         safe_config.has_api_key = self.api_key().is_ok();
@@ -730,6 +744,55 @@ mod tests {
     }
 
     #[test]
+    fn saved_api_key_can_be_read_back() {
+        // 回归测试（v0.4.0 架构审查 P0-1）：API Key 必须真的存得进去。
+        // 此前 ProviderConfig.api_key 带 skip_deserializing，命令入参里恒为 None，
+        // save_provider_config 里的 set_password 永不被调用 ⇒ 新装用户完全不可用。
+        // 现在凭据走独立的 save_api_key。
+        let storage = test_storage();
+        let key = "sk-roundtrip-key-000001";
+        {
+            let _guard = test_credential_lock().lock();
+            storage.save_api_key(key).unwrap();
+            let stored = storage.api_key().expect("保存后应能读回 API Key");
+            assert_eq!(stored, key, "保存后读回的 API Key 与写入值不一致");
+        }
+    }
+
+    #[test]
+    fn saving_config_never_writes_the_credential_store() {
+        // 纵深防御：配置保存路径**没有**写凭据的能力。
+        // 即使调用方在 Rust 侧手工构造出带 api_key 的 ProviderConfig，
+        // 凭据管理器里的 Key 也必须原封不动。
+        let storage = test_storage();
+        {
+            let _guard = test_credential_lock().lock();
+            storage.save_api_key("sk-original-key-000001").unwrap();
+            storage
+                .save_provider_config(&ProviderConfig {
+                    api_key: Some("sk-attacker-key-000001".into()),
+                    ..Default::default()
+                })
+                .unwrap();
+            let stored = storage.api_key().expect("原有 Key 应当保留");
+            assert_eq!(
+                stored, "sk-original-key-000001",
+                "保存配置不得改写凭据管理器里的 API Key"
+            );
+            assert!(!stored.contains("attacker"));
+        }
+    }
+
+    #[test]
+    fn provider_config_ignores_api_key_field_when_deserialized() {
+        // serde 层契约：ProviderConfig 的 apiKey 字段永远反序列化不出来。
+        // 这是"导入包不能投毒凭据"的第一道闸，命令层的拆分是第二道。
+        let raw = r#"{"baseUrl":"https://api.deepseek.com","hasApiKey":true,"defaultModel":"deepseek-chat","v4FlashModelId":"deepseek-v4-flash","inputPrice":0.001,"outputPrice":0.002,"apiKey":"sk-planted-key-000001"}"#;
+        let config: ProviderConfig = serde_json::from_str(raw).expect("provider.json 应可解析");
+        assert!(config.api_key.is_none(), "反序列化入口不得接受 apiKey 字段");
+    }
+
+    #[test]
     fn import_never_plants_api_key_into_credential_store() {
         // 回归测试（凭据投毒）：攻击者在 provider.json 里植入 apiKey 字段。
         // 该字段曾经能被反序列化进 ProviderConfig，再经 save_provider_config
@@ -744,12 +807,7 @@ mod tests {
         // 这会让本用例在并行运行时约 3/4 概率假失败。
         {
             let _guard = test_credential_lock().lock();
-            storage
-                .save_provider_config(&ProviderConfig {
-                    api_key: Some("sk-users-own-key-000001".into()),
-                    ..Default::default()
-                })
-                .unwrap();
+            storage.save_api_key("sk-users-own-key-000001").unwrap();
             assert!(storage.api_key().is_ok(), "写入用户 Key 后应可读回");
         }
 
@@ -815,12 +873,7 @@ mod tests {
         // 否则并发测试的凭据删除会落在 set 与 get 之间，造成假失败。
         {
             let _guard = test_credential_lock().lock();
-            storage
-                .save_provider_config(&ProviderConfig {
-                    api_key: Some("sk-secret-test-key-123456".into()),
-                    ..Default::default()
-                })
-                .unwrap();
+            storage.save_api_key("sk-secret-test-key-123456").unwrap();
             // 数据库内的供应商配置不含 Key 明文
             let stored = storage.provider_config().unwrap();
             assert!(stored.api_key.is_none());
