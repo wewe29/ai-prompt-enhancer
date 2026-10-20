@@ -12,7 +12,12 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
-from judge import DIMENSIONS, DIMENSION_LABELS, PROMPT_JUDGE_DIMS  # evaluation/ 目录已在 sys.path 中
+from judge import (  # evaluation/ 目录已在 sys.path 中
+    DIMENSIONS,
+    DIMENSION_LABELS,
+    PROMPT_JUDGE_DIMS,
+    judge_agreement_across,
+)
 
 DIMENSION_ORDER = ["accuracy", "completeness", "relevance", "clarity", "novelty"]
 
@@ -179,7 +184,11 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
     }
     by_prompt_judge: dict[str, dict[str, list[float]]] = {}
     agreement_winners: list[float] = []
-    agreement_rhos: dict[str, list[float]] = {d: [] for d in DIMENSIONS}
+    # C4：逐维度相关性的原料 —— (裁判A的 judge 结果, 裁判B的 judge 结果) 对。
+    # 跨样本才能按维度算相关（单条对比每维度只有一个 Δ 值）。
+    agreement_pairs: list[tuple[dict, dict]] = []
+    # 单条对比能算出的唯一相关性：整体 Δ 向量的 ρ
+    agreement_global_rhos: list[float] = []
     cost_orig_chars: list[float] = []
     cost_enh_chars: list[float] = []
     cost_orig_tokens: list[float] = []
@@ -326,12 +335,18 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
                     by_persona.setdefault(persona, {d: [] for d in DIMENSIONS})[dim].append(deltas[dim])
 
             ag = result.get("agreement")
-            if ag and ag.get("dim_corr"):
-                agreement_winners.append(1.0 if ag.get("winner_agreement") else 0.0)
-                for dim in DIMENSIONS:
-                    rho = ag["dim_corr"].get(dim)
-                    if isinstance(rho, (int, float)):
-                        agreement_rhos[dim].append(float(rho))
+            if ag:
+                if ag.get("winner_agreement") is not None:
+                    agreement_winners.append(1.0 if ag.get("winner_agreement") else 0.0)
+                rho = ag.get("delta_rho")
+                if isinstance(rho, (int, float)):
+                    agreement_global_rhos.append(float(rho))
+                # C4：逐维度相关性**不在单条对比上算**（每个维度只有一个 Δ 值）。
+                # 它在聚合阶段由 judge_agreement_across 用多条对比的 Δ 对独立计算，
+                # 这里只负责把两个裁判的原始打分收集起来。
+                judge_a, judge_b = result.get("judge"), result.get("judge2")
+                if judge_a and judge_b and judge_a.get("deltas") and judge_b.get("deltas"):
+                    agreement_pairs.append((judge_a, judge_b))
 
         pj = sample.get("prompt_judge")
         if pj and not pj.get("error"):
@@ -390,17 +405,25 @@ def _aggregate(data: dict[str, Any]) -> dict[str, Any]:
         ),
     }
     if agreement_winners:
-        # A9：某个维度没有样本时，该维度**不出现在** dim_corr 里 ——
+        # C4：逐维度相关性**逐维度独立计算**（跨样本的 Δ 对），
+        # 不是同一个全局 ρ 复制 5 份。
+        cross = judge_agreement_across(agreement_pairs)
+        # A9：某个维度没有足够样本时，该维度**不出现在** dim_corr 里 ——
         # "未测量该维度"与"该维度相关性为 0"必须可区分。
-        dim_corr: dict[str, float] = {}
-        for dim, vals in agreement_rhos.items():
-            if not vals:
-                continue
-            dim_corr[dim] = round(sum(vals) / len(vals), 4)
+        dim_corr: dict[str, float] = dict(cross["dim_corr"])
         summary["judge_agreement"] = {
             "winner_agreement": round(sum(agreement_winners) / len(agreement_winners), 4),
             "n": len(agreement_winners),
             "dim_corr": dim_corr,
+            # 单条对比算得出的唯一相关性：整体 Δ 向量的 ρ（跨样本均值）
+            "delta_rho_mean": (
+                round(sum(agreement_global_rhos) / len(agreement_global_rhos), 4)
+                if agreement_global_rhos
+                else None
+            ),
+            # 逐维度相关性的样本对数（= 参与计算的双裁判对比条数）
+            "n_pairs": cross["n_pairs"],
+            "n_dims": cross["n_dims"],
         }
 
     cost: dict[str, Any] = {}
@@ -584,12 +607,16 @@ def _render_markdown(data: dict[str, Any]) -> str:
         corr_map = ja.get("dim_corr") or {}
         dim_corr = "；".join(
             f"{DIMENSION_LABELS[d]} "
-            + (f"ρ={corr_map[d]:.2f}" if d in corr_map else "ρ=未测量（该维度无样本）")
+            + (f"ρ={corr_map[d]:.2f}" if d in corr_map else "ρ=未测量（该维度无足够样本）")
             for d in DIMENSION_ORDER
         )
+        rho_mean = ja.get("delta_rho_mean")
+        rho_txt = f"｜整体 Δ 相关性 ρ={rho_mean:.2f}" if isinstance(rho_mean, (int, float)) else ""
+        pairs = ja.get("n_pairs")
+        pairs_txt = f"（双裁判对比 {pairs} 条）" if pairs else "（无第二裁判对比）"
         lines.append(
             f"- 裁判一致性：双裁判胜者一致率 **{100.0 * ja['winner_agreement']:.1f}%**"
-            f"（n={ja['n']}）｜{dim_corr}\n"
+            f"（n={ja['n']}）{rho_txt}{pairs_txt}｜{dim_corr}\n"
         )
     lines.append("| 维度 | 平均 Delta（增强 − 原始） |")
     lines.append("|---|---|")

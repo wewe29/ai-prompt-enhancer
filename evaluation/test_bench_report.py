@@ -78,8 +78,12 @@ def test_aggregate_means_and_composite():
 
     assert a["win_rate"] == 1.0
     assert b["win_rate"] == 0.0
-    assert c["win_rate"] == 0.0
-    assert c["composite"] == 0.0
+    # 清单 C2 / C3：模型 C 全部条目失败 ⇒ **不可评**，不是"综合分 0.0、排最后"。
+    # 0.0 的综合分会被读成"这个模型很差"，而不是"这个模型没测到"。
+    assert c["win_rate"] is None
+    assert c["composite"] is None
+    assert c["rank"] is None
+    assert c["evaluable"] is False
     assert c["judged_prompts"] == 0
 
 
@@ -148,7 +152,16 @@ def test_scenario_weighted_composite_creative_with_novelty():
     assert m["dims"]["novelty"] == 2.0  # 新数据含 novelty 维度
 
 
-def test_novelty_missing_falls_back_to_relevance():
+def test_novelty_missing_makes_model_unevaluable():
+    """C2 / C3：novelty 缺失 ⇒ 该模型**不可评**，不得用 relevance 顶替。
+
+    **这条断言原先写的是 bug。** 旧实现：缺 novelty 时回退取 relevance，
+    于是报告里那一行「新颖度」实际测的是「相关性」，而 composite 正是
+    **模型排名的排序键** ⇒ 排名被一个不存在的维度污染。
+
+    修好后缺维度就是缺维度：``composite = None``、``rank = None``，
+    并在 ``unevaluable_gaps`` 里**点名缺哪一维**（R2：排除原因必须落在产物里）。
+    """
     details = [{
         "prompt_id": "p1", "model_id": "A", "model_label": "模型A", "scenario": "创意",
         "scores": {"accuracy": 10, "completeness": 8, "relevance": 6, "clarity": 4},
@@ -158,9 +171,12 @@ def test_novelty_missing_falls_back_to_relevance():
     payload = {"meta": {"models": [{"id": "A", "label": "模型A"}]}, "details": details}
     agg = bench_report.aggregate(payload, scenario_weights=sw)
     m = agg["models"][0]
-    # 旧数据缺 novelty → 回退 relevance=6：0.15×10+0.15×8+0.25×6+0.2×4+0.25×6 = 6.5
-    assert m["composite"] == pytest.approx(6.5, abs=0.001)
-    assert "novelty" not in m["dims"]  # 维度统计仍按缺失处理，不虚造
+    assert m["composite"] is None, "缺维度不得用别的维度顶替后继续算综合分"
+    assert m["rank"] is None, "不可评的模型不得参与排名"
+    assert m["evaluable"] is False
+    assert any("novelty" in gap for gap in m["unevaluable_gaps"]), \
+        f"必须点名缺哪一维，实际：{m['unevaluable_gaps']}"
+    assert "novelty" not in m["dims"], "维度统计仍按缺失处理，不虚造"
 
 
 def test_scenario_weights_from_payload_meta():
@@ -183,9 +199,16 @@ def test_scenario_weights_from_payload_meta():
 def test_aggregate_rank_desc():
     agg = bench_report.aggregate(_payload())
     ranks = [(m["id"], m["rank"]) for m in agg["models"]]
-    assert ranks == [("A", 1), ("B", 2), ("C", 3)]
-    composites = [m["composite"] for m in agg["models"]]
+    # C 的推理失败（scores=None）⇒ **不可评**，不得给它一个名次。
+    # 旧实现给失败模型排了第 3 名，等于把它当成"参与了比较但最差"；
+    # 而它连比较都没参加（judged_prompts = 0）。
+    assert ranks == [("A", 1), ("B", 2), ("C", None)]
+    # 可评的模型按 composite 降序；不可评的不参与排序
+    composites = [m["composite"] for m in agg["models"] if m["composite"] is not None]
     assert composites == sorted(composites, reverse=True)
+    failed = [m for m in agg["models"] if m["id"] == "C"][0]
+    assert failed["evaluable"] is False
+    assert failed["win_rate"] is None, "不可评的模型不得给出胜率（会被读成「0% 胜」）"
 
 
 def test_aggregate_detail_enrichment():

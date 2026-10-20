@@ -58,7 +58,29 @@ def test_judge_agreement_identical_inputs():
     a = _judge_result({"accuracy": 1, "completeness": 2, "relevance": 3, "clarity": 4})
     ag = judge_mod.judge_agreement(a, a)
     assert ag["winner_agreement"] is True
-    assert all(v == 1.0 for v in ag["dim_corr"].values())
+    # C4 / B4：单条对比**算不出**逐维度相关性（每个维度只有一个 Δ 值，
+    # 一个点无法求相关）。旧实现把整体 ρ 复制成 5 份，报告里于是出现
+    # 5 个一模一样的"逐维度相关性"，看上去像 5 次独立测量。
+    # 现在 dim_corr 必须是空的，唯一算得出的是整体 Δ 向量的 ρ。
+    assert ag["dim_corr"] == {}, "单条对比不得产出逐维度相关性"
+    assert ag["delta_rho"] == 1.0
+    assert ag["rho_n_dims"] == 4
+
+
+def test_judge_agreement_across_computes_per_dimension_independently():
+    """C4：逐维度相关性由**跨多条对比**的 Δ 对独立算出，不是复制一个全局 ρ。"""
+    pairs = []
+    for k in range(3):
+        deltas_a = {"accuracy": k, "completeness": 10 - k, "relevance": 5, "clarity": 5}
+        deltas_b = {"accuracy": k, "completeness": 10 - k, "relevance": 5, "clarity": 5}
+        pairs.append((_judge_result(deltas_a), _judge_result(deltas_b)))
+    out = judge_mod.judge_agreement_across(pairs)
+    assert out["n_pairs"] == 3
+    # accuracy 与 completeness 同步变化 ⇒ ρ = 1；两者各自独立算，不是复制品
+    assert out["dim_corr"]["accuracy"] == pytest.approx(1.0)
+    assert out["dim_corr"]["completeness"] == pytest.approx(1.0)
+    # 单一常量维度无法求相关（零方差）⇒ 不可判定，不得写成 ρ=0
+    assert "relevance" not in out["dim_corr"], "零方差维度不得被算成一个 ρ=0 的值"
 
 
 def test_judge_agreement_winner_disagreement():
@@ -66,6 +88,20 @@ def test_judge_agreement_winner_disagreement():
     b = _judge_result({"accuracy": 1, "completeness": 2, "relevance": 3, "clarity": 4}, winner="original")
     ag = judge_mod.judge_agreement(a, b)
     assert ag["winner_agreement"] is False
+
+
+def test_spearman_undefined_is_none_not_zero():
+    """A17：相关性**未定义**时必须返回 None（不可判定），不得返回 0.0。
+
+    「没测出来」与「测得零相关」在数据里不可区分 ⇒ 报告里的 ρ=0.00 会被
+    读成「两个裁判毫无关联」，而真相是「这一维没变化，相关性算不出来」。
+    """
+    assert judge_mod._spearman([1, 2, 3], [1, 2, 3]) == 1.0
+    # 样本不足
+    assert judge_mod._spearman([1], [1]) is None
+    # 零方差：分母为 0，相关性未定义
+    assert judge_mod._spearman([5, 5, 5], [1, 2, 3]) is None
+    assert judge_mod._spearman([1, 2, 3], [5, 5, 5]) is None
 
 
 def test_spearman_monotonic_perfect():
@@ -178,7 +214,11 @@ def test_aggregate_judge_agreement_and_stats():
     ja = agg["summary"]["judge_agreement"]
     assert ja["n"] == 1
     assert ja["winner_agreement"] == 1.0
-    assert set(ja["dim_corr"]) == set(DIMS)
+    # C4：只有 1 条对比 ⇒ 逐维度相关性不可算（每个维度只有 1 对）⇒ dim_corr 为空。
+    # 旧实现会在这里给出 5 个"逐维度相关性"，看上去像 5 次独立测量。
+    assert ja["dim_corr"] == {}, "单条对比不得产出逐维度相关性"
+    assert ja["n_pairs"] == 1
+    assert ja["n_dims"] == 0
 
     s = agg["summary"]
     assert s["win_rate_ci"][0] <= s["win_rate_ci"][1]

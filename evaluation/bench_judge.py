@@ -80,14 +80,17 @@ def judge_answer(
 def _parse_scores(text: str) -> dict[str, Any]:
     """解析裁判 JSON：五个维度必须是 1-10 的整数，reason 缺失时置空。
 
-    novelty 缺失（旧缓存/模型未输出）时回退取 relevance，保证旧数据兼容。
+    某个维度缺失 ⇒ 该样本**不可评**（清单 C1）。
+
+    此前 novelty 缺失会回退取 relevance —— 于是"新颖性"这一维度实际测的是
+    "相关性"；而且这个顶替在 docstring 里被写成"保证旧数据兼容"，
+    被当成既定设计而不是缺陷。现在缺维度就是缺维度：抛错 ⇒ 该样本判失败，
+    失败原因（点名哪个维度缺失）进入产物，可被审计。
     """
     parsed = enhancer.parse_result(text)
     scores: dict[str, Any] = {}
     for dim in DIMENSIONS:
         value = parsed.get(dim)
-        if not isinstance(value, (int, float)) and dim == "novelty":
-            value = parsed.get("relevance")
         if not isinstance(value, (int, float)):
             raise ValueError(f"裁判结果缺少 {dim} 或非数字")
         scores[dim] = int(round(float(value)))

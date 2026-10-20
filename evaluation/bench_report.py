@@ -30,24 +30,67 @@ def estimate_tokens(text: str) -> int:
     return math.ceil(len(text) / 1.8)
 
 
+def composite_gaps(
+    scores: dict[str, Any] | None,
+    latency_s: float | None,
+    weights: dict[str, float] | None = None,
+    scenario: str = "",
+    scenario_weights: dict[str, dict[str, float]] | None = None,
+) -> list[str]:
+    """返回导致 composite **不可评**的缺失项（空列表 = 可评）。
+
+    清单 C2 / C3：任何参与排序键的指标**不得由别的指标顶替**，也不得用 0 顶替。
+    缺哪一项，这里就点名哪一项 —— 排除原因必须落在产物里（R2）。
+    """
+    if not scores:
+        return ["缺少全部维度打分"]
+    gaps: list[str] = []
+    sw = (scenario_weights or {}).get(scenario)
+    if sw:
+        wmap = {
+            d: float(v)
+            for d, v in sw.items()
+            if isinstance(v, (int, float)) and float(v) != 0
+        }
+        if sum(wmap.values()) > 0:
+            for dim in COMPOSITE_DIMS:
+                if wmap.get(dim, 0.0) == 0:
+                    continue
+                if scores.get(dim) is None:
+                    gaps.append(f"缺少参与加权的维度 {dim}")
+            return gaps
+    w = {**DEFAULT_WEIGHTS, **(weights or {})}
+    if w.get("quality"):
+        for dim in QUALITY_DIMS:
+            if scores.get(dim) is None:
+                gaps.append(f"缺少质量维度 {dim}")
+    if w.get("relevance") and scores.get("relevance") is None:
+        gaps.append("缺少相关性维度 relevance")
+    if w.get("speed") and latency_s is None:
+        gaps.append("缺少延迟 latency_s")
+    return gaps
+
+
 def compute_composite(
     scores: dict[str, Any],
     latency_s: float | None,
     weights: dict[str, float] | None = None,
     scenario: str = "",
     scenario_weights: dict[str, dict[str, float]] | None = None,
-) -> float:
-    """综合分计算。
+) -> float | None:
+    """综合分计算。**缺数据 ⇒ None（不可评），绝不回落成 0.0**（清单 C2 / C3）。
 
     场景权重命中（scenario_weights 含该场景且权重和为正值）时：
-      composite = Σ (w_i / Σw) × dim_i，dim 取 accuracy/completeness/relevance/clarity/novelty，
-      映射外的维度权重为 0；维度缺失（旧缓存无 novelty）时 novelty 回退用 relevance。
+      composite = Σ (w_i / Σw) × dim_i，dim 取 accuracy/completeness/relevance/clarity/novelty。
+      参与加权的维度缺失 ⇒ composite = None（该条目不可评）。
+      **不再用 relevance 顶替缺失的 novelty** —— 此前"新颖性"实际测的是"相关性"，
+      而且这个顶替发生在**聚合侧**，而 composite 正是模型排名的排序键。
     未命中时：
       composite = q_w×质量均分(准确/完整/清晰) + r_w×相关性 + s_w×速度分；
-      速度分 = 1 - min(latency,120)/120。
+      速度分 = 1 - min(latency,120)/120。缺任何一项 ⇒ None。
     """
-    if not scores:
-        return 0.0
+    if composite_gaps(scores, latency_s, weights, scenario, scenario_weights):
+        return None
     sw = (scenario_weights or {}).get(scenario)
     if sw:
         wmap = {
@@ -62,16 +105,12 @@ def compute_composite(
                 w = wmap.get(dim, 0.0)
                 if w == 0:
                     continue
-                value = scores.get(dim)
-                if value is None and dim == "novelty":
-                    value = scores.get("relevance")
-                total += (w / total_w) * float(value or 0)
+                total += (w / total_w) * float(scores[dim])
             return total
     w = {**DEFAULT_WEIGHTS, **(weights or {})}
-    q_dims = [d for d in QUALITY_DIMS if d in scores]
-    quality = sum(scores[d] for d in q_dims) / len(q_dims) if q_dims else 0.0
-    relevance = float(scores.get("relevance") or 0)
-    speed = 1.0 - min(float(latency_s or LATENCY_CAP_S), LATENCY_CAP_S) / LATENCY_CAP_S
+    quality = sum(scores[d] for d in QUALITY_DIMS) / len(QUALITY_DIMS)
+    relevance = float(scores["relevance"])
+    speed = 1.0 - min(float(latency_s), LATENCY_CAP_S) / LATENCY_CAP_S
     return w["quality"] * quality + w["relevance"] * relevance + w["speed"] * speed
 
 
@@ -145,23 +184,41 @@ def aggregate(
             continue
         bucket = per_model.setdefault(mid, {})
         scores = item["scores"]
-        composite = compute_composite(
+        gaps = composite_gaps(
             scores, item.get("latency_s"), weights, scenario_of(item), scenario_weights
         )
+        composite = (
+            None
+            if gaps
+            else compute_composite(
+                scores, item.get("latency_s"), weights, scenario_of(item), scenario_weights
+            )
+        )
+        bucket["judged"] = bucket.get("judged", 0) + 1
         for dim in DIMENSIONS:
             if dim in scores:
                 bucket.setdefault("dims", {}).setdefault(dim, []).append(float(scores[dim]))
-        q_dims = [d for d in QUALITY_DIMS if d in scores]
-        if q_dims:
+        if all(scores.get(d) is not None for d in QUALITY_DIMS):
             bucket.setdefault("qualities", []).append(
-                sum(scores[d] for d in q_dims) / len(q_dims)
+                sum(scores[d] for d in QUALITY_DIMS) / len(QUALITY_DIMS)
             )
-        bucket.setdefault("composites", []).append(composite)
+        else:
+            # 质量均分只收"三维齐全"的条目；缺维度的条目单独计数（R2）
+            bucket.setdefault("quality_missing", []).append(item.get("prompt_id", ""))
+        if composite is None:
+            # C2：不可评的条目**不进** composites，也不参与该提示词的胜者判定。
+            # 排除原因必须留痕（gaps），否则读者只看到"这个模型没上榜"。
+            bucket.setdefault("unevaluable", []).append({
+                "prompt_id": item.get("prompt_id", ""),
+                "gaps": gaps,
+            })
+        else:
+            bucket.setdefault("composites", []).append(composite)
+            per_prompt_composite.setdefault(item.get("prompt_id", ""), {})[mid] = composite
         if item.get("latency_s") is not None:
             bucket.setdefault("latencies", []).append(float(item["latency_s"]))
         if item.get("output_len") is not None:
             bucket.setdefault("output_lens", []).append(int(item["output_len"]))
-        per_prompt_composite.setdefault(item.get("prompt_id", ""), {})[mid] = composite
 
     prompt_winners: dict[str, str] = {}
     for pid, comps in per_prompt_composite.items():
@@ -179,8 +236,13 @@ def aggregate(
     }
     for mid, bucket in per_model.items():
         dims = bucket.get("dims", {})
-        judged = len(bucket.get("composites", []))
+        judged = bucket.get("judged", 0)
+        composites = bucket.get("composites", [])
+        unevaluable = bucket.get("unevaluable", [])
         wins = sum(1 for pid, wmid in prompt_winners.items() if wmid == mid)
+        # C2：任一条目不可评 ⇒ 该模型**不可评**：综合分是排名的排序键，
+        # 用"剩下的条目"算出来的综合分会让缺失的条目凭空消失（与 A6 同一个病）。
+        model_composite = round(_mean(composites), 3) if composites and not unevaluable else None
         models.append({
             "id": mid,
             "label": label_map.get(mid, mid),
@@ -188,30 +250,44 @@ def aggregate(
             "quality_mean": round(_mean(bucket.get("qualities", [])), 2),
             "latency_mean": round(_mean(bucket.get("latencies", [])), 2),
             "output_len_mean": round(_mean(bucket.get("output_lens", [])), 1),
-            "win_rate": round(wins / judged, 3) if judged else 0.0,
+            "win_rate": round(wins / judged, 3) if judged else None,
             "wins": wins,
             "judged_prompts": judged,
-            "composite": round(_mean(bucket.get("composites", [])), 3),
+            "evaluable_prompts": len(composites),
+            "unevaluable_prompts": len(unevaluable),
+            "unevaluable_gaps": sorted({g for u in unevaluable for g in u["gaps"]}),
+            "quality_missing_prompts": len(bucket.get("quality_missing", [])),
+            "composite": model_composite,
+            "evaluable": model_composite is not None,
         })
 
-    models.sort(key=lambda m: (m["composite"], m["id"]), reverse=True)
+    # 排名只给**可评**的模型；不可评的排在后面、rank=None（清单 C2）。
+    # 绝不把不可评的模型按 0 分塞进排名 —— 那会让"没测到"看起来像"排最后"。
+    evaluable = [m for m in models if m["composite"] is not None]
+    unevaluable = [m for m in models if m["composite"] is None]
+    evaluable.sort(key=lambda m: (m["composite"], m["id"]), reverse=True)
     prev_composite: float | None = None
-    for idx, m in enumerate(models):
-        m["rank"] = idx + 1 if m["composite"] != prev_composite else models[idx - 1]["rank"]
+    for idx, m in enumerate(evaluable):
+        m["rank"] = idx + 1 if m["composite"] != prev_composite else evaluable[idx - 1]["rank"]
         prev_composite = m["composite"]
+    for m in unevaluable:
+        m["rank"] = None
+    models = evaluable + unevaluable
 
     details: list[dict[str, Any]] = []
     for item in payload.get("details", []):
         entry = dict(item)
         mid = item.get("model_id", "")
         if not item.get("error") and item.get("scores"):
-            entry["composite"] = round(
-                compute_composite(
-                    item["scores"], item.get("latency_s"), weights, scenario_of(item), scenario_weights
-                ),
-                3,
+            composite = compute_composite(
+                item["scores"], item.get("latency_s"), weights, scenario_of(item), scenario_weights
             )
+            entry["composite"] = None if composite is None else round(composite, 3)
             entry["winner"] = prompt_winners.get(item.get("prompt_id", "")) == mid
+            if composite is None:
+                entry["composite_gaps"] = composite_gaps(
+                    item["scores"], item.get("latency_s"), weights, scenario_of(item), scenario_weights
+                )
         else:
             entry["composite"] = None
             entry["winner"] = False
@@ -260,11 +336,24 @@ def _render_markdown(payload: dict[str, Any]) -> str:
     lines.append("| 排名 | 模型 | 质量均分 | 相关性 | 延迟(s) | 综合分 |")
     lines.append("|---:|---|---:|---:|---:|---:|")
     for m in models:
+        # C2 / C3：不可评的模型照常列出，但排名与综合分写「不可评」——
+        # 把它们按 0 分塞进排名，会让"没测到"看起来像"排最后"。
+        rank_txt = m["rank"] if m.get("rank") is not None else "不可评"
+        composite_txt = f"{m['composite']:.3f}" if m.get("composite") is not None else "不可评"
         lines.append(
-            f"| {m['rank']} | {m.get('label', m['id'])} | {m['quality_mean']:.2f} | "
-            f"{m['dims'].get('relevance', 0):.2f} | {m['latency_mean']:.2f} | {m['composite']:.3f} |"
+            f"| {rank_txt} | {m.get('label', m['id'])} | {m['quality_mean']:.2f} | "
+            f"{m['dims'].get('relevance', 0):.2f} | {m['latency_mean']:.2f} | {composite_txt} |"
         )
     lines.append("")
+    unevaluable_models = [m for m in models if m.get("unevaluable_gaps")]
+    if unevaluable_models:
+        lines.append("> **不可评模型**（缺失维度参与排序键 ⇒ 不参与排名）：")
+        for m in unevaluable_models:
+            lines.append(
+                f"> - {m.get('label', m['id'])}：{m.get('unevaluable_prompts', 0)} 条不可评"
+                f"（{'；'.join(m['unevaluable_gaps'])}）"
+            )
+        lines.append("")
 
     lines.extend(_cost_block(payload))
 
@@ -285,12 +374,20 @@ def _render_markdown(payload: dict[str, Any]) -> str:
                 continue
             scores = item["scores"]
             mark = " ★" if item.get("winner") else ""
+            composite = item.get("composite")
+            composite_txt = f"{composite:.3f}" if isinstance(composite, (int, float)) else "不可评"
+            latency = item.get("latency_s")
+            latency_txt = f"{latency:.2f}" if isinstance(latency, (int, float)) else "-"
             lines.append(
                 f"| {label}{mark} | {scores.get('accuracy', 0)} | {scores.get('completeness', 0)} | "
                 f"{scores.get('relevance', 0)} | {scores.get('clarity', 0)} | "
                 f"{scores.get('novelty', '-')} | "
-                f"{item.get('latency_s', 0):.2f} | {item.get('composite', 0):.3f} |"
+                f"{latency_txt} | {composite_txt} |"
             )
+            if item.get("composite_gaps"):
+                lines.append(
+                    f"| ↳ 不可评原因 | {'；'.join(item['composite_gaps'])} | | | | | | |"
+                )
         lines.append("")
 
     lines.append("## 三、逐模型小结\n")
@@ -300,8 +397,18 @@ def _render_markdown(payload: dict[str, Any]) -> str:
         ranked_dims = sorted(dims.items(), key=lambda kv: kv[1], reverse=True)
         strong = "、".join(f"{DIMENSION_LABELS[d]}（{v:.2f}）" for d, v in ranked_dims[:2] if v)
         weak = "、".join(f"{DIMENSION_LABELS[d]}（{v:.2f}）" for d, v in ranked_dims[-2:] if v)
-        lines.append(f"- 排名第 {m['rank']} | 综合分 {m['composite']:.3f} | 胜率 {m['win_rate'] * 100:.1f}%"
+        composite = m.get("composite")
+        composite_txt = f"{composite:.3f}" if isinstance(composite, (int, float)) else "不可评"
+        win_rate = m.get("win_rate")
+        win_txt = f"{win_rate * 100:.1f}%" if isinstance(win_rate, (int, float)) else "不可判定"
+        rank_txt = m["rank"] if m.get("rank") is not None else "不可评"
+        lines.append(f"- 排名第 {rank_txt} | 综合分 {composite_txt} | 胜率 {win_txt}"
                      f"（{m.get('wins', 0)}/{m.get('judged_prompts', 0)}）")
+        if m.get("unevaluable_gaps"):
+            lines.append(
+                f"- 不可评原因：{'；'.join(m['unevaluable_gaps'])}"
+                f"（{m.get('unevaluable_prompts', 0)}/{m.get('judged_prompts', 0)} 条不可评）"
+            )
         lines.append(f"- 优势维度：{strong or '无'}")
         lines.append(f"- 短板维度：{weak or '无'}")
         lines.append(f"- 平均延迟：{m['latency_mean']:.2f}s | 平均输出长度：{m['output_len_mean']:.0f} 字符")

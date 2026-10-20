@@ -174,21 +174,69 @@ def judge_pair(
 
 
 def judge_agreement(a: dict, b: dict) -> dict:
-    """a/b 为两次 judge_pair 结果；返回 winner 一致性与各维度 Spearman 相关。
+    """a/b 为两次 judge_pair 结果；返回胜者一致性与**整体** Δ 相关性。
 
-    单条对比在每个维度上只有一组 delta 值，无法按维度单独求相关，
-    因此对两个裁判的 delta 向量整体计算 Spearman ρ（各维度相关），
-    并以同一 ρ 填入各维度键下，便于报告端按维度聚合均值。
-    仅使用双方都含有的维度（旧数据缺 novelty 时自动跳过）。
+    **逐维度相关性在单条对比上算不出来**：每个维度只有一个 Δ 值，
+    一个点无法求相关。此前这里把整体 ρ 复制成每个维度一份，
+    报告里于是出现 5 个一模一样的"逐维度相关性"，看上去像 5 次独立测量
+    （清单 C4）。
+
+    现在只输出**一个**整体 ρ（``delta_rho``），``dim_corr`` 留空 ——
+    逐维度的值由 :func:`judge_agreement_across` 在聚合阶段用多条对比的
+    Δ 对真正算出来。
+
+    样本不足（维度数 < 2）时 ρ 是 ``None``（不可判定），不是 0.0。
     """
     winner_agreement = bool(a.get("winner") == b.get("winner"))
     dims = [d for d in DIMENSIONS if d in a.get("deltas", {}) and d in b.get("deltas", {})]
-    rho = 0.0
-    if dims:
+    rho: float | None = None
+    if len(dims) >= 2:
         x = [float(a["deltas"][dim]) for dim in dims]
         y = [float(b["deltas"][dim]) for dim in dims]
-        rho = _spearman(x, y)
-    return {"winner_agreement": winner_agreement, "dim_corr": {dim: rho for dim in dims}}
+        raw = _spearman(x, y)
+        rho = round(raw, 4) if raw is not None else None
+    return {
+        "winner_agreement": winner_agreement,
+        "dim_corr": {},          # 单条对比算不出逐维度相关 ⇒ 不编造
+        "delta_rho": rho,        # 唯一算得出的相关性：整体 Δ 向量
+        "rho_n_dims": len(dims),
+    }
+
+
+def judge_agreement_across(comparisons: list[tuple[dict, dict]]) -> dict:
+    """跨多条对比计算**逐维度** Spearman 相关（清单 C4 的正解）。
+
+    每条对比提供 ``(裁判A的 judge 结果, 裁判B的 judge 结果)``。
+    对每个维度，把各条对比的 ``(A_Δ, B_Δ)`` 收集成序列后**独立**求 Spearman ——
+    这才是"逐维度相关性"。单条对比只有每个维度一个点，算不出来（见
+    :func:`judge_agreement` 的说明）。
+
+    样本对不足 2 的维度**不出现在结果里**（不可判定，不是 ρ=0）。
+
+    返回
+    ----
+    dict
+        ``{"dim_corr": {维度: ρ}, "n_pairs": 对数, "n_dims": 可算维度数}``
+    """
+    per_dim: dict[str, list[tuple[float, float]]] = {}
+    for a, b in comparisons:
+        da = a.get("deltas") or {}
+        db = b.get("deltas") or {}
+        for dim in DIMENSIONS:
+            if da.get(dim) is not None and db.get(dim) is not None:
+                per_dim.setdefault(dim, []).append((float(da[dim]), float(db[dim])))
+    dim_corr: dict[str, float] = {}
+    for dim, pairs in per_dim.items():
+        if len(pairs) < 2:
+            continue          # 不可判定：不出现在结果里（不是 ρ=0）
+        x = [p[0] for p in pairs]
+        y = [p[1] for p in pairs]
+        raw = _spearman(x, y)
+        if raw is None:
+            # 相关性未定义（某一侧零方差）⇒ 不可判定，不出现在结果里（不是 ρ=0）
+            continue
+        dim_corr[dim] = round(raw, 4)
+    return {"dim_corr": dim_corr, "n_pairs": len(comparisons), "n_dims": len(dim_corr)}
 
 
 def judge_prompt_level(
@@ -260,7 +308,14 @@ def _rank(values: list[float]) -> list[float]:
     return ranks
 
 
-def _pearson(x: list[float], y: list[float]) -> float:
+def _pearson(x: list[float], y: list[float]) -> float | None:
+    """Pearson 相关。**相关性未定义时返回 ``None``（不可判定），不是 0.0。**
+
+    A17：零方差（某一侧全是同一个值）时分母为 0，相关性在数学上**未定义**。
+    此前这里返回 0.0，于是「没测出来」与「测得零相关」在数据里不可区分，
+    报告里的 ρ=0.00 会被读成「两个裁判毫无关联」，而真相是「这一维没变化，
+    相关性算不出来」。
+    """
     n = len(x)
     mx, my = sum(x) / n, sum(y) / n
     sxx = sum((v - mx) ** 2 for v in x)
@@ -268,14 +323,17 @@ def _pearson(x: list[float], y: list[float]) -> float:
     sxy = sum((x[i] - mx) * (y[i] - my) for i in range(n))
     denom = (sxx * syy) ** 0.5
     if not denom:
-        return 0.0
+        return None
     return max(-1.0, min(1.0, sxy / denom))
 
 
-def _spearman(x: list[float], y: list[float]) -> float:
-    """Spearman 秩相关：平均秩处理并列后对秩做 Pearson 相关（无 scipy 依赖）。"""
+def _spearman(x: list[float], y: list[float]) -> float | None:
+    """Spearman 秩相关：平均秩处理并列后对秩做 Pearson 相关（无 scipy 依赖）。
+
+    样本不足（< 2）或某一侧零方差时**返回 None**（不可判定），不是 0.0。
+    """
     if len(x) != len(y) or len(x) < 2:
-        return 0.0
+        return None
     return _pearson(_rank(x), _rank(y))
 
 

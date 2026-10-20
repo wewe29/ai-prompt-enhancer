@@ -197,18 +197,34 @@ def test_report_gate_blocks_when_delivery_rate_is_undeterminable():
 # ---------------------------------------------------------------- A9 维度相关性
 
 def test_unmeasured_dimension_is_absent_from_dim_corr():
-    """A9：某维度没有样本时，它不出现在 dim_corr 里（不得写成 0.0）。"""
+    """A9 + C4：未测量的维度不得出现在 dim_corr 里；逐维度相关性必须**真算**。
+
+    dim_corr 的来源已从「把 agreement 块里的全局 ρ 抄成 5 份」改成
+    **跨多条对比、逐维度独立计算**（judge_agreement_across）。所以：
+      * 样本对不足 2 的维度 ⇒ 不可判定，**不出现在** dim_corr 里（也不是 ρ=0）；
+      * 样本对够的维度 ⇒ 出现，且是它自己的 ρ。
+    """
+    # s1 有 4 个维度；s2 缺 relevance ⇒ relevance 只有 1 对样本
     payload = _payload([
-        _sample("s1", judge=_judge({d: 4 for d in DIMS})),
+        _sample("s1", judge=_judge({"accuracy": 1, "completeness": 2, "clarity": 3, "relevance": 4})),
+        _sample("s2", judge=_judge({"accuracy": 2, "completeness": 4, "clarity": 6})),
     ])
-    payload["samples"][0]["results"]["t1"]["agreement"] = {
-        "winner_agreement": True,
-        "dim_corr": {"accuracy": 0.8},
-    }
+    for sample in payload["samples"]:
+        result = sample["results"]["t1"]
+        result["judge2"] = _judge(result["judge"]["deltas"])
+        result["agreement"] = {
+            "winner_agreement": True,
+            "dim_corr": {},
+            "delta_rho": 1.0,
+            "rho_n_dims": 4,
+        }
     summary = report_mod._aggregate(payload)["summary"]
     dim_corr = summary["judge_agreement"]["dim_corr"]
-    assert dim_corr == {"accuracy": 0.8}
-    assert "completeness" not in dim_corr, "未测量的维度不得出现在 dim_corr 里"
+    # 有 2 对样本的维度：出现，且是它自己的 ρ（两个裁判完全一致 ⇒ ρ=1）
+    assert dim_corr.get("accuracy") == pytest.approx(1.0)
+    assert dim_corr.get("completeness") == pytest.approx(1.0)
+    # 只有 1 对样本的维度：不可判定，不得出现在结果里
+    assert "relevance" not in dim_corr, "样本对不足的维度不得出现在 dim_corr 里"
 
 
 def test_markdown_marks_unmeasured_dimension(tmp_path):

@@ -17,7 +17,10 @@ JUDGE_CFG = {"model": "judge-model", "temperature": 0}
 
 
 def _good_scores() -> dict:
-    return {"accuracy": 9, "completeness": 8, "relevance": 7, "clarity": 6, "reason": "不错"}
+    # 清单 C1：五个维度都必须真实给出。此前 novelty 缺失会回退取 relevance，
+    # 于是"新颖性"实际测的是"相关性"。现在缺维度 = 该样本不可评。
+    return {"accuracy": 9, "completeness": 8, "relevance": 7, "clarity": 6,
+            "novelty": 5, "reason": "不错"}
 
 
 def _call_chat_fake(monkeypatch, responses):
@@ -82,7 +85,8 @@ def test_judge_answer_error_after_retry(monkeypatch):
 
 
 def test_judge_answer_rejects_out_of_range_score(monkeypatch):
-    bad = {"accuracy": 11, "completeness": 5, "relevance": 5, "clarity": 5, "reason": ""}
+    bad = {"accuracy": 11, "completeness": 5, "relevance": 5, "clarity": 5,
+           "novelty": 5, "reason": ""}
     _call_chat_fake(monkeypatch, [
         bench_api.ChatResult(text=json.dumps(bad)),
         bench_api.ChatResult(text=json.dumps(_good_scores())),
@@ -90,6 +94,36 @@ def test_judge_answer_rejects_out_of_range_score(monkeypatch):
 
     result = bench_judge.judge_answer("任务", "提示词", "回答", API_CFG, JUDGE_CFG, "key", 30)
     assert result["accuracy"] == 9  # 越界触发重试，第二次成功
+
+
+def test_missing_novelty_is_not_substituted_by_relevance(monkeypatch):
+    """清单 C1：novelty 缺失 ⇒ 该样本不可评，**不得**用 relevance 顶替。
+
+    此前 novelty 缺失会回退取 relevance（"新颖性"实际测的是"相关性"），
+    而且这个顶替被写成"保证旧数据兼容"，被当成既定设计。
+    现在缺维度就是缺维度：报错并点名缺失的维度，失败原因可被审计。
+    """
+    payload = json.dumps({"accuracy": 9, "completeness": 8, "relevance": 7,
+                          "clarity": 6, "reason": "不错"}, ensure_ascii=False)
+    state = _call_chat_fake(monkeypatch, [bench_api.ChatResult(text=payload)])
+
+    result = bench_judge.judge_answer("任务", "提示词", "回答", API_CFG, JUDGE_CFG, "key", 30)
+
+    assert state["calls"] == 2, "缺维度必须重试，不得静默补一个维度"
+    assert "error" in result
+    assert "novelty" in result["error"], "失败原因必须点名缺失的维度"
+    assert "novelty" not in result, "不得凭空造出 novelty 分"
+    assert result.get("relevance") != 7 or "novelty" not in result
+
+
+def test_missing_novelty_never_becomes_relevance_value(monkeypatch):
+    """C1 的直接断言：解析结果里 novelty 永远不是 relevance 的拷贝。"""
+    payload = json.dumps({"accuracy": 9, "completeness": 8, "relevance": 7,
+                          "clarity": 6, "reason": "不错"}, ensure_ascii=False)
+    _call_chat_fake(monkeypatch, [bench_api.ChatResult(text=payload)])
+
+    with pytest.raises(ValueError):
+        bench_judge._parse_scores(payload)
 
 
 def test_judge_answer_propagates_api_errors(monkeypatch):
