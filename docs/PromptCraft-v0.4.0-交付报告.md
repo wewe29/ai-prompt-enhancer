@@ -281,7 +281,72 @@ OPEN 0 / FIXED 41 / UNVERIFIED 0 / TOTAL 41
 
 ---
 
-## 九、阶段小结
+## 九、发布
+
+### 9.1 已推送
+
+| | 远端 | 提交 |
+|---|---|---|
+| 分支 | `refs/heads/release/v0.4.0` | `7d7434d` |
+| 默认分支 | `refs/heads/main` | `7d7434d`（由发布分支快进合并，与 v0.3.5 的惯例一致） |
+| 标签 | `refs/tags/v0.4.0`（附注标签） | `a7e1786` → `7d7434d` |
+
+### 9.2 便携包
+
+本地构建并通过**项目自带的端到端冒烟测试**（`scripts/smoke-portable.ps1`）：
+
+```
+[smoke] 自动化结果：10/10 通过
+  ✓ 启动应用并建立 CDP 连接
+  ✓ API Key 配置状态
+  ✓ 流式生成后停止（streaming=True, stopped=True, 原文保留=True）
+  ✓ 重新生成完整交付（输出 105 字）
+  ✓ 复制结果到剪贴板 / ✓ 历史记录保存与恢复
+  ✓ API 失败时原文保留   ← 这正是 G11 的新行为
+  ✓ 运行期间无新增 PromptCraft-* 临时目录
+[smoke] 已恢复凭据管理器原值
+```
+
+`release/PromptCraft-0.4.0-windows-x64-portable.zip`（9,632,259 字节）
+SHA-256 `4a9109f8c943555b2c24450ce7e4d4be339cde9cb87fa6c56cc2d8aad85ba621`。
+
+### 9.3 发布走 GitHub Actions（新增 `.github/workflows/release.yml`）
+
+**为什么不用 `gh` CLI 直接发**：2026-10-20 这台机器到 `api.github.com` 的 **HTTPS 通路整个不通**
+（直连超时、代理上游 502、`gh` 报 EOF、`web_fetch` 失败）——**只有 SSH 可用**。
+分支与 tag 能推，**Release 只能靠 GitHub 自己来做**。
+
+工作流跑在 GitHub 的 runner 上：装 Node/Rust/Python、vcpkg 装 OpenSSL、
+**跑完三套回归与 `cargo fmt --check` 才允许构建**，复用 `scripts/build-portable.ps1`
+（与本地同一套脚本），发布前校验 SHA-256，最后用 `softprops/action-gh-release`
+发布便携包 + SHA + README，附 `release-assets/RELEASE_NOTES-v0.4.0.md`。
+
+> **一条必须记住的 GitHub 规则**：`push` 事件**只在工作流文件存在于默认分支时**才触发。
+> 所以发布分支必须并入 `main`（本项目 v0.3.5 也是这么做的），
+> tag 推送才会带起发布工作流。
+
+**本机兜底路径**（网络恢复后一条命令即可）：
+```powershell
+gh auth login --web          # 设备流；令牌在 keyring 里已失效，需重新认证
+powershell -File scripts\publish-v0.4.0.ps1
+```
+
+### 9.4 顺带修掉的一处用户机器污染
+
+清理 Windows 凭据管理器时发现 **161 条条目里有 105 条是本项目的测试残留**
+（92 条 `PromptCraftProbe-*` 来自探针程序，13 条 `PromptCraftTest-*` 来自 cargo test）。
+根因：沙箱靠 `Drop` 清理凭据，**但进程被中断时 `Drop` 不执行** —— 与 v0.3.4 评审
+修过的那次（162 条）同类复发，只是换了个文件名。
+
+- 已清理 104 条（0 失败），生产条目 `database-key.PromptCraft` 与
+  `deepseek-api-key.PromptCraft` **复查仍在**；
+- 已把探针的凭据服务名改为**固定名** `PromptCraftProbe`：下次运行覆盖上次，
+  最多泄漏 1 条而不是 92 条；
+- 新增 `tools/cleanup-test-credentials.py`（只删这两类测试残留，绝不碰生产条目）。
+
+---
+
+## 十、阶段小结
 
 ### 9.1 经验教训
 
