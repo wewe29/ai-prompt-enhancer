@@ -19,6 +19,21 @@ struct WireUsage {
     completion_tokens: u64,
 }
 
+/// 增强温度：**产品实际使用值**，Rust 侧的唯一来源。
+///
+/// v0.4.0 由 0.35 下调到 0.1。必须说清楚的是：
+/// 这次调温的效果证据**落在噪声地板之内**，不能当作已证实的改进。
+/// `docs/PromptCraft-v0.4.0-效果验证报告.md` 自述"同一配置的两次独立运行给出
+/// 30% 与 71%，噪声地板约 41 个百分点，任何小于这个量级的差异都不可解读"，
+/// 而 55% -> 30% 只有 25 个百分点，低于该地板。**方向未确认。**
+///
+/// 评测侧（evaluation/config.yaml、config.py、enhancer.py、verify_enhance.py）
+/// 必须与本常量一致；`evaluation/test_temperature_consistency.py` 逐处断言。
+/// 温度是"档位是否稳定"这个 v0.4.0 主线的隐藏参数，
+/// 一旦产品改了而评测侧没改，全部评测结论就建立在与线上不同的温度上，
+/// 而且配置看起来完全可信。
+pub const ENHANCEMENT_TEMPERATURE: f64 = 0.1;
+
 pub async fn enhance(
     request: EnhancementRequest,
     on_event: Channel<BackendEvent>,
@@ -387,12 +402,10 @@ fn build_body_with_instruction(request: &EnhancementRequest, instruction: Option
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_message}
         ],
-        // v0.4.0：由 0.35 降到 0.1。60 条样本 × 3 次的实测显示，
-        // clear 档 none/light 档位翻转率从 55% 降到 30%（约 2.5 个标准误），
-        // 且 light 出现率未下降（52% -> 57%），不是靠"什么都不做"换来的稳定。
-        // 不再往下降：temp 0.1 -> 0 无进一步改善（差异在噪声内）。
-        // 详见 docs/PromptCraft-v0.4.0-效果验证报告.md。
-        "temperature": 0.1,
+        // 增强温度：取值与理由见 ENHANCEMENT_TEMPERATURE 的定义。
+        // 这里不写"档位翻转率从 55% 降到 30%"—— 那份报告自己声明了
+        // 41 个百分点的噪声地板，25 个百分点的差异不可解读（方向未确认）。
+        "temperature": ENHANCEMENT_TEMPERATURE,
         "stream": true,
         "stream_options": {"include_usage": true},
         "response_format": {"type": "json_object"}

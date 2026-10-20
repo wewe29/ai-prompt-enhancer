@@ -53,7 +53,10 @@ DETERMINISTIC_PATH = RESULTS_DIR / "v035_deterministic.json"
 MODEL = "deepseek-flash"
 BASE_URL = "https://api.deepseek.com/chat/completions"
 MAX_TOKENS = 8192  # V4.1-Flash 思考 token 占比很高，必须给足余量
-TEMPERATURE = 0.35
+# v0.4.0 架构审查 P0-5：这里曾是硬编码的 0.35 —— 产出"档位分布"数字的脚本之一，
+# 却跑在与产品不同的温度上。改为直接引用 Python 侧的唯一来源，
+# 由 evaluation/test_temperature_consistency.py 保证它与 Rust 产品值一致。
+TEMPERATURE = enhancer.ENHANCEMENT_TEMPERATURE
 MAX_ATTEMPTS = 2
 
 # ---------------------------------------------------------------- 越权动作词

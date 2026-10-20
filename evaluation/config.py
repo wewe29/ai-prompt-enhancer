@@ -33,9 +33,11 @@ DEFAULTS: dict[str, Any] = {
         "model": "deepseek-v4-flash",
         "verbosity": "standard",
         "custom_instructions": "",
-        # v0.4.0：与 src-tauri/src/provider.rs 的产品实际值同步（原为 0.35）。
+        # v0.4.0：与 src-tauri/src/provider.rs 的 ENHANCEMENT_TEMPERATURE 同步（原为 0.35）。
         # 这一项必须跟产品走——它声称"与后端一致"却长期是 0.35，
         # 会让所有 run_eval / bench_* 结论建立在 3.5 倍于产品的温度上。
+        # 同一事实散落多处正是 v0.4.0 架构审查 P0-5 的隐患，
+        # 因此这里由 evaluation/test_temperature_consistency.py 逐处断言。
         "temperature": 0.1,
     },
     "scenario_temperatures": {

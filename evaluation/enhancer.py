@@ -17,6 +17,11 @@ import openai
 # ---- 与 provider.rs 一致的关键常量 ----
 SYSTEM_PROMPT_VERSION = "promptcraft-v2.2.0"
 
+# 增强温度：与 src-tauri/src/provider.rs 的 ENHANCEMENT_TEMPERATURE 一致（0.1）。
+# 这里是 Python 侧的唯一来源；config.yaml / config.py / verify_enhance.py
+# 的取值由 evaluation/test_temperature_consistency.py 逐处断言。
+ENHANCEMENT_TEMPERATURE = 0.1
+
 # 注意：Rust 源码中 r#"... "# 的原始字符串以换行开头、以换行结尾，这里保持完全一致。
 SYSTEM_PROMPT = """
 你是 PromptCraft 的提示词增强引擎。你把用户需求改写得更可执行，而不是扩写内容。
@@ -257,7 +262,7 @@ def enhance(original_text: str, cfg: dict[str, Any], api_key: str, *, target_mod
         attachments=[],
     )
     body = build_request_body(user_message, model=enh.get("model", "deepseek-chat"),
-                              temperature=float(enh.get("temperature", 0.1)))
+                              temperature=float(enh.get("temperature", ENHANCEMENT_TEMPERATURE)))
     base_url = enh.get("base_url", "https://api.deepseek.com").rstrip("/")
 
     # OpenAI SDK 的 base_url 传根地址即可，SDK 会自行追加 /chat/completions
