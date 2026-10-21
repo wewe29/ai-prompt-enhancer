@@ -325,6 +325,32 @@ SHA-256 `4a9109f8c943555b2c24450ce7e4d4be339cde9cb87fa6c56cc2d8aad85ba621`。
 > 所以发布分支必须并入 `main`（本项目 v0.3.5 也是这么做的），
 > tag 推送才会带起发布工作流。
 
+### 9.3.1 发布结果（已实测核对）
+
+| 项 | 值 |
+|---|---|
+| Release | https://github.com/wewe29/ai-prompt-enhancer/releases/tag/v0.4.0 |
+| 发布工作流 | `39520668910` → **success** |
+| 发布时间 | 2026-10-21T00:33:32Z |
+| draft / prerelease | false / false |
+| `/releases/latest` | **v0.4.0** ✓ |
+| 说明字数 | 3,353（**经检查不含效果宣称**，且写明了为什么不宣称） |
+
+附件与完整性：
+
+| 附件 | 字节 | sha256 |
+|---|---|---|
+| `PromptCraft-0.4.0-windows-x64-portable.zip` | 9,307,500 | `a62391f6d4ba38186f10cb69dab8d6db270e5dbb443feef771fffcf26d78f3a8` |
+| `SHA256-zip.txt` | 110 | — |
+| `README.txt` | 1,061 | — |
+
+**已下载发布的 zip 逐字节重算 sha256，与随包 `SHA256-zip.txt` 及 GitHub 记录的 digest
+三者一致** ✓（不是「上传成功」就算数）。
+
+> **发布包与本地构建的 zip 不同（9,307,500 vs 9,632,259 字节）是正常的**：
+> 两者由**不同的构建环境**产出（runner 上没有 WebView2 引导包）。
+> **发布包以 GitHub 上的这份为准**，本地那份只是验证产物。
+
 **本机兜底路径**（网络恢复后一条命令即可）：
 ```powershell
 gh auth login --web          # 设备流；令牌在 keyring 里已失效，需重新认证
