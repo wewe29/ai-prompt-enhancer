@@ -1,0 +1,2700 @@
+{
+  "_identity": {
+    "fields": {
+      "prompt_version": "promptcraft-v2.5.0",
+      "prompt_sha256": "1183a1c81fe720ee326b615903d73b4a27caf5b497bf4c65491f1dc24d4de1a2",
+      "model": "deepseek-flash",
+      "temperature": 0.1,
+      "samples_sha256": "b267e1cd7f5afccb264c9dd1d3f48298cb3ca816724ed90d69d74a83e37edeb7",
+      "repeats": 1,
+      "mode": "full",
+      "judge": "single",
+      "judge_version": "v040"
+    },
+    "tag": "64f59c0b96",
+    "created_at": "2026-10-21T14:41:00+00:00"
+  },
+  "summary": {
+    "model": "deepseek-flash",
+    "total_samples": 60,
+    "error_count": 0,
+    "errors": [],
+    "by_ambiguity_level": {
+      "clear": {
+        "total": 20,
+        "judged": 20,
+        "errors": 0,
+        "enhancement_level_distribution": {
+          "light": 13,
+          "none": 6,
+          "clarify": 1
+        },
+        "fact_fidelity": {
+          "通过": 13,
+          "轻微偏差": 7,
+          "严重问题": 0
+        },
+        "preservation": {
+          "通过": 12,
+          "轻微偏差": 3,
+          "严重问题": 4
+        },
+        "overreach": {
+          "通过": 20,
+          "严重问题": 0
+        },
+        "bloat": {
+          "通过": 10,
+          "轻微膨胀": 5,
+          "严重膨胀": 4,
+          "澄清模式不判定": 1,
+          "avg_ratio": 1.94,
+          "max_ratio": 5.49,
+          "clarify_avg_ratio": 2.42
+        },
+        "restraint": {
+          "恰当": 5,
+          "过度补全": 13,
+          "增强不足": 2,
+          "无法判断": 0
+        },
+        "redundant_question": {
+          "通过": 0,
+          "严重问题": 0,
+          "无标注-不判定": 20,
+          "无提问": 0,
+          "有标注样本数": 0
+        }
+      },
+      "medium": {
+        "total": 20,
+        "judged": 20,
+        "errors": 0,
+        "enhancement_level_distribution": {
+          "light": 16,
+          "clarify": 4
+        },
+        "fact_fidelity": {
+          "通过": 12,
+          "轻微偏差": 6,
+          "严重问题": 2
+        },
+        "preservation": {
+          "通过": 0,
+          "轻微偏差": 9,
+          "严重问题": 7
+        },
+        "overreach": {
+          "通过": 20,
+          "严重问题": 0
+        },
+        "bloat": {
+          "通过": 1,
+          "轻微膨胀": 12,
+          "严重膨胀": 3,
+          "澄清模式不判定": 4,
+          "avg_ratio": 2.31,
+          "max_ratio": 3.89,
+          "clarify_avg_ratio": 4.11
+        },
+        "restraint": {
+          "恰当": 16,
+          "过度补全": 4,
+          "增强不足": 0,
+          "无法判断": 0
+        },
+        "redundant_question": {
+          "通过": 0,
+          "严重问题": 0,
+          "无标注-不判定": 20,
+          "无提问": 0,
+          "有标注样本数": 0
+        }
+      },
+      "severe": {
+        "total": 20,
+        "judged": 20,
+        "errors": 0,
+        "enhancement_level_distribution": {
+          "clarify": 17,
+          "light": 3
+        },
+        "fact_fidelity": {
+          "通过": 6,
+          "轻微偏差": 9,
+          "严重问题": 5
+        },
+        "preservation": {
+          "通过": 2,
+          "轻微偏差": 0,
+          "严重问题": 1
+        },
+        "overreach": {
+          "通过": 20,
+          "严重问题": 0
+        },
+        "bloat": {
+          "通过": 0,
+          "轻微膨胀": 0,
+          "严重膨胀": 3,
+          "澄清模式不判定": 17,
+          "avg_ratio": 7.54,
+          "max_ratio": 11.47,
+          "clarify_avg_ratio": 16.84
+        },
+        "restraint": {
+          "恰当": 17,
+          "过度补全": 0,
+          "增强不足": 3,
+          "无法判断": 0
+        },
+        "redundant_question": {
+          "通过": 6,
+          "严重问题": 0,
+          "无标注-不判定": 12,
+          "无提问": 2,
+          "有标注样本数": 8
+        }
+      }
+    },
+    "token_totals": {
+      "prompt_tokens": 108164,
+      "completion_tokens": 152724,
+      "reasoning_tokens": 81270
+    }
+  },
+  "judgements": [
+    {
+      "id": "v30_code_decorator_retry",
+      "ambiguity_level": "clear",
+      "scenario": "编程",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "通过",
+        "identical": false,
+        "kept_ratio": 0.824
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "通过",
+        "ratio": 1.29,
+        "orig_len": 616,
+        "new_len": 793
+      },
+      "restraint": {
+        "verdict": "过度补全",
+        "level": "light",
+        "expected": "none",
+        "match": false,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_sql_order_query",
+      "ambiguity_level": "clear",
+      "scenario": "编程",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "轻微偏差",
+        "missing": [],
+        "added_numbers": [
+          "8.0"
+        ]
+      },
+      "preservation": {
+        "verdict": "通过",
+        "identical": false,
+        "kept_ratio": 1.0
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "轻微膨胀",
+        "ratio": 2.07,
+        "orig_len": 149,
+        "new_len": 309
+      },
+      "restraint": {
+        "verdict": "过度补全",
+        "level": "light",
+        "expected": "none",
+        "match": false,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_js_promise_race",
+      "ambiguity_level": "clear",
+      "scenario": "编程",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "通过",
+        "identical": true,
+        "kept_ratio": 1.0
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "通过",
+        "ratio": 1.0,
+        "orig_len": 309,
+        "new_len": 309
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "none",
+        "expected": "none",
+        "match": true,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_rust_borrow_fix",
+      "ambiguity_level": "clear",
+      "scenario": "编程",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "轻微偏差",
+        "identical": false,
+        "kept_ratio": 0.778
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "通过",
+        "ratio": 1.24,
+        "orig_len": 262,
+        "new_len": 324
+      },
+      "restraint": {
+        "verdict": "过度补全",
+        "level": "light",
+        "expected": "none",
+        "match": false,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_meeting_minutes",
+      "ambiguity_level": "clear",
+      "scenario": "办公写作",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "轻微偏差",
+        "identical": false,
+        "kept_ratio": 0.667
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "通过",
+        "ratio": 1.41,
+        "orig_len": 154,
+        "new_len": 217
+      },
+      "restraint": {
+        "verdict": "过度补全",
+        "level": "light",
+        "expected": "none",
+        "match": false,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_launch_email",
+      "ambiguity_level": "clear",
+      "scenario": "办公写作",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "轻微偏差",
+        "missing": [],
+        "added_numbers": [
+          "1",
+          "2",
+          "200",
+          "300"
+        ]
+      },
+      "preservation": {
+        "verdict": "严重问题",
+        "identical": false,
+        "kept_ratio": 0.333
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "严重膨胀",
+        "ratio": 3.27,
+        "orig_len": 94,
+        "new_len": 307
+      },
+      "restraint": {
+        "verdict": "过度补全",
+        "level": "light",
+        "expected": "none",
+        "match": false,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_onboarding_doc",
+      "ambiguity_level": "clear",
+      "scenario": "办公写作",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "轻微偏差",
+        "missing": [],
+        "added_numbers": [
+          "1",
+          "1500",
+          "2500",
+          "5"
+        ]
+      },
+      "preservation": {
+        "verdict": "通过",
+        "identical": false,
+        "kept_ratio": 1.0
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "严重膨胀",
+        "ratio": 3.11,
+        "orig_len": 75,
+        "new_len": 233
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "light",
+        "expected": "light",
+        "match": true,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_performance_review",
+      "ambiguity_level": "clear",
+      "scenario": "办公写作",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "严重问题",
+        "identical": false,
+        "kept_ratio": 0.333
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "轻微膨胀",
+        "ratio": 1.58,
+        "orig_len": 144,
+        "new_len": 228
+      },
+      "restraint": {
+        "verdict": "过度补全",
+        "level": "light",
+        "expected": "none",
+        "match": false,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_qa_https_explain",
+      "ambiguity_level": "clear",
+      "scenario": "问答",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "轻微偏差",
+        "missing": [],
+        "added_numbers": [
+          "1",
+          "2",
+          "300"
+        ]
+      },
+      "preservation": {
+        "verdict": "严重问题",
+        "identical": false,
+        "kept_ratio": 0.0
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "轻微膨胀",
+        "ratio": 2.85,
+        "orig_len": 41,
+        "new_len": 117
+      },
+      "restraint": {
+        "verdict": "过度补全",
+        "level": "light",
+        "expected": "none",
+        "match": false,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_qa_sql_injection",
+      "ambiguity_level": "clear",
+      "scenario": "问答",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "轻微偏差",
+        "identical": false,
+        "kept_ratio": 0.5
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "轻微膨胀",
+        "ratio": 1.66,
+        "orig_len": 95,
+        "new_len": 158
+      },
+      "restraint": {
+        "verdict": "过度补全",
+        "level": "light",
+        "expected": "none",
+        "match": false,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_qa_nginx_502",
+      "ambiguity_level": "clear",
+      "scenario": "问答",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "通过",
+        "identical": false,
+        "kept_ratio": 1.0
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "轻微膨胀",
+        "ratio": 2.65,
+        "orig_len": 62,
+        "new_len": 164
+      },
+      "restraint": {
+        "verdict": "过度补全",
+        "level": "light",
+        "expected": "none",
+        "match": false,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_data_ab_test",
+      "ambiguity_level": "clear",
+      "scenario": "数据分析",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "轻微偏差",
+        "missing": [],
+        "added_numbers": [
+          "1",
+          "3",
+          "4",
+          "5",
+          "50",
+          "6"
+        ]
+      },
+      "preservation": {
+        "verdict": "严重问题",
+        "identical": false,
+        "kept_ratio": 0.0
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "严重膨胀",
+        "ratio": 5.49,
+        "orig_len": 85,
+        "new_len": 467
+      },
+      "restraint": {
+        "verdict": "过度补全",
+        "level": "light",
+        "expected": "none",
+        "match": false,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_data_sql_cohort",
+      "ambiguity_level": "clear",
+      "scenario": "数据分析",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "轻微偏差",
+        "missing": [],
+        "added_numbers": [
+          "2",
+          "3",
+          "4",
+          "5"
+        ]
+      },
+      "preservation": {
+        "verdict": "澄清模式-不作判定",
+        "identical": false,
+        "kept_ratio": null
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "澄清模式-不作判定",
+        "ratio": 2.42,
+        "orig_len": 185,
+        "new_len": 448
+      },
+      "restraint": {
+        "verdict": "过度补全",
+        "level": "clarify",
+        "expected": "none",
+        "match": false,
+        "delivery_status": "needs_clarification"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 3
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_data_retention_analysis",
+      "ambiguity_level": "clear",
+      "scenario": "数据分析",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "轻微偏差",
+        "missing": [],
+        "added_numbers": [
+          "500"
+        ]
+      },
+      "preservation": {
+        "verdict": "通过",
+        "identical": false,
+        "kept_ratio": 1.0
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "严重膨胀",
+        "ratio": 3.09,
+        "orig_len": 115,
+        "new_len": 355
+      },
+      "restraint": {
+        "verdict": "过度补全",
+        "level": "light",
+        "expected": "none",
+        "match": false,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_translate_privacy_policy",
+      "ambiguity_level": "clear",
+      "scenario": "翻译",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "通过",
+        "identical": false,
+        "kept_ratio": 1.0
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "通过",
+        "ratio": 0.99,
+        "orig_len": 112,
+        "new_len": 111
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "none",
+        "expected": "none",
+        "match": true,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_translate_api_doc",
+      "ambiguity_level": "clear",
+      "scenario": "翻译",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "通过",
+        "identical": false,
+        "kept_ratio": 0.8
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "通过",
+        "ratio": 1.23,
+        "orig_len": 163,
+        "new_len": 200
+      },
+      "restraint": {
+        "verdict": "过度补全",
+        "level": "light",
+        "expected": "none",
+        "match": false,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_translate_product_manual",
+      "ambiguity_level": "clear",
+      "scenario": "翻译",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "通过",
+        "identical": false,
+        "kept_ratio": 0.8
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "通过",
+        "ratio": 1.01,
+        "orig_len": 105,
+        "new_len": 106
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "none",
+        "expected": "none",
+        "match": true,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_creative_slogan",
+      "ambiguity_level": "clear",
+      "scenario": "创意",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "通过",
+        "identical": false,
+        "kept_ratio": 1.0
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "通过",
+        "ratio": 0.99,
+        "orig_len": 101,
+        "new_len": 100
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "none",
+        "expected": "none",
+        "match": true,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_creative_haiku",
+      "ambiguity_level": "clear",
+      "scenario": "创意",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "通过",
+        "identical": false,
+        "kept_ratio": 1.0
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "通过",
+        "ratio": 0.99,
+        "orig_len": 76,
+        "new_len": 75
+      },
+      "restraint": {
+        "verdict": "增强不足",
+        "level": "none",
+        "expected": "light",
+        "match": false,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_creative_story_opening",
+      "ambiguity_level": "clear",
+      "scenario": "创意",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "通过",
+        "identical": false,
+        "kept_ratio": 1.0
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "通过",
+        "ratio": 0.99,
+        "orig_len": 86,
+        "new_len": 85
+      },
+      "restraint": {
+        "verdict": "增强不足",
+        "level": "none",
+        "expected": "light",
+        "match": false,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_code_algorithm_optimize",
+      "ambiguity_level": "medium",
+      "scenario": "编程",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "轻微偏差",
+        "missing": [],
+        "added_numbers": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ]
+      },
+      "preservation": {
+        "verdict": "轻微偏差",
+        "identical": false,
+        "kept_ratio": 0.778
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "轻微膨胀",
+        "ratio": 2.15,
+        "orig_len": 244,
+        "new_len": 524
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "light",
+        "expected": "light",
+        "match": true,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_code_error_log",
+      "ambiguity_level": "medium",
+      "scenario": "编程",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "轻微偏差",
+        "missing": [],
+        "added_numbers": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ]
+      },
+      "preservation": {
+        "verdict": "澄清模式-不作判定",
+        "identical": false,
+        "kept_ratio": null
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "澄清模式-不作判定",
+        "ratio": 3.84,
+        "orig_len": 117,
+        "new_len": 449
+      },
+      "restraint": {
+        "verdict": "过度补全",
+        "level": "clarify",
+        "expected": "light",
+        "match": false,
+        "delivery_status": "needs_clarification"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 3
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_code_refactor_class",
+      "ambiguity_level": "medium",
+      "scenario": "编程",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "严重问题",
+        "missing": [
+          "对外接口不变"
+        ],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "澄清模式-不作判定",
+        "identical": false,
+        "kept_ratio": null
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "澄清模式-不作判定",
+        "ratio": 2.45,
+        "orig_len": 226,
+        "new_len": 553
+      },
+      "restraint": {
+        "verdict": "过度补全",
+        "level": "clarify",
+        "expected": "light",
+        "match": false,
+        "delivery_status": "needs_clarification"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 2
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_code_api_design",
+      "ambiguity_level": "medium",
+      "scenario": "编程",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "严重问题",
+        "identical": false,
+        "kept_ratio": 0.0
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "轻微膨胀",
+        "ratio": 2.05,
+        "orig_len": 76,
+        "new_len": 156
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "light",
+        "expected": "light",
+        "match": true,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_office_annual_report",
+      "ambiguity_level": "medium",
+      "scenario": "办公写作",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "轻微偏差",
+        "missing": [],
+        "added_numbers": [
+          "1500",
+          "2000"
+        ]
+      },
+      "preservation": {
+        "verdict": "严重问题",
+        "identical": false,
+        "kept_ratio": 0.0
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "严重膨胀",
+        "ratio": 3.22,
+        "orig_len": 98,
+        "new_len": 316
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "light",
+        "expected": "light",
+        "match": true,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_office_project_proposal",
+      "ambiguity_level": "medium",
+      "scenario": "办公写作",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "严重问题",
+        "identical": false,
+        "kept_ratio": 0.333
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "轻微膨胀",
+        "ratio": 2.64,
+        "orig_len": 80,
+        "new_len": 211
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "light",
+        "expected": "light",
+        "match": true,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_office_followup_email",
+      "ambiguity_level": "medium",
+      "scenario": "办公写作",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "轻微偏差",
+        "identical": false,
+        "kept_ratio": 0.667
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "轻微膨胀",
+        "ratio": 2.0,
+        "orig_len": 68,
+        "new_len": 136
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "light",
+        "expected": "light",
+        "match": true,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_office_meeting_invite",
+      "ambiguity_level": "medium",
+      "scenario": "办公写作",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "轻微偏差",
+        "missing": [],
+        "added_numbers": [
+          "00",
+          "14",
+          "16"
+        ]
+      },
+      "preservation": {
+        "verdict": "澄清模式-不作判定",
+        "identical": false,
+        "kept_ratio": null
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "澄清模式-不作判定",
+        "ratio": 3.76,
+        "orig_len": 63,
+        "new_len": 237
+      },
+      "restraint": {
+        "verdict": "过度补全",
+        "level": "clarify",
+        "expected": "light",
+        "match": false,
+        "delivery_status": "needs_clarification"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 3
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_qa_ml_explain",
+      "ambiguity_level": "medium",
+      "scenario": "问答",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "轻微偏差",
+        "missing": [],
+        "added_numbers": [
+          "1",
+          "2"
+        ]
+      },
+      "preservation": {
+        "verdict": "严重问题",
+        "identical": false,
+        "kept_ratio": 0.0
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "轻微膨胀",
+        "ratio": 2.57,
+        "orig_len": 46,
+        "new_len": 118
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "light",
+        "expected": "light",
+        "match": true,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_qa_cloud_costs",
+      "ambiguity_level": "medium",
+      "scenario": "问答",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "轻微偏差",
+        "identical": false,
+        "kept_ratio": 0.5
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "轻微膨胀",
+        "ratio": 2.23,
+        "orig_len": 64,
+        "new_len": 143
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "light",
+        "expected": "light",
+        "match": true,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_qa_git_flow",
+      "ambiguity_level": "medium",
+      "scenario": "问答",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "严重问题",
+        "identical": false,
+        "kept_ratio": 0.0
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "严重膨胀",
+        "ratio": 3.5,
+        "orig_len": 82,
+        "new_len": 287
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "light",
+        "expected": "light",
+        "match": true,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_data_kpi_dashboard",
+      "ambiguity_level": "medium",
+      "scenario": "数据分析",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "严重问题",
+        "missing": [
+          "可视化"
+        ],
+        "added_numbers": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ]
+      },
+      "preservation": {
+        "verdict": "澄清模式-不作判定",
+        "identical": false,
+        "kept_ratio": null
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "澄清模式-不作判定",
+        "ratio": 6.37,
+        "orig_len": 71,
+        "new_len": 452
+      },
+      "restraint": {
+        "verdict": "过度补全",
+        "level": "clarify",
+        "expected": "light",
+        "match": false,
+        "delivery_status": "needs_clarification"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 3
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_data_funnel_analysis",
+      "ambiguity_level": "medium",
+      "scenario": "数据分析",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "轻微偏差",
+        "missing": [],
+        "added_numbers": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ]
+      },
+      "preservation": {
+        "verdict": "轻微偏差",
+        "identical": false,
+        "kept_ratio": 0.5
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "严重膨胀",
+        "ratio": 3.89,
+        "orig_len": 74,
+        "new_len": 288
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "light",
+        "expected": "light",
+        "match": true,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_data_forecast",
+      "ambiguity_level": "medium",
+      "scenario": "数据分析",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "严重问题",
+        "identical": false,
+        "kept_ratio": 0.0
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "轻微膨胀",
+        "ratio": 2.04,
+        "orig_len": 157,
+        "new_len": 321
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "light",
+        "expected": "light",
+        "match": true,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_translate_abstract",
+      "ambiguity_level": "medium",
+      "scenario": "翻译",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "轻微偏差",
+        "identical": false,
+        "kept_ratio": 0.5
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "轻微膨胀",
+        "ratio": 2.29,
+        "orig_len": 107,
+        "new_len": 245
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "light",
+        "expected": "light",
+        "match": true,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_translate_support_ticket",
+      "ambiguity_level": "medium",
+      "scenario": "翻译",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "轻微偏差",
+        "identical": false,
+        "kept_ratio": 0.667
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "通过",
+        "ratio": 1.21,
+        "orig_len": 203,
+        "new_len": 245
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "light",
+        "expected": "light",
+        "match": true,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_translate_ui_strings",
+      "ambiguity_level": "medium",
+      "scenario": "翻译",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "严重问题",
+        "identical": false,
+        "kept_ratio": 0.333
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "轻微膨胀",
+        "ratio": 1.63,
+        "orig_len": 94,
+        "new_len": 153
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "light",
+        "expected": "light",
+        "match": true,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_creative_landing_hero",
+      "ambiguity_level": "medium",
+      "scenario": "创意",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "轻微偏差",
+        "identical": false,
+        "kept_ratio": 0.75
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "轻微膨胀",
+        "ratio": 1.62,
+        "orig_len": 68,
+        "new_len": 110
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "light",
+        "expected": "light",
+        "match": true,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_creative_wechat_post",
+      "ambiguity_level": "medium",
+      "scenario": "创意",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "轻微偏差",
+        "identical": false,
+        "kept_ratio": 0.5
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "轻微膨胀",
+        "ratio": 1.83,
+        "orig_len": 63,
+        "new_len": 115
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "light",
+        "expected": "light",
+        "match": true,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_creative_video_script",
+      "ambiguity_level": "medium",
+      "scenario": "创意",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "轻微偏差",
+        "identical": false,
+        "kept_ratio": 0.5
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "轻微膨胀",
+        "ratio": 2.09,
+        "orig_len": 64,
+        "new_len": 134
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "light",
+        "expected": "light",
+        "match": true,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_code_undefined_error",
+      "ambiguity_level": "severe",
+      "scenario": "编程",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "严重问题",
+        "missing": [
+          "解决"
+        ],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "澄清模式-不作判定",
+        "identical": false,
+        "kept_ratio": null
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "澄清模式-不作判定",
+        "ratio": 15.85,
+        "orig_len": 13,
+        "new_len": 206
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "clarify",
+        "expected": "clarify",
+        "match": true,
+        "delivery_status": "needs_clarification"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 3
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_code_refactor_goal",
+      "ambiguity_level": "severe",
+      "scenario": "编程",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "轻微偏差",
+        "missing": [],
+        "added_numbers": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ]
+      },
+      "preservation": {
+        "verdict": "澄清模式-不作判定",
+        "identical": false,
+        "kept_ratio": null
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "澄清模式-不作判定",
+        "ratio": 16.16,
+        "orig_len": 19,
+        "new_len": 307
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "clarify",
+        "expected": "clarify",
+        "match": true,
+        "delivery_status": "needs_clarification"
+      },
+      "redundant_question": {
+        "verdict": "通过",
+        "hits": [],
+        "question_count": 3
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_code_schema_design",
+      "ambiguity_level": "severe",
+      "scenario": "编程",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "轻微偏差",
+        "missing": [],
+        "added_numbers": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "8.0"
+        ]
+      },
+      "preservation": {
+        "verdict": "澄清模式-不作判定",
+        "identical": false,
+        "kept_ratio": null
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "澄清模式-不作判定",
+        "ratio": 21.31,
+        "orig_len": 13,
+        "new_len": 277
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "clarify",
+        "expected": "clarify",
+        "match": true,
+        "delivery_status": "needs_clarification"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 3
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_code_contradictory",
+      "ambiguity_level": "severe",
+      "scenario": "编程",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "严重问题",
+        "missing": [
+          "一千个并发用户",
+          "不能动"
+        ],
+        "added_numbers": [
+          "1",
+          "1000",
+          "2",
+          "3",
+          "4",
+          "5",
+          "95",
+          "99"
+        ]
+      },
+      "preservation": {
+        "verdict": "澄清模式-不作判定",
+        "identical": false,
+        "kept_ratio": null
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "澄清模式-不作判定",
+        "ratio": 7.64,
+        "orig_len": 66,
+        "new_len": 504
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "clarify",
+        "expected": "clarify",
+        "match": true,
+        "delivery_status": "needs_clarification"
+      },
+      "redundant_question": {
+        "verdict": "通过",
+        "hits": [],
+        "question_count": 3
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_office_write_plan",
+      "ambiguity_level": "severe",
+      "scenario": "办公写作",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "严重问题",
+        "missing": [
+          "写个方案"
+        ],
+        "added_numbers": [
+          "1000"
+        ]
+      },
+      "preservation": {
+        "verdict": "澄清模式-不作判定",
+        "identical": false,
+        "kept_ratio": null
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "澄清模式-不作判定",
+        "ratio": 33.57,
+        "orig_len": 7,
+        "new_len": 235
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "clarify",
+        "expected": "clarify",
+        "match": true,
+        "delivery_status": "needs_clarification"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 3
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_office_email_generic",
+      "ambiguity_level": "severe",
+      "scenario": "办公写作",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "严重问题",
+        "missing": [
+          "你看着定"
+        ],
+        "added_numbers": [
+          "200"
+        ]
+      },
+      "preservation": {
+        "verdict": "澄清模式-不作判定",
+        "identical": false,
+        "kept_ratio": null
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "澄清模式-不作判定",
+        "ratio": 12.73,
+        "orig_len": 15,
+        "new_len": 191
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "clarify",
+        "expected": "clarify",
+        "match": true,
+        "delivery_status": "needs_clarification"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 3
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_office_report_summary",
+      "ambiguity_level": "severe",
+      "scenario": "办公写作",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "轻微偏差",
+        "missing": [],
+        "added_numbers": [
+          "10%",
+          "20%",
+          "3",
+          "5"
+        ]
+      },
+      "preservation": {
+        "verdict": "通过",
+        "identical": false,
+        "kept_ratio": 1.0
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "严重膨胀",
+        "ratio": 11.47,
+        "orig_len": 17,
+        "new_len": 195
+      },
+      "restraint": {
+        "verdict": "增强不足",
+        "level": "light",
+        "expected": "clarify",
+        "match": false,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无提问",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_office_announcement",
+      "ambiguity_level": "severe",
+      "scenario": "办公写作",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "澄清模式-不作判定",
+        "identical": false,
+        "kept_ratio": null
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "澄清模式-不作判定",
+        "ratio": 15.0,
+        "orig_len": 8,
+        "new_len": 120
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "clarify",
+        "expected": "clarify",
+        "match": true,
+        "delivery_status": "needs_clarification"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 3
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_qa_what_is_this",
+      "ambiguity_level": "severe",
+      "scenario": "问答",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "严重问题",
+        "missing": [
+          "这是"
+        ],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "澄清模式-不作判定",
+        "identical": false,
+        "kept_ratio": null
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "澄清模式-不作判定",
+        "ratio": 19.29,
+        "orig_len": 7,
+        "new_len": 135
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "clarify",
+        "expected": "clarify",
+        "match": true,
+        "delivery_status": "needs_clarification"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 2
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_qa_compare_plans",
+      "ambiguity_level": "severe",
+      "scenario": "问答",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "澄清模式-不作判定",
+        "identical": false,
+        "kept_ratio": null
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "澄清模式-不作判定",
+        "ratio": 10.56,
+        "orig_len": 16,
+        "new_len": 169
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "clarify",
+        "expected": "clarify",
+        "match": true,
+        "delivery_status": "needs_clarification"
+      },
+      "redundant_question": {
+        "verdict": "通过",
+        "hits": [],
+        "question_count": 2
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_qa_wrong_premise",
+      "ambiguity_level": "severe",
+      "scenario": "问答",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "澄清模式-不作判定",
+        "identical": false,
+        "kept_ratio": null
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "澄清模式-不作判定",
+        "ratio": 8.16,
+        "orig_len": 25,
+        "new_len": 204
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "clarify",
+        "expected": "clarify",
+        "match": true,
+        "delivery_status": "needs_clarification"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 3
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_data_improve_conversion",
+      "ambiguity_level": "severe",
+      "scenario": "数据分析",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "轻微偏差",
+        "missing": [],
+        "added_numbers": [
+          "1",
+          "2",
+          "3"
+        ]
+      },
+      "preservation": {
+        "verdict": "澄清模式-不作判定",
+        "identical": false,
+        "kept_ratio": null
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "澄清模式-不作判定",
+        "ratio": 19.73,
+        "orig_len": 11,
+        "new_len": 217
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "clarify",
+        "expected": "clarify",
+        "match": true,
+        "delivery_status": "needs_clarification"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 3
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_data_analyze_excel",
+      "ambiguity_level": "severe",
+      "scenario": "数据分析",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "轻微偏差",
+        "missing": [],
+        "added_numbers": [
+          "3",
+          "5"
+        ]
+      },
+      "preservation": {
+        "verdict": "澄清模式-不作判定",
+        "identical": false,
+        "kept_ratio": null
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "澄清模式-不作判定",
+        "ratio": 9.56,
+        "orig_len": 25,
+        "new_len": 239
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "clarify",
+        "expected": "clarify",
+        "match": true,
+        "delivery_status": "needs_clarification"
+      },
+      "redundant_question": {
+        "verdict": "通过",
+        "hits": [],
+        "question_count": 3
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_data_write_report",
+      "ambiguity_level": "severe",
+      "scenario": "数据分析",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "轻微偏差",
+        "missing": [],
+        "added_numbers": [
+          "1500",
+          "3",
+          "5",
+          "800"
+        ]
+      },
+      "preservation": {
+        "verdict": "澄清模式-不作判定",
+        "identical": false,
+        "kept_ratio": null
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "澄清模式-不作判定",
+        "ratio": 22.47,
+        "orig_len": 17,
+        "new_len": 382
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "clarify",
+        "expected": "clarify",
+        "match": true,
+        "delivery_status": "needs_clarification"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 3
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_translate_generic",
+      "ambiguity_level": "severe",
+      "scenario": "翻译",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "澄清模式-不作判定",
+        "identical": false,
+        "kept_ratio": null
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "澄清模式-不作判定",
+        "ratio": 23.14,
+        "orig_len": 7,
+        "new_len": 162
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "clarify",
+        "expected": "clarify",
+        "match": true,
+        "delivery_status": "needs_clarification"
+      },
+      "redundant_question": {
+        "verdict": "通过",
+        "hits": [],
+        "question_count": 3
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_translate_audio_transcript",
+      "ambiguity_level": "severe",
+      "scenario": "翻译",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "通过",
+        "identical": false,
+        "kept_ratio": 1.0
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "严重膨胀",
+        "ratio": 6.16,
+        "orig_len": 19,
+        "new_len": 117
+      },
+      "restraint": {
+        "verdict": "增强不足",
+        "level": "light",
+        "expected": "clarify",
+        "match": false,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无提问",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_translate_two_versions",
+      "ambiguity_level": "severe",
+      "scenario": "翻译",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "通过",
+        "missing": [],
+        "added_numbers": []
+      },
+      "preservation": {
+        "verdict": "澄清模式-不作判定",
+        "identical": false,
+        "kept_ratio": null
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "澄清模式-不作判定",
+        "ratio": 6.85,
+        "orig_len": 27,
+        "new_len": 185
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "clarify",
+        "expected": "clarify",
+        "match": true,
+        "delivery_status": "needs_clarification"
+      },
+      "redundant_question": {
+        "verdict": "通过",
+        "hits": [],
+        "question_count": 2
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_creative_advertise",
+      "ambiguity_level": "severe",
+      "scenario": "创意",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "轻微偏差",
+        "missing": [],
+        "added_numbers": [
+          "100",
+          "150",
+          "20",
+          "35"
+        ]
+      },
+      "preservation": {
+        "verdict": "澄清模式-不作判定",
+        "identical": false,
+        "kept_ratio": null
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "澄清模式-不作判定",
+        "ratio": 25.71,
+        "orig_len": 7,
+        "new_len": 180
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "clarify",
+        "expected": "clarify",
+        "match": true,
+        "delivery_status": "needs_clarification"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 3
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_creative_birthday_poem",
+      "ambiguity_level": "severe",
+      "scenario": "创意",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "轻微偏差",
+        "missing": [],
+        "added_numbers": [
+          "12",
+          "8"
+        ]
+      },
+      "preservation": {
+        "verdict": "严重问题",
+        "identical": false,
+        "kept_ratio": 0.0
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "严重膨胀",
+        "ratio": 5.0,
+        "orig_len": 9,
+        "new_len": 45
+      },
+      "restraint": {
+        "verdict": "增强不足",
+        "level": "light",
+        "expected": "clarify",
+        "match": false,
+        "delivery_status": "ready"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 0
+      },
+      "needs_human_review": true
+    },
+    {
+      "id": "v30_creative_product_name",
+      "ambiguity_level": "severe",
+      "scenario": "创意",
+      "judged": true,
+      "fact_fidelity": {
+        "verdict": "轻微偏差",
+        "missing": [],
+        "added_numbers": [
+          "10",
+          "2",
+          "4",
+          "8"
+        ]
+      },
+      "preservation": {
+        "verdict": "澄清模式-不作判定",
+        "identical": false,
+        "kept_ratio": null
+      },
+      "overreach": {
+        "verdict": "通过",
+        "must_not_add_violations": [],
+        "overreach_hits": []
+      },
+      "bloat": {
+        "verdict": "澄清模式-不作判定",
+        "ratio": 18.55,
+        "orig_len": 11,
+        "new_len": 204
+      },
+      "restraint": {
+        "verdict": "恰当",
+        "level": "clarify",
+        "expected": "clarify",
+        "match": true,
+        "delivery_status": "needs_clarification"
+      },
+      "redundant_question": {
+        "verdict": "无标注-不判定",
+        "hits": [],
+        "question_count": 3
+      },
+      "needs_human_review": true
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "schema_version": "1.0",
+  "title": "PromptCraft v0.4.2 阶段 A 测量证据索引",
+  "note": "本目录登记 v0.4.2 效果线的**阶段 A（可达性核算）**证据。阶段 A 只做核算，不做人工盲评、不产生任何效果结论。结论与复现材料必须同版本，否则结论不可复核。",
+  "stage": "A-reachability",
+  "status": "NOT_A_RELEASE_GATE",
+  "status_note": "本目录的数字**不构成任何效果宣称**。它是『门槛还差多少』的核算，用来决定下一步是扩样本还是改口径。人工盲评（门槛 4/5）尚未开始。",
+  "baseline": {
+    "branch": "release/v0.4.1",
+    "conditions": {
+      "model": "deepseek-flash",
+      "temperature": 0.1,
+      "prompt_version": "promptcraft-v2.5.0",
+      "samples": "evaluation/samples_v30.yaml",
+      "sample_count": 60
+    },
+    "note": "**与 v0.4.0 的归档不可直接比较**：v0.4.0 是 promptcraft-v2.2.0 时期的数据，本目录是 v2.5.0。提示词正文参与运行身份哈希（prompt_sha256），两者身份不同、不可混跑。"
+  },
+  "experiments": [
+    {
+      "id": "reachability",
+      "title": "v0.4.2 效果线可达性核算（60 条，1 次运行）",
+      "report": "docs/PromptCraft-v0.4.2-可达性核算.md",
+      "scripts": [
+        "evaluation/verify_enhance.py",
+        "evaluation/v042_reachability.py",
+        "evaluation/run_identity.py"
+      ],
+      "raw_status": "ARCHIVED",
+      "conditions": {
+        "model": "deepseek-flash",
+        "temperature": 0.1,
+        "prompt_version": "promptcraft-v2.5.0",
+        "prompt_sha256": "1183a1c81fe720ee326b615903d73b4a27caf5b497bf4c65491f1dc24d4de1a2",
+        "samples_sha256": "b267e1cd7f5afccb264c9dd1d3f48298cb3ca816724ed90d69d74a83e37edeb7",
+        "sample_count": 60,
+        "api_calls": 60
+      },
+      "conclusions": "docs/evaluation-data-v042/conclusions/reachability_v042.json",
+      "reproduce": "py -3 evaluation/verify_enhance.py && py -3 evaluation/v042_reachability.py --raw <raw.json>",
+      "archived_artifacts": [
+        {
+          "file": "docs/evaluation-data-v042/raw/v040_enhance_deterministic__m-deepseek-flash__t0.1__r1__64f59c0b96.json",
+          "bytes": 67722,
+          "sha256": "84145b5627e43d441d7272e72b8c5c9191bc0fb22d6359a39520b839a3e91eac"
+        },
+        {
+          "file": "docs/evaluation-data-v042/raw/v040_enhance_raw__m-deepseek-flash__t0.1__r1__64f59c0b96.json",
+          "bytes": 395728,
+          "sha256": "d7917b7a19e280553e8a3918981306f80f39695b9fd908371acb8a025adc857c"
+        }
+      ]
+    }
+  ],
+  "answers_archive": {
+    "path": "docs/evaluation-data-v042/answers/",
+    "status": "EMPTY",
+    "status_note": "阶段 A 不做人工盲评，因此没有人工答案可归档。阶段 B 的人工答案必须脱敏后归档到这里，并在 manifest.json 登记文件名、用途、评审人数、单元数与 sha256。"
+  }
+}
