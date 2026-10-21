@@ -53,6 +53,22 @@ Rust 与 Python 由 `evaluation/test_enhancer.py` 逐字断言；
 发布标题不再写死某一版文案 ⇒ 新版本不需要再改这个工作流文件。
 `body_path` 指向的文件不存在时必须失败，不允许静默发一个空说明。
 
+**两个由 CI 抓出的问题（本地全绿，只有 CI 红）**
+
+- **数据集真值必须排在模型输出之后**：`verify_enhance.py` 原先把模型输出
+  `**result` 展开在最后，而 `parse_result` **不过滤未知字段** ⇒ 模型有可能
+  吐出一个同名的 `must_not_question` / `must_preserve` / `original` 并覆盖真值。
+  那等于「拿模型自己声称的判据去判模型自己」，判定照样出数，只是数是模型写的。
+  现抽出 `build_record()`，真值一律排在 `**result` 之后，并配**敌意模型输出**
+  的回归测试。
+- **补装 `@types/node`**：跨源断言要在前端测试里读 `prompts.rs`，
+  用了 `node:fs` 等 Node API，而项目从未装过 `@types/node` ⇒ `tsc` 报 TS2307，
+  `npm run build` 失败。**本机 `npm test` 全绿**（vitest 不做类型检查），
+  **CI 与发布工作流双双红** ⇒ 这条已补进发布前必跑清单。
+
+**实施偏离登记**：见 `docs/DEVIATIONS.md`（7 条，含 n 单位口径、
+G5/G6 的不可达登记、标注范围取值等）。
+
 ## [0.4.0] - 2026-10-21
 
 ### 「把失败显示成成功」系统性清理（41 条同族项全部闭环）

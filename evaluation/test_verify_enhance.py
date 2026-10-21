@@ -181,6 +181,71 @@ def test_summarize_separates_unlabeled_from_passed():
 
 
 # =====================================================================
+# 真值优先：模型不能把自己的判据换掉
+# =====================================================================
+_HOSTILE_SAMPLE = {
+    "id": "s1",
+    "ambiguity_level": "severe",
+    "scenario": "翻译",
+    "original": "帮我翻译一下。",
+    "must_preserve": ["翻译"],
+    "must_not_add": ["不要虚构原文内容"],
+    "must_not_question": ["原文是什么"],
+    "expected_behavior": "clarify",
+}
+
+
+def test_model_output_cannot_override_dataset_ground_truth():
+    """模型幻觉出的同名字段不得覆盖数据集真值。
+
+    `parse_result` 不过滤未知字段 ⇒ 模型可能吐一个 `must_not_question`。
+    若真值排在模型输出之前，判定就变成「用模型自己声称的判据判模型自己」，
+    而且照样出数 —— 只是那个数是模型写的。
+    """
+    hostile = {
+        "primary_prompt": "随便什么",
+        "questions": [{"text": "要翻译的原文是什么？"}],
+        "must_not_question": [],          # 模型想把自己的判据清空
+        "must_preserve": ["别的东西"],
+        "original": "改写过的原文",
+        "id": "模型编的id",
+    }
+    record = ve.build_record(_HOSTILE_SAMPLE, hostile)
+
+    assert record["must_not_question"] == ["原文是什么"]
+    assert record["must_preserve"] == ["翻译"]
+    assert record["original"] == "帮我翻译一下。"
+    assert record["id"] == "s1"
+    # 判定维度吃到的必须是真值 ⇒ 仍然判出严重问题
+    assert ve.judge_dimension_redundant_question(record)["verdict"] == "严重问题"
+
+
+def test_build_record_keeps_model_fields():
+    """模型自己的输出字段必须保留（primary_prompt / questions / status 等）。"""
+    result = {
+        "primary_prompt": "把下面的内容翻译成英文。",
+        "questions": [{"text": "翻译成哪种语言？"}],
+        "status": "ready",
+        "enhancement_level": "clarify",
+        "facts": ["原文"],
+    }
+    record = ve.build_record(_HOSTILE_SAMPLE, result)
+    assert record["primary_prompt"] == "把下面的内容翻译成英文。"
+    assert record["status"] == "ready"
+    assert record["enhancement_level"] == "clarify"
+    assert record["facts"] == ["原文"]
+    assert record["questions"] == [{"text": "翻译成哪种语言？"}]
+    assert record["error"] == ""
+
+
+def test_build_record_error_path_keeps_error_and_empty_prompt():
+    record = ve.build_record(_HOSTILE_SAMPLE, {}, error="HTTP 500: boom")
+    assert record["error"] == "HTTP 500: boom"
+    assert record["primary_prompt"] == ""
+    assert record["must_not_question"] == ["原文是什么"]
+
+
+# =====================================================================
 # 样本集标注
 # =====================================================================
 def test_every_severe_sample_has_the_field(severe_samples):

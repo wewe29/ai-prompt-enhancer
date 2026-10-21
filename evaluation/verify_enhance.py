@@ -133,6 +133,38 @@ def call_deepseek(api_key: str, user_message: str) -> dict[str, Any]:
     return result
 
 
+def build_record(
+    sample: dict[str, Any], result: dict[str, Any], error: str = ""
+) -> dict[str, Any]:
+    """把模型输出与样本真值合成一条落盘记录。
+
+    **数据集真值必须排在模型输出之后。**
+
+    `parse_result` 只做 JSON 解析，**不过滤未知字段**；`normalize_result`
+    只补缺失的数组字段。所以模型有可能幻觉出 `must_not_question` /
+    `must_preserve` / `original` 这类同名字段。
+
+    若真值排在前面，模型就能把**自己的判据换掉** ——
+    拿「模型自己声称要保留什么」去判定「有没有保留」，
+    是这一族缺陷里最隐蔽的一种：判定照样出数，只是数是模型自己写的。
+
+    排序不是格式问题，是判定可信度问题。
+    """
+    return {
+        **result,
+        "id": sample["id"],
+        "ambiguity_level": sample["ambiguity_level"],
+        "scenario": sample.get("scenario", ""),
+        "original": sample["original"],
+        "must_preserve": sample.get("must_preserve", []),
+        "must_not_add": sample.get("must_not_add", []),
+        "must_not_question": sample.get("must_not_question", []),
+        "expected_behavior": sample.get("expected_behavior", ""),
+        "error": error,
+        "primary_prompt": result.get("primary_prompt", ""),
+    }
+
+
 def enhance_one(sample: dict[str, Any], api_key: str) -> dict[str, Any]:
     """对单条样本执行增强，失败重试；始终返回一条可落盘的记录。"""
     user_message = enhancer.build_user_message(
@@ -151,18 +183,7 @@ def enhance_one(sample: dict[str, Any], api_key: str) -> dict[str, Any]:
     for attempt in range(MAX_ATTEMPTS):
         try:
             result = call_deepseek(api_key, user_message)
-            return {
-                "id": sample["id"],
-                "ambiguity_level": sample["ambiguity_level"],
-                "scenario": sample.get("scenario", ""),
-                "original": sample["original"],
-                "must_preserve": sample.get("must_preserve", []),
-                "must_not_add": sample.get("must_not_add", []),
-                "must_not_question": sample.get("must_not_question", []),
-                "expected_behavior": sample.get("expected_behavior", ""),
-                "error": "",
-                **result,
-            }
+            return build_record(sample, result)
         except urllib.error.HTTPError as exc:
             detail = ""
             try:
@@ -179,18 +200,7 @@ def enhance_one(sample: dict[str, Any], api_key: str) -> dict[str, Any]:
         if attempt < MAX_ATTEMPTS - 1:
             time.sleep(2.0 * (attempt + 1))
 
-    return {
-        "id": sample["id"],
-        "ambiguity_level": sample["ambiguity_level"],
-        "scenario": sample.get("scenario", ""),
-        "original": sample["original"],
-        "must_preserve": sample.get("must_preserve", []),
-        "must_not_add": sample.get("must_not_add", []),
-        "must_not_question": sample.get("must_not_question", []),
-        "expected_behavior": sample.get("expected_behavior", ""),
-        "error": last_error,
-        "primary_prompt": "",
-    }
+    return build_record(sample, {}, error=last_error)
 
 
 def _read_raw(path: Path) -> list[dict[str, Any]]:
