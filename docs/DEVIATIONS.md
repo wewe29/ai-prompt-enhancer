@@ -160,3 +160,32 @@ v0.4.0 上，v0.4.1 不改这个文件就发不出去（`fail_on_unmatched_files
 
 **教训**：**本机 `npm test` 绿 ≠ `npm run build` 绿。**
 vitest 不做类型检查，`tsc` 才做。发布前必须单独跑一次 `npm run build`。
+
+---
+
+## D-009 发布说明路径必须用 tag 而不是 version
+
+**缺口**：`release.yml` 的 `body_path` 参数化时用了
+`steps.target.outputs.version`（= `0.4.1`，**去掉了前缀 v**），
+而发布说明的文件名约定是 `RELEASE_NOTES-<tag>.md`
+（= `RELEASE_NOTES-v0.4.1.md`，**带 v**）⇒ 路径对不上。
+
+**后果**：发布工作流会在**构建完十几分钟之后**、进入发布步时才失败。
+本地任何测试都发现不了——这条路径只在 GitHub runner 上解析。
+
+**采用值**：`body_path` 改用 `steps.target.outputs.tag`；
+同时新增 `evaluation/test_release_workflow.py`，把这条路径变成**本机可判定**：
+
+- 解析出 `body_path` 表达式 → 按当前版本算出实际路径 → 断言该文件真的存在；
+- 断言表达式用的是 `tag` 而不是 `version`；
+- 反向对照：断言 `RELEASE_NOTES-v<version>.md` 与 `RELEASE_NOTES-<version>.md`
+  解析到**不同**的文件（否则测试失去区分力）；
+- 断言 `files:` 里的产物名与 `build-portable.ps1` 实际生成的 zip 名一致；
+- 断言发布说明里不含效果宣称。
+
+**已验证的反向对照**：把 `body_path` 改回 `version` 口径后，
+上述测试有 2 条立刻转红。
+
+**理由**：**发布管线本身也是代码，也要有门禁。**
+一个只会在 CI 上、且在流水线末尾才暴露的路径错误，
+成本是十几分钟的构建时间 + 一次失败发布。

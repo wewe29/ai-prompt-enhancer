@@ -130,7 +130,9 @@ jobs:
         with:
           tag_name: ${{ steps.target.outputs.tag }}
           name: PromptCraft ${{ steps.target.outputs.tag }}
-          body_path: release-assets/RELEASE_NOTES-${{ steps.target.outputs.version }}.md
+          # 用 tag（带 v）而不是 version（去 v）：发布说明的文件名约定是
+          # RELEASE_NOTES-<tag>.md（v0.4.0 / v0.3.5 …），与 version 对不上。
+          body_path: release-assets/RELEASE_NOTES-${{ steps.target.outputs.tag }}.md
           fail_on_unmatched_files: true
           files: |
             release/PromptCraft-${{ steps.target.outputs.version }}-windows-x64-portable.zip
