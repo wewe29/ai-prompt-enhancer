@@ -45,6 +45,28 @@ def test_system_prompt_version_identical():
     assert enhancer.SYSTEM_PROMPT_VERSION == _rust_version(), "SYSTEM_PROMPT_VERSION 不一致！"
 
 
+APP_TSX = PROJECT_ROOT / "src" / "App.tsx"
+
+
+def _ts_version() -> str:
+    """从 src/App.tsx 取出 SYSTEM_PROMPT_VERSION。
+
+    前端把这个常量写进历史记录的 promptVersion。它一旦漂了，
+    历史记录就在写一个不存在的提示词版本号 —— 而没有任何东西会报警。
+    """
+    source = APP_TSX.read_text(encoding="utf-8")
+    match = re.search(r'const\s+SYSTEM_PROMPT_VERSION\s*=\s*"([^"]+)"', source)
+    assert match, "App.tsx 里找不到 SYSTEM_PROMPT_VERSION"
+    return match.group(1)
+
+
+def test_frontend_prompt_version_matches_rust():
+    """前端写进历史记录的 promptVersion 必须与 Rust 一致。"""
+    assert _ts_version() == _rust_version(), (
+        "App.tsx 与 prompts.rs 的 SYSTEM_PROMPT_VERSION 不一致！"
+    )
+
+
 def _rust_user_message_template() -> str:
     """从 src-tauri/src/provider.rs 取出 user message 的 format 模板。
 

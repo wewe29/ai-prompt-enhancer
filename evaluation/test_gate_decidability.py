@@ -176,3 +176,69 @@ def test_committed_spec_has_no_hand_written_requirements():
     for g in spec["gates"]:
         assert "required_n" not in g, f"{g['id']} 手写了 required_n"
         assert "required_runs" not in g, f"{g['id']} 手写了 required_runs"
+
+
+# ------------------------------------------------- n 的单位（口径）
+#: 每条 active 门槛的 n 单位。这是装配 v040_gates 时最容易搞错的地方 ——
+#: G4/G5 的分母是**问题条数**（44/60、1/9 都是问题数），G6 是**样本条数**，
+#: G7 是**运行次数**。口径搞错，门禁就在拿错误分母判对错。
+EXPECTED_N_UNIT = {
+    "G4": "questions",
+    "G5": "questions",
+    "G6": "samples",
+    "G7": "runs",
+}
+
+
+def test_every_active_gate_declares_its_n_unit():
+    spec = json.loads(SPEC_PATH.read_text(encoding="utf-8"))
+    for g in spec["gates"]:
+        if g.get("status") != "active":
+            continue
+        assert g.get("n_unit"), f"{g['id']} 没有声明 n_unit"
+        assert g["n_unit"] in {"questions", "samples", "runs"}, (
+            f"{g['id']} 的 n_unit 非法：{g['n_unit']}"
+        )
+
+
+def test_n_units_are_the_documented_ones():
+    """反向对照：把某条的单位改掉，下面的断言必须立刻红。"""
+    spec = json.loads(SPEC_PATH.read_text(encoding="utf-8"))
+    by_id = {g["id"]: g for g in spec["gates"]}
+    for gid, unit in EXPECTED_N_UNIT.items():
+        assert by_id[gid]["n_unit"] == unit, f"{gid} 的 n_unit 应为 {unit}"
+
+
+def test_count_type_gates_never_count_questions():
+    """计数型门槛的分母不可能是问题条数（问题数是 G4/G5 的分母）。"""
+    spec = json.loads(SPEC_PATH.read_text(encoding="utf-8"))
+    for g in spec["gates"]:
+        if g.get("count_unit") == "samples":
+            assert g.get("n_unit") != "questions", (
+                f"{g['id']} 是计数型门槛，n_unit 不可能是 questions"
+            )
+
+
+def test_known_gaps_are_recorded_for_unreachable_gates():
+    """G5/G6 在现有样本集下结构性不可达 —— 缺口必须登记在规范里。
+
+    没有这条登记，下一个人会以为 required_n=68/61 随手就能凑够。
+    """
+    spec = json.loads(SPEC_PATH.read_text(encoding="utf-8"))
+    by_id = {g["id"]: g for g in spec["gates"]}
+    for gid in ("G5", "G6"):
+        gap = by_id[gid].get("known_gap")
+        assert gap, f"{gid} 缺少 known_gap 登记"
+        assert len(gap) > 30, f"{gid} 的 known_gap 太空泛：{gap!r}"
+
+
+def test_known_gap_quotes_the_derived_requirement():
+    """known_gap 里写的 required_n 必须与代码推导出来的一致（防止文档漂移）。"""
+    spec = json.loads(SPEC_PATH.read_text(encoding="utf-8"))
+    rows = {r["id"]: r for r in derive_requirements(spec)}
+    by_id = {g["id"]: g for g in spec["gates"]}
+    for gid in ("G5", "G6"):
+        required = rows[gid]["required_n"]
+        assert f"required_n={required}" in by_id[gid]["known_gap"], (
+            f"{gid} 的 known_gap 与推导出的 required_n={required} 不一致"
+        )

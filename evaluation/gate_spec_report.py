@@ -17,6 +17,15 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
+# 本机控制台默认 GBK，规范里若出现 GBK 编不了的符号（⇒、→、⋯），
+# print() 会抛 UnicodeEncodeError 把整份报告打断 —— 报告工具被自己的数据搞崩。
+# 改成 errors="replace"：编不了的字符退化成 '?'，其余照常输出，报告不中断。
+try:  # pragma: no cover - 取决于运行环境是否支持 reconfigure
+    sys.stdout.reconfigure(errors="replace")
+    sys.stderr.reconfigure(errors="replace")
+except Exception:  # noqa: BLE001 - 老解释器没有 reconfigure 时忽略
+    pass
+
 from gate_decidability import (  # noqa: E402
     ALPHA,
     POWER,
@@ -70,10 +79,21 @@ def print_table(spec: dict, rows: list[dict]) -> None:
               f"{r['tau']:>6.2f}{r['required_n']:>8}{req_r_s:>7}  "
               f"{r['status']:<6} {fe_s}")
     print()
+    # 已知缺口必须出现在报告里 —— 只藏在 JSON 里等于没有。
+    gaps = [g for g in spec.get("gates", []) if g.get("known_gap")]
+    if gaps:
+        print("--- 已知缺口（active 门槛的可达性）---")
+        for g in gaps:
+            print(f"  [{g['id']}] {g['name']}")
+            print(f"         {g['known_gap']}")
+        print()
     print("说明：")
     print("  · 『需 n』= 把『现状水平』与『目标水平』区分开所需的提示词条数（纯二项口径）")
     print("  · 『需 R』= 让噪声半宽 ≤ 间距/2 所需的独立运行轮数；『不可行』表示再加轮次也补不回来")
     print("  · 作废（void）的门槛不参与放行判定，但必须显式出现在报告里 —— 作废不等于通过")
+    print("  · 每条门槛 n 的单位见规范里的 n_unit 字段"
+          "（questions=问题条数 / samples=样本条数 / runs=运行次数）"
+          " —— 装配 v040_gates 时口径对不上，门禁就判错了")
 
 
 def main(argv: list[str] | None = None) -> int:

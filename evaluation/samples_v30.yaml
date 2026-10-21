@@ -510,6 +510,12 @@ samples:
     expected_behavior: light
 
   # ================= severe（20）=================
+
+  # ---- must_not_question 填写规则（v0.4.1，SPEC §4.3）----
+  # 只写「答案确实已出现在用户原文/上下文/附件里」的提问内容；每条 1-3 条；
+  # 能确定就填，不确定就留空。**宁可漏填，不要凑数** ——
+  # 误标会产生假阳性，让门禁失真（比没有门禁更坏）。
+  # 空列表 = 该样本不做第六维判定：不计入分母，也**不算通过**。
   # ---- 编程（4）----
   - id: v30_code_undefined_error
     scenario: 编程
@@ -518,6 +524,7 @@ samples:
       帮我看看这个报错怎么解决。
     must_preserve: ["报错", "解决"]
     must_not_add: ["不要虚构具体的报错信息", "不要假设是某一特定语言"]
+    must_not_question: []
     expected_behavior: clarify
 
   - id: v30_code_refactor_goal
@@ -527,6 +534,9 @@ samples:
       帮我把这段代码优化一下，线上有点问题。
     must_preserve: ["代码", "优化", "线上"]
     must_not_add: ["不要虚构线上问题的具体表现", "不要假设代码语言"]
+    must_not_question:      # 这些问题的答案用户已经给了，问了就是多余
+      - 代码在哪里
+      - 请粘贴代码
     expected_behavior: clarify
 
   - id: v30_code_schema_design
@@ -536,6 +546,7 @@ samples:
       帮我设计一套数据库表结构。
     must_preserve: ["数据库", "表结构"]
     must_not_add: ["不要虚构业务场景", "不要假设具体数据库类型"]
+    must_not_question: []
     expected_behavior: clarify
 
   - id: v30_code_contradictory
@@ -546,6 +557,9 @@ samples:
       而且不能动任何现有接口和数据结构，帮我看看怎么改。
     must_preserve: ["一千个并发用户", "50 毫秒", "不能动"]
     must_not_add: ["不要虚构代码内容", "不要承诺不可能的性能目标"]
+    must_not_question:      # 这些问题的答案用户已经给了，问了就是多余
+      - 代码在哪里
+      - 请粘贴代码
     expected_behavior: clarify
 
   # ---- 办公写作（4）----
@@ -556,6 +570,7 @@ samples:
       帮我写个方案。
     must_preserve: ["方案", "写个方案"]
     must_not_add: ["不要虚构主题", "不要假设是活动方案"]
+    must_not_question: []
     expected_behavior: clarify
 
   - id: v30_office_email_generic
@@ -565,6 +580,7 @@ samples:
       帮我写一封邮件，内容你看着定。
     must_preserve: ["邮件", "你看着定"]
     must_not_add: ["不要虚构收件人与事由", "不要编造事件背景"]
+    must_not_question: []
     expected_behavior: clarify
 
   - id: v30_office_report_summary
@@ -574,6 +590,9 @@ samples:
       帮我把这个文档总结一下，做完发我。
     must_preserve: ["总结", "文档"]
     must_not_add: ["不要虚构文档内容", "不要假设文档格式"]
+    must_not_question:      # 这些问题的答案用户已经给了，问了就是多余
+      - 文档在哪里
+      - 请粘贴文档
     expected_behavior: clarify
 
   - id: v30_office_announcement
@@ -583,6 +602,7 @@ samples:
       帮我写一份通知。
     must_preserve: ["写一份", "通知"]
     must_not_add: ["不要虚构通知对象和事项", "不要假设是放假通知"]
+    must_not_question: []
     expected_behavior: clarify
 
   # ---- 问答（3）----
@@ -593,6 +613,7 @@ samples:
       这是什么意思？
     must_preserve: ["这是", "意思"]
     must_not_add: ["不要猜测所指对象", "不要编造具体术语解释"]
+    must_not_question: []
     expected_behavior: clarify
 
   - id: v30_qa_compare_plans
@@ -602,6 +623,9 @@ samples:
       帮我比较一下这两个方案哪个更好。
     must_preserve: ["比较", "方案"]
     must_not_add: ["不要虚构两个方案的内容", "不要假设比较维度"]
+    must_not_question:      # 这些问题的答案用户已经给了，问了就是多余
+      - 方案在哪里
+      - 请粘贴方案
     expected_behavior: clarify
 
   - id: v30_qa_wrong_premise
@@ -611,6 +635,7 @@ samples:
       为什么我明明把列表清空了，程序还是报错说列表有值？
     must_preserve: ["列表", "清空", "报错"]
     must_not_add: ["不要虚构代码片段", "不要假设语言和上下文"]
+    must_not_question: []
     expected_behavior: clarify
 
   # ---- 数据分析（3）----
@@ -621,6 +646,7 @@ samples:
       怎么提升我们的转化率？
     must_preserve: ["提升", "转化率"]
     must_not_add: ["不要虚构行业基准数据", "不要假设具体业务形态"]
+    must_not_question: []
     expected_behavior: clarify
 
   - id: v30_data_analyze_excel
@@ -630,6 +656,9 @@ samples:
       帮我分析一下这份 Excel 数据，里面有很多表。
     must_preserve: ["Excel", "表"]
     must_not_add: ["不要虚构数据内容", "不要假设表结构"]
+    must_not_question:      # 这些问题的答案用户已经给了，问了就是多余
+      - 数据在哪里
+      - 请粘贴数据
     expected_behavior: clarify
 
   - id: v30_data_write_report
@@ -639,6 +668,7 @@ samples:
       帮我写一份数据分析报告，要专业的。
     must_preserve: ["数据分析报告", "专业的"]
     must_not_add: ["不要虚构数据来源", "不要假设分析主题"]
+    must_not_question: []
     expected_behavior: clarify
 
   # ---- 翻译（3）----
@@ -649,6 +679,9 @@ samples:
       帮我翻译一下。
     must_preserve: ["翻译", "帮我翻译"]
     must_not_add: ["不要虚构原文内容", "不要假设目标语言"]
+    must_not_question:      # 这些问题的答案用户已经给了，问了就是多余
+      - 原文是什么
+      - 要翻译的内容
     expected_behavior: clarify
 
   - id: v30_translate_audio_transcript
@@ -658,6 +691,10 @@ samples:
       把这段会议录音翻译成英文，我后面要用。
     must_preserve: ["录音", "英文"]
     must_not_add: ["不要虚构录音内容", "不要假设讲话人身份"]
+    must_not_question:      # 这些问题的答案用户已经给了，问了就是多余
+      - 录音内容在哪里
+      - 请上传音频
+      - 请粘贴转写文本
     expected_behavior: clarify
 
   - id: v30_translate_two_versions
@@ -667,6 +704,9 @@ samples:
       把这段话翻译成中文，分别给普通读者和专业人士两个版本。
     must_preserve: ["中文", "两个版本"]
     must_not_add: ["不要虚构原文", "不要假设原文语言"]
+    must_not_question:      # 这些问题的答案用户已经给了，问了就是多余
+      - 两个版本的原文分别是什么
+      - 请提供原文
     expected_behavior: clarify
 
   # ---- 创意（3）----
@@ -677,6 +717,7 @@ samples:
       帮我写个广告。
     must_preserve: ["广告", "写个广告"]
     must_not_add: ["不要虚构产品信息", "不要假设投放渠道"]
+    must_not_question: []
     expected_behavior: clarify
 
   - id: v30_creative_birthday_poem
@@ -686,6 +727,7 @@ samples:
       写一首诗送给朋友。
     must_preserve: ["诗", "朋友"]
     must_not_add: ["不要虚构朋友信息", "不要假设场合与风格"]
+    must_not_question: []
     expected_behavior: clarify
 
   - id: v30_creative_product_name
@@ -695,4 +737,5 @@ samples:
       给我们的产品起个名字。
     must_preserve: ["产品", "名字"]
     must_not_add: ["不要虚构产品功能", "不要假设目标市场"]
+    must_not_question: []
     expected_behavior: clarify

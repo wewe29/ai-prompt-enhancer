@@ -1,5 +1,5 @@
 {
-  "spec_version": "v040.1",
+  "spec_version": "v040.2",
   "title": "PromptCraft v0.4.0 验收门禁规范（机器可读）",
   "baseline_commit": "202a686",
   "branch": "release/v0.4.0",
@@ -9,7 +9,8 @@
   "notes": [
     "本文件只存事实（阈值/基线/噪声模型/状态）。required_n 与 required_runs 由 evaluation/gate_decidability.py 现场推导，不手写，避免与文档漂移。",
     "噪声模型只有两种：run_to_run（模型决策类，τ 来自实测运行间漂移）与 binomial（人工评审类，τ=0 且必须至少 2 轮独立评审）。",
-    "τ 不可跨门槛套用。41 个百分点是模型档位决策的运行间漂移，不是人工盲评的评审者间漂移。"
+    "τ 不可跨门槛套用。41 个百分点是模型档位决策的运行间漂移，不是人工盲评的评审者间漂移。",
+    "n_unit 是 n 的**权威单位**：questions=问题条数（G4/G5 的分母是问题，不是样本）、samples=样本条数（G6 的分母是标注过的样本）、runs=运行次数（G7 的分母是 360 次运行）。count_unit 只是『计数型门槛』这一分支的标记，它的字面值不表示 n 的单位 —— G7 的 count_unit=samples 但 n_unit=runs。"
   ],
   "noise_models": {
     "run_to_run": {
@@ -70,7 +71,8 @@
       "noise_model": "binomial",
       "min_runs": 2,
       "status": "active",
-      "source": "docs/PromptCraft-v0.4.0-效果验证报告.md §4.3：翻译场景 1/9 = 11%"
+      "n_unit": "questions",
+      "source": "docs/PromptCraft-v0.4.0-效果验证报告.md §4.3：翻译场景 1/9 = 11%（9 = 翻译 3 条 × 每条 3 个问题）"
     },
     {
       "id": "G5",
@@ -82,7 +84,9 @@
       "noise_model": "binomial",
       "min_runs": 2,
       "status": "active",
-      "source": "docs/PromptCraft-v0.4.0-效果验证报告.md §4.2：总体命中率 44/60 = 73.3%"
+      "n_unit": "questions",
+      "source": "docs/PromptCraft-v0.4.0-效果验证报告.md §4.2：总体命中率 44/60 = 73.3%（60 = severe 20 条 × 每条 3 个问题）",
+      "known_gap": "required_n=68，单位是**问题条数**。severe 档 20 条 × 3 问 = 60 个问题 < 68 ⇒ 现有样本集下不可达；需把 severe 样本扩到 ≥23 条。且 v2.5.0 的问题自检规则会减少转澄清条数，分母还会进一步下降 —— 必须先做可达性核算再开跑。"
     },
     {
       "id": "G6",
@@ -96,8 +100,10 @@
       "status": "active",
       "count_unit": "samples",
       "certify_rate_max": 0.05,
+      "n_unit": "samples",
       "source": "docs/PromptCraft-v0.4.0-iteration-spec.md §7 门槛 6：现状 2/20 条 0 命中",
-      "note": "这是计数不是比率。0 事件在 n 次试验下的 95% 率上界约为 3/n：n=20 时上界 15%，n≥60 时上界 ≤5% 才谈得上『0 命中』。"
+      "note": "这是计数不是比率。0 事件在 n 次试验下的 95% 率上界约为 3/n：n=20 时上界 15%，n≥60 时上界 ≤5% 才谈得上『0 命中』。",
+      "known_gap": "required_n=61（certify_rate_max=0.05 ⇒ 0 事件的 95% 率上界 ≤5%）**超过被测总体**：severe 样本只有 20 条。即便 20 条全部标注，n=20<61 ⇒ 在现有样本集下结构性不可达；按 SPEC §4.3 只强制标注 3 条翻译样本时 n=3，0 命中的 95% 上界约 63%。"
     },
     {
       "id": "G7",
@@ -111,6 +117,7 @@
       "status": "active",
       "count_unit": "samples",
       "certify_rate_max": 0.05,
+      "n_unit": "runs",
       "source": "docs/PromptCraft-v0.4.0-效果验证报告.md §3.2：360 次运行零漂移"
     }
   ],

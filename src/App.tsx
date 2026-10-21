@@ -18,7 +18,7 @@ import { HistoryView } from "./views/HistoryView";
 import { ProfileView } from "./views/ProfileView";
 import { SettingsView } from "./views/SettingsView";
 
-const SYSTEM_PROMPT_VERSION = "promptcraft-v2.2.0";
+const SYSTEM_PROMPT_VERSION = "promptcraft-v2.5.0";
 
 const defaultProvider: ProviderConfig = {
   baseUrl: "https://api.deepseek.com",

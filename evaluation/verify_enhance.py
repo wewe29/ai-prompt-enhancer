@@ -4,7 +4,7 @@
 流程：
   阶段 A  读 evaluation/samples_v30.yaml 的 60 条样本，调用 DeepSeek-V4.1-Flash
           （model id ``deepseek-flash``）执行增强，落盘原始结果。
-  阶段 B  对原始结果执行**确定性判定**（五维中可机械判定的部分），
+  阶段 B  对原始结果执行**确定性判定**（六维中可机械判定的部分），
           落盘可复算的指标。
 
 设计原则（对应 docs/PromptCraft-增强器评审规则-单模型版.md）：
@@ -158,6 +158,7 @@ def enhance_one(sample: dict[str, Any], api_key: str) -> dict[str, Any]:
                 "original": sample["original"],
                 "must_preserve": sample.get("must_preserve", []),
                 "must_not_add": sample.get("must_not_add", []),
+                "must_not_question": sample.get("must_not_question", []),
                 "expected_behavior": sample.get("expected_behavior", ""),
                 "error": "",
                 **result,
@@ -185,6 +186,7 @@ def enhance_one(sample: dict[str, Any], api_key: str) -> dict[str, Any]:
         "original": sample["original"],
         "must_preserve": sample.get("must_preserve", []),
         "must_not_add": sample.get("must_not_add", []),
+        "must_not_question": sample.get("must_not_question", []),
         "expected_behavior": sample.get("expected_behavior", ""),
         "error": last_error,
         "primary_prompt": "",
@@ -406,8 +408,73 @@ def judge_dimension_restraint(record: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def judge_dimension_redundant_question(record: dict[str, Any]) -> dict[str, Any]:
+    """维度 6：禁止提问已知信息。问题的答案已出现在原文/上下文里即为冗余提问。
+
+    归一化后子串匹配（复用 normalize_for_match）。
+    命中任一 must_not_question → 严重问题。
+    must_not_question 缺失/空 → 「无标注-不判定」，**不得记为通过**。
+
+    判定口径（写死，避免实现时自由发挥）：
+
+    | 情形 | verdict |
+    |---|---|
+    | must_not_question 缺失/为空 | 无标注-不判定 |
+    | 有标注 + 该样本没有提问 | 无提问 |
+    | 有标注 + 某个提问包含任一标注串 | 严重问题 |
+    | 有标注 + 有提问但无命中 | 通过 |
+
+    计数口径（供 v0.4.2 装配门槛 G6 用）：
+
+    * 分子 = 本维度判为「严重问题」的**样本**数（不是问题数）
+    * 分母 n = must_not_question 非空的**样本**数（有标注的样本数）
+    * 「无标注-不判定」既不进分子也不进分母，但**必须出现在输出里**
+      （否则未标注样本会混进分母，门禁会造出虚假绿灯）。
+
+    这是**保守的下限**：子串匹配只抓字面复现（「要翻译的原文是什么？」含
+    「原文是什么」✓），改写过的问法会漏报。门槛 6 是下限证据，
+    门槛 4/5 的人工盲评才是权威度量。
+    """
+    annotations = [
+        str(a).strip() for a in (record.get("must_not_question") or []) if str(a).strip()
+    ]
+    questions = [
+        str(q.get("text") or q.get("question") or "").strip()
+        for q in (record.get("questions") or [])
+    ]
+
+    if not annotations:
+        return {
+            "verdict": "无标注-不判定",
+            "hits": [],
+            "question_count": len(questions),
+        }
+
+    if not questions:
+        return {
+            "verdict": "无提问",
+            "hits": [],
+            "question_count": 0,
+        }
+
+    hits = []
+    for annotation in annotations:
+        needle = normalize_for_match(annotation)
+        if not needle:
+            continue
+        for question in questions:
+            if needle in normalize_for_match(question):
+                hits.append({"annotation": annotation, "question": question})
+
+    return {
+        "verdict": "严重问题" if hits else "通过",
+        "hits": hits,
+        "question_count": len(questions),
+    }
+
+
 def judge(record: dict[str, Any]) -> dict[str, Any]:
-    """对单条增强结果执行五维确定性判定。"""
+    """对单条增强结果执行六维确定性判定。"""
     if record.get("error"):
         return {"id": record["id"], "error": record["error"], "judged": False}
     return {
@@ -420,7 +487,8 @@ def judge(record: dict[str, Any]) -> dict[str, Any]:
         "overreach": judge_dimension_overreach(record),
         "bloat": judge_dimension_bloat(record),
         "restraint": judge_dimension_restraint(record),
-        "needs_human_review": True,  # 五个维度都存在自动判不了的部分
+        "redundant_question": judge_dimension_redundant_question(record),
+        "needs_human_review": True,  # 六个维度都存在自动判不了的部分
     }
 
 
@@ -490,6 +558,22 @@ def summarize(records: list[dict[str, Any]], judgements: list[dict[str, Any]]) -
                 "过度补全": count("restraint", "过度补全"),
                 "增强不足": count("restraint", "增强不足"),
                 "无法判断": count("restraint", "无法判断"),
+            },
+            "redundant_question": {
+                "通过": count("redundant_question", "通过"),
+                "严重问题": count("redundant_question", "严重问题"),
+                # 「无标注-不判定」**不得计入通过**（SPEC §4.3）：
+                # 未标注样本混进分母会让门禁造出虚假绿灯。
+                "无标注-不判定": count("redundant_question", "无标注-不判定"),
+                "无提问": count("redundant_question", "无提问"),
+                # 有标注样本数 = 门槛 G6 的分母 n。
+                # 口径见 judge_dimension_redundant_question 的 docstring。
+                "有标注样本数": sum(
+                    1
+                    for j in items
+                    if j.get("redundant_question", {}).get("verdict")
+                    in ("通过", "严重问题", "无提问")
+                ),
             },
         }
 

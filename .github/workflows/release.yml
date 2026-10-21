@@ -10,7 +10,12 @@ name: Release
 #
 # 触发：
 #   - 推送 v* tag（tag 必须在**包含本文件**的提交上，否则不会触发）
-#   - 手动 workflow_dispatch（分支选 release/v0.4.0，tag 参数填要发布的 tag）
+#   - 手动 workflow_dispatch（分支选 release/<当前版本分支>，tag 参数填要发布的 tag）
+#
+# 本工作流已参数化：发布说明按版本号取 release-assets/RELEASE_NOTES-<version>.md，
+# 产物名也带版本号 ⇒ 新版本不需要再改这个文件。
+# body_path 指向的文件不存在时必须失败（fail_on_unmatched_files）——
+# 静默发一个空说明比不发更坏。
 #
 # 纪律：发布前必须跑完三套回归。**发一个没跑过测试的构建是没有意义的。**
 
@@ -21,9 +26,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: '要发布的 tag（例如 v0.4.0）'
+        description: '要发布的 tag（例如 v0.4.1）。留空则用触发本次运行的 ref。'
         required: true
-        default: 'v0.4.0'
+        default: ''
       ref:
         description: '构建所用的 ref（默认该 tag 指向的提交）'
         required: false
@@ -124,8 +129,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.target.outputs.tag }}
-          name: PromptCraft ${{ steps.target.outputs.tag }} — 诚实性闭环：41 条「失败显示成成功」全部关掉（不含效果宣称）
-          body_path: release-assets/RELEASE_NOTES-v0.4.0.md
+          name: PromptCraft ${{ steps.target.outputs.tag }}
+          body_path: release-assets/RELEASE_NOTES-${{ steps.target.outputs.version }}.md
           fail_on_unmatched_files: true
           files: |
             release/PromptCraft-${{ steps.target.outputs.version }}-windows-x64-portable.zip
