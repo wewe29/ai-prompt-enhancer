@@ -3,8 +3,8 @@ use crate::security;
 use chrono::{Duration, Utc};
 use keyring::Entry;
 use rusqlite::{Connection, params};
-use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use std::{
     fs,
     io::{Read, Write},
@@ -369,7 +369,8 @@ impl Storage {
     pub fn save_app_settings(&self, settings: &AppSettings) -> Result<(), String> {
         // 既有设置读不出来时拒绝覆盖（同 A10）：损坏的行不能被默认值悄悄顶掉。
         self.read_settings_value::<AppSettings>("ui.local")?;
-        let json = serde_json::to_string(settings).map_err(|error| error.to_string())?;        let connection = self
+        let json = serde_json::to_string(settings).map_err(|error| error.to_string())?;
+        let connection = self
             .connection
             .lock()
             .map_err(|_| "数据库锁已损坏".to_string())?;
@@ -416,9 +417,8 @@ impl Storage {
         // 此前 `if let Ok(entry) = Entry::new(...)` 把"条目创建失败"整段吞掉，
         // 函数照样返回 Ok ⇒ UI 报"已清空"，而 API Key 仍留在 Windows 凭据管理器里。
         // 错误文案必须如实说明"本地数据已清空"但"凭据未删"。
-        remove_credential().map_err(|error| {
-            format!("本地数据已清空，但{error}；请打开凭据管理器手动确认。")
-        })
+        remove_credential()
+            .map_err(|error| format!("本地数据已清空，但{error}；请打开凭据管理器手动确认。"))
     }
 
     pub fn export_data(&self, path: &Path) -> Result<usize, String> {
@@ -928,10 +928,7 @@ mod tests {
             ],
         );
         let report = storage.import_data(&path).unwrap();
-        assert!(
-            report.prices_kept,
-            "包里的价格与本机不同，必须标记为未采用"
-        );
+        assert!(report.prices_kept, "包里的价格与本机不同，必须标记为未采用");
 
         let stored = storage.provider_config().unwrap();
         assert_eq!(stored.input_price, 0.003, "导入包不得改写输入价格");

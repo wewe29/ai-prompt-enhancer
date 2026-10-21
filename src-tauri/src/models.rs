@@ -225,10 +225,18 @@ pub struct UsageRecord {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum BackendEvent {
-    Delta { data: String },
-    Status { data: String },
-    Result { result: EnhancementResult },
-    Usage { usage: UsageRecord },
+    Delta {
+        data: String,
+    },
+    Status {
+        data: String,
+    },
+    Result {
+        result: EnhancementResult,
+    },
+    Usage {
+        usage: UsageRecord,
+    },
     /// 事件通道上的失败。
     ///
     /// B5：此前 Rust 侧没有这个变体，而 TS 侧声明了 `"error"`，
@@ -237,7 +245,10 @@ pub enum BackendEvent {
     /// 现在这个变体存在，而且 provider.rs 的失败路径**真的**会发它。
     /// 命令的 Err 返回仍然是权威失败通道；这个事件让前端在流式中途
     /// 就能知道"这次增强失败了"，而不是只看到一个迟到的命令错误。
-    Error { code: String, message: String },
+    Error {
+        code: String,
+        message: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

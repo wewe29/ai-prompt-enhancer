@@ -201,7 +201,9 @@ impl Drop for ProbeSandbox {
                 };
                 match entry.delete_credential() {
                     Ok(()) | Err(keyring::Error::NoEntry) => break,
-                    Err(_) => std::thread::sleep(std::time::Duration::from_millis(25 * (attempt + 1))),
+                    Err(_) => {
+                        std::thread::sleep(std::time::Duration::from_millis(25 * (attempt + 1)))
+                    }
                 }
             }
         }

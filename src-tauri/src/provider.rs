@@ -1233,7 +1233,10 @@ mod tests {
             "部分交付路径不得给出任何档位判断（曾硬编码 none）"
         );
         assert_eq!(
-            result.failure_reason.as_ref().map(|failure| failure.code.as_str()),
+            result
+                .failure_reason
+                .as_ref()
+                .map(|failure| failure.code.as_str()),
             Some("STRUCTURE_PARTIAL")
         );
     }
@@ -1717,7 +1720,8 @@ mod tests {
             "完整结构成功率必须为 91/100（5 个用例缺必填的 enhancement_level，按新契约判为部分交付），实际 {complete_count}"
         );
         assert_eq!(
-            partial_count + fallback_count, 9,
+            partial_count + fallback_count,
+            9,
             "非完整交付必须恰好是 5 个缺 enhancement_level + 1 个 XXX 占位符 + 3 个不可解析，实际 {}",
             partial_count + fallback_count
         );
