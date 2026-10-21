@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -156,19 +157,26 @@ def stamped_name(base: str, identity: dict[str, Any], *, timestamp: str | None =
 def run_dir(base_dir: Path | str, identity: dict[str, Any]) -> Path:
     """按运行身份分配一个独立的产物目录。
 
-    目录名带 UTC 时间戳（**微秒精度**）+ 身份标签 ⇒ 每次运行一个目录，
+    目录名带 UTC 时间戳 + **随机后缀** + 身份标签 ⇒ 每次运行一个目录，
     **绝不互相覆盖**。
 
-    微秒精度不是讲究：秒级时间戳下，同一秒内启动的两次运行会拿到
-    同一个目录名，"绝不覆盖"就成了一句空话。
+    **随机后缀不是可有可无的**：此前只用「微秒时间戳」做区分，实测在 GitHub 的
+    windows-latest runner 上，两次连续调用会拿到**完全相同**的时间戳
+    （Windows 的系统时钟分辨率比微秒粗，两次调用落在同一个 tick 内），
+    于是两个运行目录指向同一路径 ⇒ 后一次把前一次的产物覆盖掉。
+    这个缺陷在本机一直绿、只在 CI 上红 —— 正是「按行号直接改会改错地方」
+    那条教训的翻版：**本机绿 ≠ 正确**。
+
+    随机后缀保证唯一性**不依赖时钟精度**；时间戳只给人看（可排序、可读）。
     """
     fields = identity.get("fields", {})
     model = str(fields.get("model", "unknown")).replace("/", "-")
     temperature = fields.get("temperature", "?")
     repeats = fields.get("repeats", 1)
     tag = identity.get("tag", "0000000000")
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
-    return Path(base_dir) / f"{stamp}__m-{model}__t{temperature}__r{repeats}__{tag}"
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    unique = uuid.uuid4().hex[:8]
+    return Path(base_dir) / f"{stamp}-{unique}__m-{model}__t{temperature}__r{repeats}__{tag}"
 
 
 def assert_same_identity(

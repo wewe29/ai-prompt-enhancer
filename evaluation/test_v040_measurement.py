@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -66,10 +67,32 @@ def test_stamped_name_carries_identity():
     assert name.endswith(".json")
 
 
-def test_run_dir_is_not_shared_between_runs():
+def test_run_dir_is_not_shared_between_runs(monkeypatch):
+    """两次运行**绝不能**拿到同一个产物目录。
+
+    **为什么必须冻结时钟来测**：这条断言原先只比较两次调用的结果，
+    在本机一直绿、却在 GitHub 的 windows-latest runner 上红 ——
+    因为目录名的唯一性当时**只靠时间戳**，而 Windows 的系统时钟分辨率
+    比微秒粗，两次连续调用可能落在同一个 tick 内。
+
+    冻结时钟后，这条用例在任何机器上都能确定性地复现那个缺陷：
+    时钟不动 ⇒ 若唯一性只依赖时钟，两个目录名必然相同 ⇒ 断言立刻红。
+
+    ⇒ 教训：**唯一性不能建立在时钟精度上**，测试也不能建立在时钟精度上。
+    """
+    class _FrozenDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):  # noqa: N802 - 覆盖标准库 API
+            return cls(2026, 10, 20, 12, 0, 0, tzinfo=tz)
+
+    monkeypatch.setattr(run_identity, "datetime", _FrozenDatetime)
+
     a = run_identity.run_dir(Path("results"), _identity())
     b = run_identity.run_dir(Path("results"), _identity())
-    assert a != b  # 时间戳隔离 ⇒ 两次运行不共用目录
+    assert a != b, "两次运行拿到了同一个产物目录（唯一性不得依赖时钟精度）"
+    # 目录名仍应带身份标签，便于人工核对产物来源
+    assert a.name.endswith("__" + _identity()["tag"])
+    assert a.name.startswith("20261020-120000-")
 
 
 def test_assert_same_identity_rejects_mismatch():
