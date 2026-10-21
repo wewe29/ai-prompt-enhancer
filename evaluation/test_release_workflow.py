@@ -90,6 +90,18 @@ def test_release_notes_carry_no_effect_claims():
         assert banned not in text, f"发布说明出现了不该出现的效果宣称：{banned}"
 
 
+def test_shipped_readme_does_not_carry_a_stale_version():
+    """随包 README 不得写死版本号。
+
+    它是**静态文件**、每版都原样上传 ⇒ 写死的版本必然过期
+    （从 v0.3.x 到 v0.4.1，它一直随包写着「0.1.0」）。
+    版本由 zip 文件名与 exe 的版本信息承载。
+    """
+    text = (RELEASE_ASSETS / "README.txt").read_text(encoding="utf-8")
+    found = re.findall(r"\b\d+\.\d+\.\d+\b", text)
+    assert not found, f"随包 README 写死了版本号 {found}（静态文件每版都会过期）"
+
+
 def test_artifact_glob_matches_the_built_zip_name():
     """`files:` 里的产物名必须与 build-portable.ps1 实际生成的 zip 名一致。"""
     text = _workflow_text()

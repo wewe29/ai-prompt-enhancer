@@ -1,4 +1,7 @@
-PromptCraft 0.1.0 - Windows 10/11 64 位便携版
+PromptCraft - Windows 10/11 64 位便携版
+
+（版本号请看压缩包文件名与程序属性中的版本信息；本说明是静态文件，
+不写死版本号，以免随包发出去时总是过时的。）
 
 使用方法：
 1. 解压完整 ZIP，双击 PromptCraft.exe。
