@@ -28,8 +28,10 @@
 `count_unit` 只是「计数型门槛」这一分支的标记、其字面值不表示 n 的单位。
 
 **理由**：把口径钉进机器可读文件，而不是留在人脑或某份报告里。
-`evaluation/test_gate_decidability.py` 用 4 条断言把它钉住
-（单位存在、取值合法、逐条等于预期值、计数型门槛的 n 单位不可能是 questions）。
+`evaluation/test_gate_decidability.py` 用 5 条断言把它钉住
+（3 条关于 `n_unit`：单位存在且取值合法 / 逐条等于预期值 /
+计数型门槛的 n 单位不可能是 questions；2 条关于 `known_gap`：
+非空 / 与推导出的 required_n 一致）。
 
 **为什么不用 `count_unit` 表达**：`count_unit` 的字面值是 `"samples"`，
 但 G7 的 n 是 360 次**运行**，不是样本。沿用它会把 G7 的口径说错。

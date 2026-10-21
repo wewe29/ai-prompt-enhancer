@@ -49,24 +49,26 @@ Rust 与 Python 由 `evaluation/test_enhancer.py` 逐字断言；
 
 **发布工作流参数化**
 
-`body_path` 改为按版本号取 `release-assets/RELEASE_NOTES-<version>.md`，
+`body_path` 改为按 **tag** 取 `release-assets/RELEASE_NOTES-<tag>.md`
+（`v0.4.1` ⇒ `RELEASE_NOTES-v0.4.1.md`，文件名约定带 v），
 发布标题不再写死某一版文案 ⇒ 新版本不需要再改这个工作流文件。
 `body_path` 指向的文件不存在时必须失败，不允许静默发一个空说明。
 
-**两个由 CI 抓出的问题（本地全绿，只有 CI 红）**
+**实施与 CI 过程中抓出的三个问题**
 
-- **数据集真值必须排在模型输出之后**：`verify_enhance.py` 原先把模型输出
-  `**result` 展开在最后，而 `parse_result` **不过滤未知字段** ⇒ 模型有可能
-  吐出一个同名的 `must_not_question` / `must_preserve` / `original` 并覆盖真值。
-  那等于「拿模型自己声称的判据去判模型自己」，判定照样出数，只是数是模型写的。
-  现抽出 `build_record()`，真值一律排在 `**result` 之后，并配**敌意模型输出**
-  的回归测试。
-- **补装 `@types/node`**：跨源断言要在前端测试里读 `prompts.rs`，
-  用了 `node:fs` 等 Node API，而项目从未装过 `@types/node` ⇒ `tsc` 报 TS2307，
-  `npm run build` 失败。**本机 `npm test` 全绿**（vitest 不做类型检查），
-  **CI 与发布工作流双双红** ⇒ 这条已补进发布前必跑清单。
-- **随包 README 写死了「0.1.0」**：它是静态文件、每版原样上传，
-  从 v0.3.x 到现在一直随包发着一个过期三个大版本的版本号。现去掉版本号
+- **数据集真值必须排在模型输出之后**（实施时发现）：`verify_enhance.py` 原先把
+  模型输出 `**result` 展开在最后，而 `parse_result` **不过滤未知字段** ⇒
+  模型有可能吐出一个同名的 `must_not_question` / `must_preserve` / `original`
+  并覆盖真值。那等于「拿模型自己声称的判据去判模型自己」，判定照样出数，
+  只是数是模型写的。现抽出 `build_record()`，真值一律排在 `**result` 之后，
+  并配**敌意模型输出**的回归测试。
+- **补装 `@types/node`**（CI 抓出，本机全绿）：跨源断言要在前端测试里读
+  `prompts.rs`，用了 `node:fs` 等 Node API，而项目从未装过 `@types/node` ⇒
+  `tsc` 报 TS2307，`npm run build` 失败。**本机 `npm test` 全绿**
+  （vitest 不做类型检查），**CI 与发布工作流双双红**
+  ⇒ 这条已补进发布前必跑清单。
+- **随包 README 写死了「0.1.0」**（最终核查时发现）：它是静态文件、每版原样
+  上传，从 v0.3.x 到现在一直随包发着一个过期三个大版本的版本号。现去掉版本号
   （版本由 zip 文件名与 exe 版本信息承载），并加测试钉住。
 
 **发布管线本身也要有门禁**：新增 `evaluation/test_release_workflow.py`
